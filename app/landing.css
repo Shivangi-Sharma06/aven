@@ -370,6 +370,92 @@ a {
   color: #000;
 }
 
+.loop-panel[data-theme="light"] {
+  border-color: rgba(0, 0, 0, 0.16);
+  background: #fff;
+  color: #000;
+}
+
+.loop-panel[data-theme="dark"] {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: #000;
+  color: #fff;
+}
+
+.loop-panel[data-theme="dark"] > .aven-section {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+    #000;
+  color: #fff;
+}
+
+.loop-panel[data-theme="dark"] .section-kicker,
+.loop-panel[data-theme="dark"] .section-copy,
+.loop-panel[data-theme="dark"] .step-panel span,
+.loop-panel[data-theme="dark"] .attestation-card > span,
+.loop-panel[data-theme="dark"] .protocol-stack span,
+.loop-panel[data-theme="dark"] .data-list dt,
+.loop-panel[data-theme="dark"] small {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.loop-panel[data-theme="dark"] .step-panel,
+.loop-panel[data-theme="dark"] .attestation-card,
+.loop-panel[data-theme="dark"] .protocol-stack article,
+.loop-panel[data-theme="dark"] .agent-rails > div {
+  border-color: rgba(255, 255, 255, 0.36);
+  background: #000;
+  color: #fff;
+}
+
+.loop-panel[data-theme="dark"] .step-panel p,
+.loop-panel[data-theme="dark"] .protocol-stack p {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.loop-panel[data-theme="dark"] .data-list div,
+.loop-panel[data-theme="dark"] .proof-stack strong,
+.loop-panel[data-theme="dark"] .protocol-stack code,
+.loop-panel[data-theme="dark"] .agent-rails strong,
+.loop-panel[data-theme="dark"] .agent-rails span {
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
+.loop-panel[data-theme="dark"] .stream-line div {
+  background: #fff;
+}
+
+.loop-panel[data-theme="dark"] .stream-line div::before,
+.loop-panel[data-theme="dark"] .stream-line div::after {
+  border-color: #fff;
+}
+
+.loop-panel[data-theme="dark"] .stream-line div::before {
+  background: #000;
+}
+
+.loop-panel[data-theme="dark"] .stream-line div::after,
+.loop-panel[data-theme="dark"] .stream-line i {
+  background: #fff;
+}
+
+.loop-panel[data-theme="dark"] .attestation-path path {
+  stroke: rgba(255, 255, 255, 0.72);
+}
+
+.loop-panel[data-theme="dark"] button {
+  border-color: #fff;
+  background: #000;
+  color: #fff;
+}
+
+.loop-panel[data-theme="dark"] button:hover {
+  border-color: #fff;
+  background: #fff;
+  color: #000;
+}
+
 .loop-panel > .stage,
 .loop-panel > .aven-section {
   width: 100%;

@@ -41,8 +41,9 @@ export default function InfinitePageLoop({ enabled, panels }: InfinitePageLoopPr
           })
         );
 
-        let maxScroll = 0;
         let wrapping = false;
+        let duplicateStart = 0;
+        let resizeFrame = 0;
         const smoother = ScrollSmoother.get();
 
         const pageTrigger = ScrollTrigger.create({
@@ -53,16 +54,11 @@ export default function InfinitePageLoop({ enabled, panels }: InfinitePageLoopPr
           snap: {
             snapTo(value) {
               const increment = 1 / (panelElements.length - 1);
-              const snapped = gsap.utils.snap(increment, value);
-
-              if (maxScroll <= 2) return snapped;
-              if (snapped <= 0) return 2 / maxScroll;
-              if (snapped >= 1) return (maxScroll - 2) / maxScroll;
-              return snapped;
+              return gsap.utils.snap(increment, value);
             },
-            duration: { min: 0.18, max: 0.45 },
+            duration: 0.35,
             delay: 0.08,
-            ease: "power1.inOut",
+            ease: "power2.out",
           },
         });
 
@@ -73,42 +69,53 @@ export default function InfinitePageLoop({ enabled, panels }: InfinitePageLoopPr
           ScrollTrigger.update();
         };
 
-        const updateMaxScroll = () => {
-          maxScroll = Math.max(0, ScrollTrigger.maxScroll(window) - 1);
+        const calculateBounds = () => {
+          const duplicateTrigger = pinTriggers[pinTriggers.length - 1];
+          duplicateStart = duplicateTrigger.start;
         };
 
-        let previousScroll = getScroll();
-
-        const onScroll = () => {
-          if (wrapping || maxScroll <= 2) return;
-
-          const scroll = getScroll();
-          const direction = scroll - previousScroll;
-          previousScroll = scroll;
-
-          let destination: number | null = null;
-          if (direction > 0 && scroll >= maxScroll) destination = 2;
-          if (direction < 0 && scroll <= 0) destination = maxScroll - 2;
-          if (destination === null) return;
-
+        const wrapTo = (destination: number) => {
+          if (wrapping) return;
           wrapping = true;
-          previousScroll = destination;
           setScroll(destination);
           requestAnimationFrame(() => {
             wrapping = false;
           });
         };
 
-        updateMaxScroll();
-        window.addEventListener("resize", updateMaxScroll);
-        window.addEventListener("scroll", onScroll, { passive: true });
+        const onWheel = (event: WheelEvent) => {
+          if (wrapping || duplicateStart <= 2) return;
+          const scroll = getScroll();
 
-        const refreshFrame = requestAnimationFrame(() => ScrollTrigger.refresh());
+          if (event.deltaY > 0 && scroll >= duplicateStart - 1) {
+            wrapTo(2);
+          } else if (event.deltaY < 0 && scroll <= 1) {
+            wrapTo(duplicateStart - 2);
+          }
+        };
+
+        const onResize = () => {
+          cancelAnimationFrame(resizeFrame);
+          resizeFrame = requestAnimationFrame(() => {
+            ScrollTrigger.refresh();
+            calculateBounds();
+          });
+        };
+
+        calculateBounds();
+        window.addEventListener("resize", onResize);
+        window.addEventListener("wheel", onWheel, { passive: true });
+
+        const refreshFrame = requestAnimationFrame(() => {
+          ScrollTrigger.refresh();
+          calculateBounds();
+        });
 
         return () => {
           cancelAnimationFrame(refreshFrame);
-          window.removeEventListener("resize", updateMaxScroll);
-          window.removeEventListener("scroll", onScroll);
+          cancelAnimationFrame(resizeFrame);
+          window.removeEventListener("resize", onResize);
+          window.removeEventListener("wheel", onWheel);
           pageTrigger.kill();
           pinTriggers.forEach((trigger) => trigger.kill());
         };
@@ -121,11 +128,12 @@ export default function InfinitePageLoop({ enabled, panels }: InfinitePageLoopPr
 
   return (
     <main ref={rootRef} className="infinite-page-loop">
-      {panels.map((panel) => (
+      {panels.map((panel, index) => (
         <section
           className={`loop-panel loop-panel--${panel.id}${panel.dense ? " loop-panel--dense" : ""}`}
           data-loop-panel
           data-panel-id={panel.id}
+          data-theme={index % 2 === 0 ? "light" : "dark"}
           key={panel.id}
         >
           {panel.content}
@@ -136,6 +144,7 @@ export default function InfinitePageLoop({ enabled, panels }: InfinitePageLoopPr
         className="loop-panel loop-panel--hero loop-panel--duplicate"
         data-loop-panel
         data-duplicate="true"
+        data-theme="light"
         aria-hidden="true"
       >
         <div className="loop-hero-duplicate">

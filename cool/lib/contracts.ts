@@ -13,7 +13,7 @@ export const NETWORK_PASSPHRASE = "Test SDF Network ; September 2015";
 /** USDC on Stellar testnet */
 export const USDC_ASSET_ID = "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA";
 /** Native XLM SAC on testnet */
-export const XLM_ASSET_ID = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCN8";
+export const XLM_ASSET_ID = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC";
 
 /** 7 decimal fixed-point, same as Stellar stroops */
 export function toContractAmount(human: number): bigint {

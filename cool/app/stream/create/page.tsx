@@ -30,10 +30,11 @@ export default function CreateStreamPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<{ streamId: string; txHash: string } | null>(null);
 
-  // Auto-compute rate from total + duration
+  // Auto-compute rate from total + duration (rounded down to 7 decimal places for contract safety)
+  const durationLedgers = durationDays ? Math.round(parseFloat(durationDays) * LEDGERS_PER_DAY) : 0;
   const computedRate =
-    totalAmount && durationDays
-      ? (parseFloat(totalAmount) / (parseFloat(durationDays) * 86400)).toFixed(8)
+    totalAmount && durationLedgers > 0
+      ? (Math.floor((parseFloat(totalAmount) * 10000000) / (durationLedgers * SECONDS_PER_LEDGER)) / 10000000).toFixed(7)
       : "";
 
   async function handleSubmit(e: React.FormEvent) {
@@ -43,6 +44,7 @@ export default function CreateStreamPage() {
     const total = parseFloat(totalAmount);
     const days = parseFloat(durationDays);
     const rate = parseFloat(ratePerSecond || computedRate);
+
 
     if (!recipient.startsWith("G") || recipient.length < 56) {
       setError("Recipient must be a valid Stellar address starting with G");

@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  outputFileTracingRoot: path.resolve(__dirname),
   webpack: (config) => {
     // Handle Buffer polyfill for Stellar SDK in the browser
     config.resolve.fallback = {
@@ -15,3 +17,4 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
+

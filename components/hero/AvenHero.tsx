@@ -3,7 +3,7 @@ import { useRouter } from 'next/navigation'
 import AvenNetwork from './AvenNetwork'
 import AvenMorphLogo from './AvenMorphLogo'
 import LiveStreamCounter from './LiveStreamCounter'
-import { gsap, MorphSVGPlugin, ScrollSmoother, useGSAP } from '../../lib/gsap'
+import { gsap, ScrollSmoother, useGSAP } from '../../lib/gsap'
 
 
 function scrollToTarget(id: string) {
@@ -50,15 +50,6 @@ export default function AvenHero() {
       const targetN = logo.querySelector('#aven-letter-n') as any
 
       if (!shapeA || !shapeV || !shapeE || !shapeN || !targetA || !targetV || !targetE || !targetN) return
-
-      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-        gsap.set([network, nav, items], { autoAlpha: 1, y: 0 })
-        gsap.set(shapeA, { morphSVG: { shape: targetA } })
-        gsap.set(shapeV, { morphSVG: { shape: targetV } })
-        gsap.set(shapeE, { morphSVG: { shape: targetE } })
-        gsap.set(shapeN, { morphSVG: { shape: targetN } })
-        return undefined
-      }
 
       // Intro animation for page entry (run once)
       const tlIntro = gsap.timeline({ defaults: { ease: 'power3.out' } })

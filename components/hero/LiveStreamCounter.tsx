@@ -1,12 +1,9 @@
 import { useRef } from 'react'
 import { gsap, useGSAP } from '../../lib/gsap'
-import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
 
 
 export default function LiveStreamCounter({ compact = false }: { compact?: boolean }) {
   const amountRef = useRef<HTMLElement>(null)
-
-  const prefersReducedMotion = usePrefersReducedMotion()
 
   useGSAP(
     () => {
@@ -21,7 +18,6 @@ export default function LiveStreamCounter({ compact = false }: { compact?: boole
       }
 
       render()
-      if (prefersReducedMotion) return undefined
 
       const tween = gsap.to(value, {
         amount: value.amount + 0.002314 * 120,
@@ -33,7 +29,7 @@ export default function LiveStreamCounter({ compact = false }: { compact?: boole
 
       return () => tween.kill()
     },
-    { dependencies: [prefersReducedMotion] }
+    { scope: amountRef }
   )
 
   return (

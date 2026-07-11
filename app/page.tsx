@@ -1,11 +1,12 @@
 "use client";
 
-import { useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import './landing.css';
-import { gsap, ScrollSmoother, ScrollTrigger, useGSAP } from '../lib/gsap';
+import { gsap, useGSAP } from '../lib/gsap';
 
 import AvenNavigation from '../components/navigation/AvenNavigation';
+import SmoothScroll from '../components/SmoothScroll';
 import AvenHero from '../components/hero/AvenHero';
 import HowItWorks from '../components/sections/HowItWorks';
 import LiveStreamDemo from '../components/sections/LiveStreamDemo';
@@ -19,18 +20,12 @@ import AvenFooter from '../components/sections/AvenFooter';
 
 export default function LandingPage() {
   const appRef = useRef<HTMLDivElement>(null);
-  const smootherRef = useRef<any>(null);
+  const [smoothScrollReady, setSmoothScrollReady] = useState(false);
+  const handleSmoothScrollReady = useCallback(() => setSmoothScrollReady(true), []);
 
   useGSAP(
     () => {
-      ScrollSmoother.get()?.kill();
-
-      const smoother = ScrollSmoother.create({
-        smooth: 1,
-        effects: false,
-      });
-
-      smootherRef.current = smoother;
+      if (!smoothScrollReady) return;
 
       gsap.utils.toArray<HTMLElement>('.aven-section').forEach((section) => {
         const sectionHeader = section.querySelector('.section-kicker');
@@ -71,37 +66,27 @@ export default function LandingPage() {
         );
       });
 
-      ScrollTrigger.refresh();
-
-      return () => {
-        smoother.kill();
-        if (smootherRef.current === smoother) {
-          smootherRef.current = null;
-        }
-      };
     },
-    { scope: appRef }
+    { scope: appRef, dependencies: [smoothScrollReady], revertOnUpdate: true }
   );
 
   return (
     <div ref={appRef} className="app">
       <AvenNavigation />
-      <div id="smooth-wrapper">
-        <div id="smooth-content">
-          <main>
-            <AvenHero />
-            <HowItWorks />
-            <LiveStreamDemo />
-            <WorkAttestations />
-            <Reputation />
-            <Protocol />
-            <Developers />
-            <AIAgents />
-            <FinalCTA />
-          </main>
-          <AvenFooter />
-        </div>
-      </div>
+      <SmoothScroll onReady={handleSmoothScrollReady}>
+        <main>
+          <AvenHero />
+          <HowItWorks />
+          <LiveStreamDemo />
+          <WorkAttestations />
+          <Reputation />
+          <Protocol />
+          <Developers />
+          <AIAgents />
+          <FinalCTA />
+        </main>
+        <AvenFooter />
+      </SmoothScroll>
     </div>
   );
 }

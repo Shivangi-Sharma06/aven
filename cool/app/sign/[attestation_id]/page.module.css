@@ -1,0 +1,77 @@
+.card {
+  max-width: 600px;
+}
+
+.top,
+.detail > div,
+.signatures {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.top {
+  flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+
+.detail {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 0;
+}
+
+.detail span:first-child {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.card h1 {
+  margin: 24px 0 10px;
+  font-family: var(--font-space), sans-serif;
+  font-size: 24px;
+}
+
+.payment {
+  display: inline-flex;
+  margin: 10px 0 20px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-elevated);
+  font-family: var(--font-mono), monospace;
+  padding: 10px 12px;
+}
+
+.signatures {
+  align-items: flex-start;
+  flex-direction: column;
+  border-top: 1px solid var(--border);
+  margin-bottom: 20px;
+  padding-top: 18px;
+}
+
+.signatures span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--success);
+}
+
+.pending {
+  color: var(--warning) !important;
+}
+
+.good {
+  color: var(--success);
+}
+
+@media (max-width: 767px) {
+  .detail > div {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

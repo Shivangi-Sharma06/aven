@@ -1,0 +1,117 @@
+.top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.top h1 {
+  margin: 8px 0 0;
+  font-family: var(--font-space), sans-serif;
+  font-size: 40px;
+  letter-spacing: 0;
+}
+
+.summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  margin-bottom: 28px;
+}
+
+.summary div {
+  display: grid;
+  gap: 6px;
+  border-top: 2px solid #3a3a6a;
+  border-left: 2px solid #3a3a6a;
+  border-right: 2px solid #050510;
+  border-bottom: 2px solid #050510;
+  border-radius: 0;
+  background: #0f0f1e;
+  box-shadow: var(--shadow-md);
+  padding: 20px;
+  transition: transform 220ms ease, box-shadow 220ms ease;
+}
+
+.summary div:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
+
+.summary span {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.summary strong {
+  font-family: var(--font-mono), monospace;
+  font-size: 28px;
+  letter-spacing: 0;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  width: fit-content;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0;
+  background: #050510;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 20px;
+  padding: 5px;
+}
+
+.tabs button {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-weight: 700;
+  padding: 10px 14px;
+  transition: background 180ms ease, color 180ms ease, box-shadow 180ms ease;
+}
+
+.tabs .active {
+  background: var(--surface-elevated);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.activeMono {
+  color: var(--stream-active);
+  font-family: var(--font-mono), monospace;
+}
+
+.empty {
+  display: grid;
+  place-items: center;
+  gap: 12px;
+  min-height: 260px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0;
+  background: rgba(13, 16, 24, 0.9);
+  box-shadow: var(--shadow-md);
+}
+
+.empty h3 {
+  margin: 0;
+  font-family: var(--font-space), sans-serif;
+}
+
+@media (max-width: 767px) {
+  .top {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .summary {
+    grid-template-columns: 1fr;
+  }
+}

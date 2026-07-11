@@ -1,0 +1,39 @@
+.wrap {
+  max-width: 580px;
+}
+
+.explainer {
+  margin-bottom: 22px;
+}
+
+.explainer h1,
+.success h2 {
+  margin: 8px 0 14px;
+  font-family: var(--font-space), sans-serif;
+  font-size: 40px;
+  letter-spacing: 0;
+}
+
+.explainer p {
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.form,
+.success {
+  display: grid;
+  gap: 20px;
+}
+
+.verified {
+  display: inline-flex;
+  width: fit-content;
+  border-radius: 0;
+  background: var(--accent-soft);
+  color: var(--stream-completed);
+  font-family: var(--font-space), sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 7px 10px;
+}

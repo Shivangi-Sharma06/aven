@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mission Board</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=IM+Fell+English:ital@0;1&display=swap"
+        rel="stylesheet">
+    <style>
+        *,
+        *::before,
+        *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            background: #e8e8e8;
+            min-height: 100vh;
+            font-family: 'IM Fell English', serif;
+            color: #000;
+            overflow-x: hidden;
+        }
+
+        /* HEADER */
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: #e8e8e8;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+            padding: 1.2rem 3rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        header h1 {
+            font-family: 'Cinzel', serif;
+            font-size: 1.05rem;
+            font-weight: 700;
+            letter-spacing: 0.35em;
+            color: #000;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            font-family: 'Cinzel', serif;
+            font-size: 0.6rem;
+            letter-spacing: 0.2em;
+            color: rgba(0, 0, 0, 0.35);
+        }
+
+        .blink-dot {
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: #000;
+            animation: blink 2s ease-in-out infinite;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: .15
+            }
+
+            50% {
+                opacity: 1
+            }
+        }
+
+        /* CANVAS */
+        .canvas {
+            position: relative;
+            padding: 4rem 2rem 8rem;
+            min-height: calc(100vh - 61px);
+        }
+
+        svg.lines {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* GRID */
+        .grid {
+            position: relative;
+            z-index: 2;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0 4rem;
+            max-width: 960px;
+            margin: 0 auto;
+            align-items: start;
+        }
+
+        .col {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .col-title {
+            font-family: 'Cinzel', serif;
+            font-size: 0.58rem;
+            letter-spacing: 0.35em;
+            color: rgba(0, 0, 0, 0.3);
+            text-transform: uppercase;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        /* NODE — white fill, black bracket corners */
+        .node {
+            position: relative;
+            width: 100%;
+            max-width: 230px;
+            background: #e8e8e8;
+            padding: 0.65rem 1rem;
+            cursor: pointer;
+            animation: fadein 0.5s ease backwards;
+            transition: box-shadow 0.2s ease, transform 0.2s ease;
+        }
+
+        /* Black bracket corners */
+        .node .c {
+            position: absolute;
+            width: 9px;
+            height: 9px;
+        }
+
+        .node .c.tl {
+            top: -1px;
+            left: -1px;
+            border-top: 2px solid #000;
+            border-left: 2px solid #000;
+        }
+
+        .node .c.tr {
+            top: -1px;
+            right: -1px;
+            border-top: 2px solid #000;
+            border-right: 2px solid #000;
+        }
+
+        .node .c.bl {
+            bottom: -1px;
+            left: -1px;
+            border-bottom: 2px solid #000;
+            border-left: 2px solid #000;
+        }
+
+        .node .c.br {
+            bottom: -1px;
+            right: -1px;
+            border-bottom: 2px solid #000;
+            border-right: 2px solid #000;
+        }
+
+        .node:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 24px rgba(0, 0, 0, 0.1);
+        }
+
+        .node-label {
+            font-family: 'IM Fell English', serif;
+            font-size: 0.82rem;
+            color: #000;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .node-sub {
+            font-family: 'Cinzel', serif;
+            font-size: 0.55rem;
+            color: rgba(0, 0, 0, 0.38);
+            letter-spacing: 0.12em;
+            margin-top: 0.15rem;
+        }
+
+        .node .chev {
+            position: absolute;
+            right: 0.7rem;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.65rem;
+            color: rgba(0, 0, 0, 0.25);
+            transition: color 0.15s, transform 0.15s;
+        }
+
+        .node:hover .chev {
+            color: rgba(0, 0, 0, 0.6);
+            transform: translateY(-50%) translateX(2px);
+        }
+
+        .gap {
+            height: 2.2rem;
+        }
+
+        @keyframes fadein {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .col:nth-child(1) .node {
+            animation-delay: calc(var(--i, 0)*80ms);
+        }
+
+        .col:nth-child(2) .node {
+            animation-delay: calc(120ms + var(--i, 0)*80ms);
+        }
+
+        .col:nth-child(3) .node {
+            animation-delay: calc(240ms + var(--i, 0)*80ms);
+        }
+
+        /* INFO PANEL */
+        .info-panel {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 200;
+            background: #000;
+            color: #fff;
+            padding: 1rem 3rem;
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .info-panel.show {
+            transform: translateY(0);
+        }
+
+        .info-panel .iname {
+            font-family: 'Cinzel', serif;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.15em;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .info-panel .idesc {
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.55);
+            flex: 1;
+        }
+
+        .info-panel .iclose {
+            cursor: pointer;
+            font-size: 1rem;
+            color: rgba(255, 255, 255, 0.35);
+            background: none;
+            border: none;
+            font-family: inherit;
+            transition: color 0.15s;
+            flex-shrink: 0;
+        }
+
+        .info-panel .iclose:hover {
+            color: #fff;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <h1>MISSION BOARD</h1>
+        <div class="header-right">
+            <div class="blink-dot"></div>
+            OBJECTIVE TREE · ACTIVE
+        </div>
+    </header>
+
+    <div class="canvas" id="canvas">
+        <svg class="lines" id="svg"></svg>
+
+        <div class="grid">
+
+            <!-- COL 1 -->
+            <div class="col" id="c1">
+                <div class="col-title">Origin</div>
+
+                <div class="node" id="n1" style="--i:0" data-label="Field Commander"
+                    data-desc="Primary operative. Oversees strategy, deployment, and field decisions across all active sectors.">
+                    <div class="c tl"></div>
+                    <div class="c tr"></div>
+                    <div class="c bl"></div>
+                    <div class="c br"></div>
+                    <div class="node-label">Field Commander</div>
+                    <div class="node-sub">RANK · ALPHA</div>
+                </div>
+
+                <div class="gap"></div>
+
+                <div class="node" id="n2" style="--i:1" data-label="Join Operation: Eclipse"
+                    data-desc="Engage in the primary annihilation operation. Mandatory clearance required.">
+                    <div class="c tl"></div>
+                    <div class="c tr"></div>
+                    <div class="c bl"></div>
+                    <div class="c br"></div>
+                    <div class="node-label">Join Operation: Eclipse</div>
+                    <span class="chev">»</span>
+                </div>
+
+                <div class="gap"></div>
+
+                <div class="node" id="n3" style="--i:2" data-label="Contact Allied Sectors"
+                    data-desc="Establish secure channel with allied sectors Delta and Foxtrot before the operation window closes.">
+                    <div class="c tl"></div>
+                    <div class="c tr"></div>
+                    <div class="c bl"></div>
+                    <div class="c br"></div>
+                    <div class="node-label">Contact Allied Sectors</div>
+                    <span class="chev">»</span>
+                </div>
+
+                <div class="gap"></div>
+
+                <div class="node" id="n4" style="--i:3" data-label="Retrieve the Cache"
+                    data-desc="Secure the artifact cache at grid 7-Foxtrot. Enemy proximity is high. Move before 0300.">
+                    <div class="c tl"></div>
+                    <div class="c tr"></div>
+                    <div class="c bl"></div>
+                    <div class="c br"></div>
+                    <div class="node-label">Retrieve the Cache</div>
+                    <span class="chev">»</span>
+                </div>
+            </div>
+
+            <!-- COL 2 -->
+            <div class="col" id="c2">
+                <div class="col-title">Assignments</div>
+
+                <div class="node" id="n5" style="--i:0" data-label="Rendezvous · Unit Sigma"
+                    data-desc="Meet Unit Sigma at the safe house for the intelligence handoff. Bring the cipher key.">
+                    <div class="c tl"></div>
+                    <div class="c tr"></div>
+                    <div class="c bl"></div>
+                    <div class="c br"></div>
+                    <div class="node-label">Rendezvous · Unit Sigma</div>
+                    <div class="node-sub">PRIORITY · HIGH</div>
+                </div>
+
+                <div class="gap"></div>
+
+                <div class="node" id="n6" style="--i:1" data-label="Workshop: Tier IV Access"
+                    data-desc="Access the Gorosei Workshop to acquire Tier IV hardware blueprints. Authorization code required.">
+                    <div class="c tl"></div>
+                    <div class="c tr"></div>
+                    <div class="c bl"></div>
+                    <div class="c br"></div>
+                    <div class="node-label">Workshop: Tier IV Access</div>
+                    <span class="chev">»</span>
+                </div>
+
+                <div class="gap"></div>
+
+                <div class="node" id="n7" style="--i:2" data-label="Relic Recovery · North"
+                    data-desc="Recover three cursed relics held in the northern vault. Do not open containment seals on-site.">
+                    <div class="c tl"></div>
+                    <div class="c tr"></div>
+                    <div class="c bl"></div>
+                    <div class="c br"></div>
+                    <div class="node-label">Relic Recovery · North</div>
+                    <span class="chev">»</span>
+                </div>
+
+                <div class="gap"></div>
+
+                <div class="node" id="n8" style="--i:3" data-label="Merge with Panda Co."
+                    data-desc="Rendezvous with Panda Company near the delta. Execute only after all relics are secured.">
+                    <div class="c tl"></div>
+                    <div class="c tr"></div>
+                    <div class="c bl"></div>
+                    <div class="c br"></div>
+                    <div class="node-label">Merge with Panda Co.</div>
+                    <span class="chev">»</span>
+                </div>
+
+                <div class="gap"></div>
+
+                <div class="node" id="n9" style="--i:4" data-label="Join Operation: Eclipse"
+                    data-desc="Secondary strike team joins the annihilation game. Coordinate with Col 1 team on final approach.">
+                    <div class="c tl"></div>
+                    <div class="c tr"></div>
+                    <div class="c bl"></div>
+                    <div class="c br"></div>
+                    <div class="node-label">Join Operation: Eclipse</div>
+                    <span class="chev">»</span>
+                </div>
+            </div>
+
+            <!-- COL 3 -->
+            <div class="col" id="c3">
+                <div class="col-title">Intel</div>
+
+                <div class="node" id="n10" style="--i:0" data-label="Debrief Log · Sortie 14"
+                    data-desc="Post-mission debrief from Sortie 14. Review anomaly in grid sector 9 before next deployment.">
+                    <div class="c tl"></div>
+                    <div class="c tr"></div>
+                    <div class="c bl"></div>
+                    <div class="c br"></div>
+                    <div class="node-label">Debrief Log · Sortie 14</div>
+                    <div class="node-sub">UPDATED 3H AGO</div>
+                </div>
+
+                <div class="gap"></div>
+
+                <div class="node" id="n11" style="--i:1" data-label="Patrol Map · Updated"
+                    data-desc="Enemy patrol routes revised after yesterday's skirmish. Three new blind spots identified in sectors 7–9.">
+                    <div class="c tl"></div>
+                    <div class="c tr"></div>
+                    <div class="c bl"></div>
+                    <div class="c br"></div>
+                    <div class="node-label">Patrol Map · Updated</div>
+                    <div class="node-sub">SECTORS 7 · 8 · 9</div>
+                </div>
+
+                <div class="gap"></div>
+
+                <div class="node" id="n12" style="--i:2" data-label="Supply Route · Compromised"
+                    data-desc="Primary supply lines are compromised. Alternate routes flagged in red on the tactical overlay.">
+                    <div class="c tl"></div>
+                    <div class="c tr"></div>
+                    <div class="c bl"></div>
+                    <div class="c br"></div>
+                    <div class="node-label">Supply Route · Compromised</div>
+                    <div class="node-sub">ALERT · CRITICAL</div>
+                </div>
+
+                <div class="gap"></div>
+
+                <div class="node" id="n13" style="--i:3" data-label="Agent: Venom · East"
+                    data-desc="Asset Venom is embedded in the eastern district. Cover must not be blown under any circumstances.">
+                    <div class="c tl"></div>
+                    <div class="c tr"></div>
+                    <div class="c bl"></div>
+                    <div class="c br"></div>
+                    <div class="node-label">Agent: Venom · East</div>
+                    <div class="node-sub">STATUS · ACTIVE</div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Info Panel -->
+    <div class="info-panel" id="info">
+        <span class="iname" id="iname">—</span>
+        <span class="idesc" id="idesc"></span>
+        <button class="iclose" id="iclose">✕</button>
+    </div>
+
+    <script>
+        // Info panel
+        const infoEl = document.getElementById('info');
+        const inameEl = document.getElementById('iname');
+        const idescEl = document.getElementById('idesc');
+        document.querySelectorAll('.node').forEach(n => {
+            n.addEventListener('click', () => {
+                inameEl.textContent = n.dataset.label;
+                idescEl.textContent = n.dataset.desc;
+                infoEl.classList.add('show');
+            });
+        });
+        document.getElementById('iclose').addEventListener('click', () => infoEl.classList.remove('show'));
+
+        // SVG connector lines
+        function pos(id) {
+            const el = document.getElementById(id);
+            const r = el.getBoundingClientRect();
+            const cr = document.getElementById('canvas').getBoundingClientRect();
+            return {
+                cx: r.left - cr.left + r.width / 2,
+                cy: r.top - cr.top + r.height / 2,
+                top: r.top - cr.top,
+                bottom: r.bottom - cr.top,
+                left: r.left - cr.left,
+                right: r.right - cr.left,
+            };
+        }
+
+        function vline(svg, x, y1, y2) {
+            const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            l.setAttribute('x1', x); l.setAttribute('y1', y1);
+            l.setAttribute('x2', x); l.setAttribute('y2', y2);
+            l.setAttribute('stroke', 'rgba(0,0,0,0.2)');
+            l.setAttribute('stroke-width', '1');
+            svg.appendChild(l);
+        }
+
+        function hcurve(svg, x1, y1, x2, y2) {
+            const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            const mx = (x1 + x2) / 2;
+            p.setAttribute('d', `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`);
+            p.setAttribute('fill', 'none');
+            p.setAttribute('stroke', 'rgba(0,0,0,0.15)');
+            p.setAttribute('stroke-width', '1');
+            p.setAttribute('stroke-dasharray', '4 4');
+            p.style.animation = 'dash 2.5s linear infinite';
+            svg.appendChild(p);
+        }
+
+        function draw() {
+            const svg = document.getElementById('svg');
+            svg.innerHTML = '<style>@keyframes dash{to{stroke-dashoffset:-24}}</style>';
+
+            [['n1', 'n2'], ['n2', 'n3'], ['n3', 'n4'],
+            ['n5', 'n6'], ['n6', 'n7'], ['n7', 'n8'], ['n8', 'n9']].forEach(([a, b]) => {
+                const pa = pos(a), pb = pos(b);
+                vline(svg, pa.cx, pa.bottom, pb.top);
+            });
+
+            [['n1', 'n5'], ['n4', 'n9'], ['n5', 'n10'], ['n7', 'n11'], ['n9', 'n13']].forEach(([a, b]) => {
+                const pa = pos(a), pb = pos(b);
+                hcurve(svg, pa.right, pa.cy, pb.left, pb.cy);
+            });
+        }
+
+        window.addEventListener('load', () => setTimeout(draw, 100));
+        window.addEventListener('resize', draw);
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,25 @@
+.wrap {
+  max-width: 600px;
+}
+
+.explainer {
+  margin-bottom: 18px;
+}
+
+.explainer h1,
+.success h2 {
+  margin: 0 0 14px;
+  font-family: var(--font-space), sans-serif;
+  font-size: 32px;
+}
+
+.explainer p {
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.form,
+.success {
+  display: grid;
+  gap: 18px;
+}

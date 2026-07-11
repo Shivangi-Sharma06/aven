@@ -1,0 +1,19 @@
+[package]
+name = "reputation_contract"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+testutils = ["soroban-sdk/testutils", "shared/testutils"]
+
+[dependencies]
+soroban-sdk = { workspace = true }
+shared = { path = "../shared" }
+attestation_contract = { path = "../attestation_contract" }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+shared = { path = "../shared", features = ["testutils"] }

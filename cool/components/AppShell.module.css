@@ -1,0 +1,324 @@
+.desktopIcons {
+  position: fixed;
+  top: 18px;
+  left: 16px;
+  z-index: 2;
+  display: grid;
+  gap: 12px;
+  width: 82px;
+  pointer-events: none;
+}
+
+.desktopIcon {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  min-height: 72px;
+  border: 1px solid transparent;
+  color: #c0c0e0;
+  font-family: "Segoe UI", Arial, sans-serif;
+  font-size: 11px;
+  line-height: 1.1;
+  text-align: center;
+  text-shadow: 1px 1px 0 #050510;
+  pointer-events: auto;
+  padding: 5px 3px;
+}
+
+.desktopIcon:hover,
+.selectedIcon {
+  border-color: #7c3aed;
+  background: rgba(124, 58, 237, 0.14);
+  outline: 1px dotted rgba(224, 224, 240, 0.45);
+  outline-offset: -4px;
+}
+
+.desktopIcon span {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border: 2px solid #2a2a4a;
+  background: #1a1a2e;
+  color: #a855f7;
+  font-size: 26px;
+  box-shadow: inset 1px 1px 0 #2e2e5a, inset -1px -1px 0 #050510;
+}
+
+.desktopIcon small {
+  max-width: 76px;
+  overflow-wrap: anywhere;
+}
+
+.header {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 50;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  border-top: 2px solid #2a2a4a;
+  background: #0d0d20;
+  box-shadow: inset 0 1px 0 rgba(224, 224, 240, 0.12);
+  padding: 4px 8px;
+}
+
+.startWrap,
+.walletWrap {
+  position: relative;
+}
+
+.startButton,
+.connect,
+.walletBadge,
+.menuButton,
+.link,
+.dropdown button,
+.dropdown a,
+.startMenu button,
+.startMenu a {
+  border-top: 2px solid #3a3a6a;
+  border-left: 2px solid #3a3a6a;
+  border-right: 2px solid #050510;
+  border-bottom: 2px solid #050510;
+  border-radius: 0;
+  background: #1e1e3a;
+  color: #c0c0e0;
+  cursor: pointer;
+  font-family: "Segoe UI", Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: none;
+}
+
+.startButton {
+  min-width: 82px;
+  height: 28px;
+  color: #e0e0f0;
+}
+
+.pressed,
+.active {
+  border-top-color: #050510;
+  border-left-color: #050510;
+  border-right-color: #3a3a6a;
+  border-bottom-color: #3a3a6a;
+  background: #2e2e5a;
+  color: #ffffff;
+}
+
+.startMenu {
+  position: absolute;
+  bottom: calc(100% + 5px);
+  left: 0;
+  display: grid;
+  min-width: 224px;
+  border-top: 2px solid #3a3a6a;
+  border-left: 2px solid #3a3a6a;
+  border-right: 2px solid #050510;
+  border-bottom: 2px solid #050510;
+  background: #1a1a2e;
+  box-shadow: 7px 7px 0 rgba(0, 0, 0, 0.42);
+  padding: 5px;
+}
+
+.startMenu a,
+.startMenu button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #e0e0f0;
+  padding: 9px 10px;
+  text-align: left;
+}
+
+.startMenu a:hover,
+.startMenu button:hover {
+  background: #7c3aed;
+  color: #ffffff;
+}
+
+.startMenu span {
+  display: inline-grid;
+  width: 18px;
+  place-items: center;
+  color: #a855f7;
+}
+
+.startMenu a:hover span,
+.startMenu button:hover span {
+  color: #ffffff;
+}
+
+.startMenu hr {
+  width: 100%;
+  height: 1px;
+  border: 0;
+  border-top: 1px solid #050510;
+  border-bottom: 1px solid #3a3a6a;
+  margin: 5px 0;
+}
+
+.nav {
+  display: flex;
+  min-width: 0;
+  gap: 5px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.nav::-webkit-scrollbar {
+  display: none;
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  min-width: 108px;
+  max-width: 180px;
+  height: 28px;
+  overflow: hidden;
+  padding: 0 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clock {
+  min-width: 86px;
+  border-top: 2px solid #050510;
+  border-left: 2px solid #050510;
+  border-right: 2px solid #3a3a6a;
+  border-bottom: 2px solid #3a3a6a;
+  background: #0a0a1a;
+  color: #a0a0c0;
+  font-family: var(--font-mono), "Courier New", monospace;
+  font-size: 12px;
+  padding: 6px 8px;
+  text-align: center;
+}
+
+.right {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.connect {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 28px;
+  padding: 0 10px;
+}
+
+.connect:hover,
+.walletBadge:hover,
+.menuButton:hover,
+.link:hover {
+  background: #2e2e5a;
+  color: #ffffff;
+}
+
+.walletBadge {
+  height: 28px;
+  color: #e0e0f0;
+  font-family: var(--font-mono), "Courier New", monospace;
+  padding: 0 10px;
+}
+
+.dropdown {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 5px);
+  display: grid;
+  min-width: 190px;
+  border-top: 2px solid #3a3a6a;
+  border-left: 2px solid #3a3a6a;
+  border-right: 2px solid #050510;
+  border-bottom: 2px solid #050510;
+  background: #1a1a2e;
+  box-shadow: 7px 7px 0 rgba(0, 0, 0, 0.42);
+  padding: 5px;
+}
+
+.dropdown button,
+.dropdown a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  padding: 9px 10px;
+  text-align: left;
+}
+
+.dropdown button:hover,
+.dropdown a:hover {
+  background: #7c3aed;
+  color: #ffffff;
+}
+
+.menuButton {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  width: 30px;
+}
+
+@media (max-width: 900px) {
+  .desktopIcons {
+    display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .header {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .nav {
+    position: fixed;
+    right: 8px;
+    bottom: 43px;
+    left: 8px;
+    display: none;
+    flex-direction: column;
+    border-top: 2px solid #3a3a6a;
+    border-left: 2px solid #3a3a6a;
+    border-right: 2px solid #050510;
+    border-bottom: 2px solid #050510;
+    background: #1a1a2e;
+    padding: 6px;
+  }
+
+  .open {
+    display: flex;
+  }
+
+  .link {
+    max-width: none;
+    width: 100%;
+  }
+
+  .clock {
+    display: none;
+  }
+
+  .connect {
+    max-width: 44px;
+    overflow: hidden;
+  }
+
+  .menuButton {
+    display: inline-flex;
+  }
+}

@@ -398,7 +398,7 @@ a {
 .step-panel,
 .stream-terminal,
 .attestation-card,
-.reputation-profile,
+.reputation-document-card,
 .protocol-stack article,
 .developer-grid,
 .agent-rails > div {
@@ -561,6 +561,16 @@ a {
   padding: 32px;
 }
 
+.attestation-card:hover {
+  border-color: #000;
+  box-shadow: none;
+}
+
+.attestation-card:focus-visible {
+  outline: 2px solid #000;
+  outline-offset: 4px;
+}
+
 .data-list--large {
   gap: 0;
 }
@@ -578,79 +588,83 @@ a {
   vector-effect: non-scaling-stroke;
 }
 
-.reputation-profile {
+.reputation-document-card {
   padding: 32px;
+  border: 1px solid #000;
+  border-radius: 0;
+  background: #fff;
+  color: #000;
+  box-shadow: none;
 }
 
-.profile-header {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px 24px;
-  align-items: start;
-  padding-bottom: 28px;
-  border-bottom: 1px solid #000;
+.reputation-document-card:hover {
+  border-color: #000;
+  box-shadow: none;
 }
 
-.profile-header span,
-.profile-header small,
-.category-row span,
-.reputation-profile p {
+.reputation-document-card:focus-visible {
+  outline: 2px solid #000;
+  outline-offset: 4px;
+}
+
+.reputation-document-title {
+  padding-bottom: 18px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.28);
+  color: rgba(0, 0, 0, 0.52);
+  font-family: var(--font-mono);
   font-size: 11px;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
 }
 
-.profile-header strong {
-  grid-row: span 2;
-  font-size: clamp(72px, 11vw, 132px);
-  line-height: 0.8;
-  letter-spacing: -0.08em;
-}
-
-.profile-stats {
+.reputation-document-row {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  border-bottom: 1px solid #000;
+  grid-template-columns: minmax(112px, 0.85fr) 1.4fr;
+  gap: 16px;
+  align-items: baseline;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.22);
 }
 
-.profile-stats div {
-  padding: 24px 14px 24px 0;
-}
-
-.profile-stats strong,
-.profile-stats span {
-  display: block;
-}
-
-.profile-stats strong {
+.reputation-document-row span {
+  color: rgba(0, 0, 0, 0.52);
   font-family: var(--font-mono);
-  font-size: 20px;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
 }
 
-.profile-stats span {
-  margin-top: 8px;
-  color: var(--soft);
+.reputation-document-row strong {
+  color: #000;
+  font-family: var(--font-mono);
+  font-size: clamp(14px, 1.25vw, 18px);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.reputation-score-row {
+  align-items: center;
+}
+
+.reputation-document-row .reputation-score {
+  color: #000;
+  font-family: var(--font-sans);
+  font-size: clamp(64px, 10vw, 112px);
+  font-weight: 800;
+  letter-spacing: -0.08em;
+  line-height: 0.9;
+}
+
+.reputation-document-footnote {
+  margin: 20px 0 0;
+  color: rgba(0, 0, 0, 0.55);
+  font-family: var(--font-mono);
   font-size: 10px;
-  letter-spacing: 0.14em;
-}
-
-.category-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 24px 0;
-}
-
-.category-row span,
-.use-case-list span {
-  border: 1px solid #000;
-  padding: 9px 10px;
-}
-
-.reputation-profile p {
-  margin: 0;
-  color: var(--muted);
-  line-height: 1.8;
+  letter-spacing: 0.18em;
+  line-height: 1.7;
+  text-transform: uppercase;
 }
 
 .protocol-stack {
@@ -681,6 +695,11 @@ a {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.use-case-list span {
+  border: 1px solid #000;
+  padding: 9px 10px;
 }
 
 .code-panels {
@@ -782,8 +801,9 @@ a {
     margin-top: 30px;
   }
 
-  .profile-stats {
+  .reputation-document-row {
     grid-template-columns: 1fr;
+    gap: 8px;
   }
 
   .aven-section {
@@ -802,7 +822,7 @@ a {
 
   .stream-terminal,
   .attestation-card,
-  .reputation-profile,
+  .reputation-document-card,
   .developer-grid {
     padding: 22px;
   }

@@ -1,7 +1,9 @@
-const stats = [
-  ['20', 'COMPLETED STREAMS'],
-  ['18,420 USDC', 'VERIFIED PAYMENTS'],
-  ['1,284 HOURS', 'VERIFIED WORK'],
+const reputationRows = [
+  ['IDENTITY', 'KARTIKEY.AVEN'],
+  ['COMPLETED', '20 STREAMS'],
+  ['PAID', '18,420 USDC'],
+  ['TIME', '1,284 HOURS'],
+  ['CATEGORIES', 'SMART CONTRACTS / FRONTEND / SECURITY / OPEN SOURCE'],
 ]
 
 export default function Reputation() {
@@ -20,26 +22,19 @@ export default function Reputation() {
             attestation history.
           </p>
         </div>
-        <div className="section-visual reputation-profile">
-          <div className="profile-header">
-            <span>KARTIKEY.AVEN</span>
-            <strong>842</strong>
-            <small>REPUTATION</small>
+        <div className="section-visual reputation-document-card">
+          <div className="reputation-document-title">REPUTATION RECORD</div>
+          <div className="reputation-document-row reputation-score-row">
+            <span>SCORE</span>
+            <strong className="reputation-score">842</strong>
           </div>
-          <div className="profile-stats">
-            {stats.map(([value, label]) => (
-              <div key={label}>
-                <strong>{value}</strong>
-                <span>{label}</span>
-              </div>
-            ))}
-          </div>
-          <div className="category-row">
-            {['SMART CONTRACTS', 'FRONTEND', 'SECURITY', 'OPEN SOURCE'].map((category) => (
-              <span key={category}>{category}</span>
-            ))}
-          </div>
-          <p>
+          {reputationRows.map(([label, value]) => (
+            <div className="reputation-document-row" key={label}>
+              <span>{label}</span>
+              <strong>{value}</strong>
+            </div>
+          ))}
+          <p className="reputation-document-footnote">
             TRANSPARENT · PORTABLE · VERIFIABLE · NOT CONTROLLED BY AVEN · NOT
             CONTROLLED BY A MARKETPLACE
           </p>

@@ -352,6 +352,172 @@ a {
   background-size: 80px 80px;
 }
 
+.infinite-page-loop {
+  position: relative;
+  isolation: isolate;
+  background: #fff;
+  color: #000;
+}
+
+.loop-panel {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  min-height: 640px;
+  overflow: hidden;
+  border-top: 1px solid rgba(0, 0, 0, 0.16);
+  background: #fff;
+  color: #000;
+}
+
+.loop-panel > .stage,
+.loop-panel > .aven-section {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+}
+
+.loop-panel > .aven-section {
+  padding: clamp(54px, 7vh, 84px) 32px;
+}
+
+.loop-panel .section-layout {
+  margin-top: clamp(22px, 3.5vh, 38px);
+  gap: clamp(28px, 5vw, 72px);
+}
+
+.loop-panel .aven-section h2 {
+  font-size: clamp(38px, 5.4vw, 76px);
+}
+
+.loop-panel--hero .hero-copy {
+  height: 100%;
+  min-height: 100%;
+  padding: 76px 24px 40px;
+}
+
+.loop-panel--hero .hero-brand {
+  width: min(52vw, 440px);
+  margin-bottom: 28px;
+}
+
+.loop-panel--hero .hero-copy h1 {
+  margin-top: 18px;
+  font-size: clamp(32px, 3.8vw, 54px);
+}
+
+.loop-panel--hero .hero-copy__body {
+  margin-top: 20px;
+  font-size: 14px;
+}
+
+.loop-panel--hero .live-counter {
+  margin-top: 24px;
+}
+
+.loop-panel--hero .hero-actions {
+  margin-top: 24px;
+}
+
+.loop-panel--how .section-layout {
+  grid-template-columns: 1fr;
+}
+
+.loop-panel--how .steps-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.loop-panel--dense > .aven-section {
+  padding-block: clamp(42px, 5.5vh, 68px);
+}
+
+.loop-panel--dense .section-layout {
+  margin-top: clamp(16px, 2.5vh, 28px);
+  gap: clamp(22px, 4vw, 56px);
+}
+
+.loop-panel--dense .step-panel,
+.loop-panel--dense .protocol-stack article {
+  padding: clamp(14px, 2vh, 22px);
+}
+
+.loop-panel--dense .steps-grid,
+.loop-panel--dense .protocol-stack {
+  gap: clamp(8px, 1.4vh, 14px);
+}
+
+.loop-panel--dense .step-panel p,
+.loop-panel--dense .protocol-stack p {
+  margin-block: 8px;
+  line-height: 1.45;
+}
+
+.loop-panel--dense .attestation-card,
+.loop-panel--dense .reputation-document-card,
+.loop-panel--dense .developer-grid {
+  padding: clamp(18px, 2.5vw, 28px);
+}
+
+.loop-panel--dense .reputation-document-row {
+  padding-block: clamp(7px, 1.15vh, 12px);
+}
+
+.loop-panel--dense .reputation-document-row .reputation-score {
+  font-size: clamp(54px, 8vh, 88px);
+}
+
+.loop-panel--cta {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.loop-panel--cta > .final-cta {
+  min-height: 0;
+  height: 100%;
+  padding-block: clamp(64px, 9vh, 112px);
+}
+
+.loop-panel--cta > .aven-footer {
+  background: #fff;
+}
+
+.loop-panel--duplicate {
+  pointer-events: none;
+}
+
+.loop-hero-duplicate {
+  min-height: 100%;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 28px;
+  padding: 96px 32px;
+  text-align: center;
+  background:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+    #fff;
+  background-size: 80px 80px;
+}
+
+.loop-hero-duplicate span,
+.loop-hero-duplicate p {
+  margin: 0;
+  color: var(--soft);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.loop-hero-duplicate strong {
+  font-family: "Bodoni 72", "Bodoni Moda", "Libre Bodoni", Didot, serif;
+  font-size: clamp(104px, 27vw, 390px);
+  font-weight: 700;
+  letter-spacing: -0.07em;
+  line-height: 0.75;
+}
+
 .section-layout {
   width: min(1180px, 100%);
   margin: 42px auto 0;
@@ -829,6 +995,101 @@ a {
 
   .aven-footer {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .loop-panel {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .loop-panel > .stage,
+  .loop-panel > .aven-section {
+    height: auto;
+    min-height: 0;
+  }
+
+  .loop-panel > .stage {
+    min-height: 620px;
+  }
+
+  .loop-panel--hero .hero-copy {
+    height: auto;
+    min-height: 620px;
+    padding: 92px 18px 54px;
+  }
+
+  .loop-panel--hero .hero-brand {
+    width: min(62vw, 560px);
+    margin-bottom: 42px;
+  }
+
+  .loop-panel--hero .hero-copy h1 {
+    margin-top: 32px;
+    font-size: clamp(34px, 4.2vw, 64px);
+  }
+
+  .loop-panel--hero .hero-copy__body {
+    margin-top: 34px;
+    font-size: 16px;
+  }
+
+  .loop-panel--hero .live-counter {
+    margin-top: 46px;
+  }
+
+  .loop-panel--hero .hero-actions {
+    margin-top: 42px;
+  }
+
+  .loop-panel--how .steps-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .loop-panel > .aven-section,
+  .loop-panel--dense > .aven-section {
+    padding: 82px 20px;
+  }
+
+  .loop-panel--cta {
+    display: block;
+  }
+
+  .loop-panel--cta > .final-cta {
+    height: auto;
+  }
+
+  .loop-panel--duplicate {
+    display: none;
+  }
+}
+
+@media (min-width: 769px) and (max-height: 760px) {
+  .loop-panel > .aven-section,
+  .loop-panel--dense > .aven-section {
+    padding-block: 38px;
+  }
+
+  .loop-panel .section-layout,
+  .loop-panel--dense .section-layout {
+    margin-top: 16px;
+  }
+
+  .loop-panel .aven-section h2 {
+    font-size: clamp(34px, 4.8vw, 64px);
+  }
+
+  .loop-panel .loud-copy {
+    margin-top: 22px;
+    font-size: clamp(18px, 2.4vw, 30px);
+  }
+
+  .loop-panel--dense .attestation-card,
+  .loop-panel--dense .reputation-document-card,
+  .loop-panel--dense .developer-grid {
+    padding: 16px;
   }
 }
 

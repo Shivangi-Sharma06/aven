@@ -17,6 +17,7 @@ import Developers from '../components/sections/Developers';
 import AIAgents from '../components/sections/AIAgents';
 import FinalCTA from '../components/sections/FinalCTA';
 import AvenFooter from '../components/sections/AvenFooter';
+import InfinitePageLoop from '../components/sections/InfinitePageLoop';
 
 export default function LandingPage() {
   const appRef = useRef<HTMLDivElement>(null);
@@ -74,18 +75,28 @@ export default function LandingPage() {
     <div ref={appRef} className="app">
       <AvenNavigation />
       <SmoothScroll onReady={handleSmoothScrollReady}>
-        <main>
-          <AvenHero />
-          <HowItWorks />
-          <LiveStreamDemo />
-          <WorkAttestations />
-          <Reputation />
-          <Protocol />
-          <Developers />
-          <AIAgents />
-          <FinalCTA />
-        </main>
-        <AvenFooter />
+        <InfinitePageLoop
+          enabled={smoothScrollReady}
+          panels={[
+            { id: 'hero', content: <AvenHero /> },
+            { id: 'how', content: <HowItWorks />, dense: true },
+            { id: 'stream', content: <LiveStreamDemo /> },
+            { id: 'attestations', content: <WorkAttestations />, dense: true },
+            { id: 'reputation', content: <Reputation />, dense: true },
+            { id: 'protocol', content: <Protocol />, dense: true },
+            { id: 'developers', content: <Developers />, dense: true },
+            { id: 'agents', content: <AIAgents /> },
+            {
+              id: 'cta',
+              content: (
+                <>
+                  <FinalCTA />
+                  <AvenFooter />
+                </>
+              ),
+            },
+          ]}
+        />
       </SmoothScroll>
     </div>
   );

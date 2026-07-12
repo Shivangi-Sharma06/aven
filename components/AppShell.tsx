@@ -27,7 +27,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <Link
           href="/stream/create"
           className={`nav-item ${pathname === "/stream/create" ? "active" : ""}`}
-          style={{ color: "var(--violet)" }}
         >
           <PlusCircle size={24} />
           <span>Create</span>

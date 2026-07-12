@@ -567,7 +567,28 @@ a {
   background: #fff;
 }
 
+.loop-panel--final > .final-cta {
+  padding-block: clamp(42px, 6vh, 72px);
+}
+
+.loop-panel--final .final-cta h2 {
+  margin-top: clamp(20px, 3vh, 32px);
+  font-size: clamp(36px, 5.8vw, 84px);
+  line-height: 0.9;
+}
+
+.loop-panel--final .final-cta .hero-actions {
+  margin-top: clamp(24px, 4vh, 38px);
+}
+
 .loop-panel--duplicate {
+  pointer-events: none;
+}
+
+.loop-wrap-runway {
+  height: 85vh;
+  min-height: 544px;
+  background: #fff;
   pointer-events: none;
 }
 
@@ -1148,6 +1169,10 @@ a {
   }
 
   .loop-panel--duplicate {
+    display: none;
+  }
+
+  .loop-wrap-runway {
     display: none;
   }
 }

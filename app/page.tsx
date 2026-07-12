@@ -1,12 +1,10 @@
 "use client";
 
-import { useCallback, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRef } from 'react';
 import './landing.css';
 import { gsap, useGSAP } from '../lib/gsap';
 
 import AvenNavigation from '../components/navigation/AvenNavigation';
-import SmoothScroll from '../components/SmoothScroll';
 import AvenHero from '../components/hero/AvenHero';
 import HowItWorks from '../components/sections/HowItWorks';
 import LiveStreamDemo from '../components/sections/LiveStreamDemo';
@@ -21,13 +19,9 @@ import InfinitePageLoop from '../components/sections/InfinitePageLoop';
 
 export default function LandingPage() {
   const appRef = useRef<HTMLDivElement>(null);
-  const [smoothScrollReady, setSmoothScrollReady] = useState(false);
-  const handleSmoothScrollReady = useCallback(() => setSmoothScrollReady(true), []);
 
   useGSAP(
     () => {
-      if (!smoothScrollReady) return;
-
       gsap.utils.toArray<HTMLElement>('.aven-section').forEach((section) => {
         const sectionHeader = section.querySelector('.section-kicker');
         const sectionVisual = section.querySelector('.section-visual');
@@ -68,15 +62,13 @@ export default function LandingPage() {
       });
 
     },
-    { scope: appRef, dependencies: [smoothScrollReady], revertOnUpdate: true }
+    { scope: appRef }
   );
 
   return (
     <div ref={appRef} className="app">
       <AvenNavigation />
-      <SmoothScroll onReady={handleSmoothScrollReady}>
         <InfinitePageLoop
-          enabled={smoothScrollReady}
           panels={[
             { id: 'hero', content: <AvenHero /> },
             { id: 'how', content: <HowItWorks />, dense: true },
@@ -97,7 +89,6 @@ export default function LandingPage() {
             },
           ]}
         />
-      </SmoothScroll>
     </div>
   );
 }

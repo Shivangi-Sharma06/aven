@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useRef } from "react";
-import { gsap, ScrollSmoother, ScrollTrigger, useGSAP } from "@/lib/gsap";
+import { gsap, ScrollTrigger, useGSAP } from "@/lib/gsap";
 
 export type InfinitePagePanel = {
   id: string;
@@ -10,125 +10,94 @@ export type InfinitePagePanel = {
   dense?: boolean;
 };
 
-type InfinitePageLoopProps = {
-  enabled: boolean;
-  panels: InfinitePagePanel[];
-};
+type InfinitePageLoopProps = { panels: InfinitePagePanel[] };
 
-export default function InfinitePageLoop({ enabled, panels }: InfinitePageLoopProps) {
+export default function InfinitePageLoop({ panels }: InfinitePageLoopProps) {
   const rootRef = useRef<HTMLElement>(null);
 
   useGSAP(
     () => {
       const root = rootRef.current;
-      if (!root || !enabled) return;
+      if (!root) return;
 
       const media = gsap.matchMedia();
 
       media.add("(min-width: 769px)", () => {
-        const panelElements = gsap.utils.toArray<HTMLElement>("[data-loop-panel]", root);
+        const renderedPanels = gsap.utils.toArray<HTMLElement>("[data-aven-layered-panel]", root);
+        const panelElements = renderedPanels.filter((panel) => !panel.hasAttribute("data-duplicate"));
         if (panelElements.length < 2) return;
 
-        const pinTriggers = panelElements.map((panel, index) =>
+        const triggers: ScrollTrigger[] = [];
+
+        panelElements.forEach((panel) => {
+          triggers.push(
           ScrollTrigger.create({
-            id: `aven-page-panel-${index}`,
             trigger: panel,
             start: "top top",
-            end: "bottom top",
             pin: true,
             pinSpacing: false,
-            refreshPriority: index,
           })
-        );
+          );
+        });
 
-        let wrapping = false;
-        let firstPanelStart = 0;
-        let duplicateStart = 0;
-        let forwardWrapPoint = 0;
-        let resizeFrame = 0;
-        let wrapFrame = 0;
-        const smoother = ScrollSmoother.get();
-        const duplicatePanel = panelElements[panelElements.length - 1];
+        let maxScroll = 0;
 
-        const getScroll = () => smoother?.scrollTop() ?? window.scrollY;
-        const setScroll = (value: number) => {
-          if (smoother) smoother.scrollTop(value);
-          else window.scrollTo(0, value);
-          ScrollTrigger.update();
+        const pageScrollTrigger = ScrollTrigger.create({
+          snap(value) {
+            const snappedValue = gsap.utils.snap(1 / panelElements.length, value);
+
+            if (maxScroll <= 0) return snappedValue;
+            if (snappedValue <= 0) return 1.05 / maxScroll;
+            if (snappedValue >= 1) return maxScroll / (maxScroll + 1.05);
+            return snappedValue;
+          },
+        });
+
+        triggers.push(pageScrollTrigger);
+
+        const onResize = () => {
+          maxScroll = ScrollTrigger.maxScroll(window) - 1;
         };
 
-        const calculateBounds = () => {
-          firstPanelStart = pinTriggers[0].start;
-          const duplicateTrigger = pinTriggers[pinTriggers.length - 1];
-          duplicateStart = duplicateTrigger.start;
-          forwardWrapPoint = duplicateStart + duplicatePanel.offsetHeight * 0.85;
-        };
+        const onScroll = (event: Event) => {
+          const scroll = pageScrollTrigger.scroll();
 
-        const wrapTo = (destination: number) => {
-          if (wrapping) return;
-          wrapping = true;
-          setScroll(destination);
-          cancelAnimationFrame(wrapFrame);
-          wrapFrame = requestAnimationFrame(() => {
-            wrapping = false;
-          });
-        };
-
-        const onScroll = () => {
-          if (wrapping || forwardWrapPoint <= duplicateStart) return;
-          const boundaryScroll = Math.max(getScroll(), window.scrollY);
-          if (boundaryScroll >= forwardWrapPoint) wrapTo(firstPanelStart + 2);
-        };
-
-        const onWheel = (event: WheelEvent) => {
-          if (wrapping || duplicateStart <= 2) return;
-          const scroll = getScroll();
-
-          if (event.deltaY < 0 && scroll <= firstPanelStart + 1) {
-            wrapTo(duplicateStart - 2);
+          if (scroll > maxScroll) {
+            pageScrollTrigger.scroll(1);
+            if (event.cancelable) event.preventDefault();
+          } else if (scroll < 1) {
+            pageScrollTrigger.scroll(maxScroll - 1);
+            if (event.cancelable) event.preventDefault();
           }
         };
 
-        const onResize = () => {
-          cancelAnimationFrame(resizeFrame);
-          resizeFrame = requestAnimationFrame(() => {
-            ScrollTrigger.refresh();
-            calculateBounds();
-          });
-        };
-
-        calculateBounds();
+        onResize();
         window.addEventListener("resize", onResize);
-        window.addEventListener("scroll", onScroll, { passive: true });
-        window.addEventListener("wheel", onWheel, { passive: true });
-
+        window.addEventListener("scroll", onScroll, { passive: false });
         const refreshFrame = requestAnimationFrame(() => {
+          onResize();
           ScrollTrigger.refresh();
-          calculateBounds();
         });
 
         return () => {
           cancelAnimationFrame(refreshFrame);
-          cancelAnimationFrame(resizeFrame);
-          cancelAnimationFrame(wrapFrame);
           window.removeEventListener("resize", onResize);
           window.removeEventListener("scroll", onScroll);
-          window.removeEventListener("wheel", onWheel);
-          pinTriggers.forEach((trigger) => trigger.kill());
+          triggers.forEach((trigger) => trigger.kill());
         };
       });
 
       return () => media.revert();
     },
-    { scope: rootRef, dependencies: [enabled], revertOnUpdate: true }
+    { scope: rootRef }
   );
 
   return (
-    <main ref={rootRef} className="infinite-page-loop">
+    <main ref={rootRef} className="aven-layered-loop">
       {panels.map((panel, index) => (
         <section
-          className={`loop-panel loop-panel--${panel.id}${panel.dense ? " loop-panel--dense" : ""}${index === panels.length - 1 ? " loop-panel--final" : ""}`}
-          data-loop-panel
+          className={`aven-layered-panel aven-layered-panel--${panel.id}${panel.dense ? " aven-layered-panel--dense" : ""}${index === panels.length - 1 ? " aven-layered-panel--final" : ""}`}
+          data-aven-layered-panel
           data-panel-id={panel.id}
           data-theme={index % 2 === 0 ? "light" : "dark"}
           data-final-panel={index === panels.length - 1 ? "true" : undefined}
@@ -139,19 +108,18 @@ export default function InfinitePageLoop({ enabled, panels }: InfinitePageLoopPr
       ))}
 
       <section
-        className="loop-panel loop-panel--hero loop-panel--duplicate"
-        data-loop-panel
+        className="aven-layered-panel aven-layered-panel--hero aven-layered-panel--duplicate"
+        data-aven-layered-panel
         data-duplicate="true"
         data-theme="light"
         aria-hidden="true"
       >
-        <div className="loop-hero-duplicate">
+        <div className="aven-layered-hero-copy">
           <span>STREAMING VALUE · PROVING WORK</span>
           <strong>AVEN</strong>
           <p>THE ECONOMIC LAYER FOR VERIFIED WORK.</p>
         </div>
       </section>
-      <div className="loop-wrap-runway" aria-hidden="true" />
     </main>
   );
 }

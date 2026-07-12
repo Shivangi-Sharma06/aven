@@ -5,13 +5,20 @@ extern crate std;
 use super::*;
 use soroban_sdk::{testutils::Address as _, Address, Env, String};
 
-fn setup() -> (Env, AttestationContractClient<'static>, Address, Address, Address) {
+fn setup() -> (
+    Env,
+    AttestationContractClient<'static>,
+    Address,
+    Address,
+    Address,
+) {
     let env = Env::default();
     let admin = Address::generate(&env);
     let stream_contract = Address::generate(&env);
-    let contract_id = env.register(AttestationContract, ());
+    let contract_id = env.register(AttestationContract, (&admin,));
     let client = AttestationContractClient::new(&env, &contract_id);
-    client.init(&admin, &stream_contract);
+    env.mock_all_auths();
+    client.set_stream_contract(&admin, &stream_contract);
     let sender = Address::generate(&env);
     let recipient = Address::generate(&env);
     (env, client, stream_contract, sender, recipient)
@@ -78,4 +85,38 @@ fn test_verify_attestation_true() {
 fn test_verify_attestation_false() {
     let (_env, client, _stream_contract, _sender, _recipient) = setup();
     assert!(!client.verify_attestation(&999));
+}
+
+#[test]
+#[should_panic]
+fn test_duplicate_stream_attestation_rejected() {
+    let (env, client, stream_contract, sender, recipient) = setup();
+    mint_sample(&env, &client, &stream_contract, &sender, &recipient);
+    mint_sample(&env, &client, &stream_contract, &sender, &recipient);
+}
+
+#[test]
+#[should_panic]
+fn test_invalid_payment_rejected() {
+    let (env, client, stream_contract, sender, recipient) = setup();
+    env.mock_all_auths();
+    client.mint_attestation(
+        &stream_contract,
+        &7,
+        &sender,
+        &recipient,
+        &0,
+        &Address::generate(&env),
+        &Category::Freelance,
+        &String::from_str(&env, "Zero pay"),
+        &10,
+        &20,
+    );
+}
+
+#[test]
+fn test_get_stream_attestation() {
+    let (env, client, stream_contract, sender, recipient) = setup();
+    let id = mint_sample(&env, &client, &stream_contract, &sender, &recipient);
+    assert_eq!(client.get_stream_attestation(&7), id);
 }

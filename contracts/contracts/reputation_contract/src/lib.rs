@@ -1,8 +1,13 @@
 #![no_std]
 
-use attestation_contract::AttestationContractClient;
 use shared::{AttestationRecord, Category, MAX_HISTORY_READ};
-use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, Vec};
+use soroban_sdk::{contract, contractimpl, contracttype, vec, Address, Env, IntoVal, Symbol, Vec};
+
+#[contracttype]
+#[derive(Clone)]
+enum DataKey {
+    AttestationContract,
+}
 
 #[contracttype]
 #[derive(Clone)]
@@ -25,6 +30,13 @@ pub struct ReputationContract;
 
 #[contractimpl]
 impl ReputationContract {
+    /// Pins the reputation engine to the official attestation source.
+    pub fn __constructor(env: Env, attestation_contract: Address) {
+        env.storage()
+            .instance()
+            .set(&DataKey::AttestationContract, &attestation_contract);
+    }
+
     /// Recomputes a score live from on-chain attestation history every
     /// single call. Nothing is ever cached or stored, so a score can never
     /// be frozen at a high value - it always reflects current chain state.
@@ -38,8 +50,17 @@ impl ReputationContract {
         attestation_contract: Address,
         recipient: Address,
     ) -> ScoreBreakdown {
-        let client = AttestationContractClient::new(&env, &attestation_contract);
-        let ids: Vec<u64> = client.get_recipient_attestations(&recipient);
+        let Some(verified_attestation_contract) =
+            verified_attestation_contract(&env, attestation_contract)
+        else {
+            return empty_breakdown();
+        };
+
+        let ids: Vec<u64> = env.invoke_contract(
+            &verified_attestation_contract,
+            &Symbol::new(&env, "get_recipient_attestations"),
+            vec![&env, recipient.into_val(&env)],
+        );
 
         let mut breakdown = ScoreBreakdown {
             total: 0,
@@ -61,17 +82,27 @@ impl ReputationContract {
         let mut i: u32 = 0;
         while i < read_count {
             let id = ids.get(i).unwrap();
-            let record: AttestationRecord = client.get_attestation(&id);
+            let record: AttestationRecord = env.invoke_contract(
+                &verified_attestation_contract,
+                &Symbol::new(&env, "get_attestation"),
+                vec![&env, id.into_val(&env)],
+            );
             let points = score_one(&record, current_ledger);
 
             breakdown.total = breakdown.total.saturating_add(points);
             match record.category {
-                Category::Freelance => breakdown.freelance = breakdown.freelance.saturating_add(points),
+                Category::Freelance => {
+                    breakdown.freelance = breakdown.freelance.saturating_add(points)
+                }
                 Category::Salary => breakdown.salary = breakdown.salary.saturating_add(points),
                 Category::Bounty => breakdown.bounty = breakdown.bounty.saturating_add(points),
                 Category::Grant => breakdown.grant = breakdown.grant.saturating_add(points),
-                Category::AgentTask => breakdown.agent_task = breakdown.agent_task.saturating_add(points),
-                Category::Subscription => breakdown.subscription = breakdown.subscription.saturating_add(points),
+                Category::AgentTask => {
+                    breakdown.agent_task = breakdown.agent_task.saturating_add(points)
+                }
+                Category::Subscription => {
+                    breakdown.subscription = breakdown.subscription.saturating_add(points)
+                }
             }
 
             i += 1;
@@ -93,7 +124,38 @@ impl ReputationContract {
         recipient: Address,
         minimum_score: i128,
     ) -> bool {
+        if minimum_score < 0 {
+            return false;
+        }
         Self::compute_score(env, attestation_contract, recipient) >= minimum_score
+    }
+
+    pub fn get_attestation_contract(env: Env) -> Option<Address> {
+        env.storage().instance().get(&DataKey::AttestationContract)
+    }
+}
+
+fn verified_attestation_contract(env: &Env, candidate: Address) -> Option<Address> {
+    let configured: Address = env
+        .storage()
+        .instance()
+        .get(&DataKey::AttestationContract)?;
+    if candidate == configured {
+        Some(configured)
+    } else {
+        None
+    }
+}
+
+fn empty_breakdown() -> ScoreBreakdown {
+    ScoreBreakdown {
+        total: 0,
+        freelance: 0,
+        salary: 0,
+        bounty: 0,
+        grant: 0,
+        agent_task: 0,
+        subscription: 0,
     }
 }
 
@@ -127,9 +189,7 @@ fn score_one(record: &AttestationRecord, current_ledger: u32) -> i128 {
     };
 
     // (raw * recency_pct * category_pct) / (100 * 100)
-    raw.saturating_mul(recency_pct)
-        .saturating_mul(category_pct)
-        / 10_000
+    raw.saturating_mul(recency_pct).saturating_mul(category_pct) / 10_000
 }
 
 mod test;

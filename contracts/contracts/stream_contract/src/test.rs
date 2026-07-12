@@ -4,6 +4,7 @@ extern crate std;
 
 use super::*;
 use soroban_sdk::{
+    contract, contractimpl,
     testutils::{Address as _, Ledger},
     token::{StellarAssetClient, TokenClient},
     Address, Env, String,
@@ -11,10 +12,34 @@ use soroban_sdk::{
 
 fn create_client<'a>(env: &'a Env, attestation_contract: &Address) -> StreamContractClient<'a> {
     let admin = Address::generate(env);
-    let contract_id = env.register(StreamContract, ());
-    let client = StreamContractClient::new(env, &contract_id);
-    client.init(&admin, attestation_contract);
-    client
+    let contract_id = env.register(StreamContract, (&admin, attestation_contract));
+    StreamContractClient::new(env, &contract_id)
+}
+
+#[contract]
+struct MockAttestationContract;
+
+#[contractimpl]
+impl MockAttestationContract {
+    #[allow(clippy::too_many_arguments)]
+    pub fn mint_attestation(
+        caller: Address,
+        stream_id: u64,
+        _sender: Address,
+        _recipient: Address,
+        total_paid: i128,
+        _asset: Address,
+        _category: Category,
+        _title: String,
+        _start_ledger: u32,
+        _end_ledger: u32,
+    ) -> u64 {
+        caller.require_auth();
+        if total_paid <= 0 {
+            panic!("invalid payment");
+        }
+        stream_id
+    }
 }
 
 fn create_asset(env: &Env, sender: &Address, amount: i128) -> Address {
@@ -37,17 +62,16 @@ fn create_stream(
     deposit: i128,
     duration: u32,
 ) -> u64 {
-    client
-        .create_stream(
-            sender,
-            recipient,
-            &rate,
-            asset,
-            &deposit,
-            &duration,
-            &Category::Freelance,
-            &String::from_str(env, "Frontend work"),
-        )
+    client.create_stream(
+        sender,
+        recipient,
+        &rate,
+        asset,
+        &deposit,
+        &duration,
+        &Category::Freelance,
+        &String::from_str(env, "Frontend work"),
+    )
 }
 
 #[test]
@@ -214,4 +238,29 @@ fn test_overflow_protection() {
         i128::MAX,
         u32::MAX,
     );
+}
+
+#[test]
+fn test_withdraw_completion_mints_attestation_and_refunds_extra_deposit() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_sequence_number(100);
+    let sender = Address::generate(&env);
+    let recipient = Address::generate(&env);
+    let attestation_contract = env.register(MockAttestationContract, ());
+    let asset = create_asset(&env, &sender, 1_000);
+    let token = TokenClient::new(&env, &asset);
+    let client = create_client(&env, &attestation_contract);
+    let id = create_stream(&env, &client, &sender, &recipient, &asset, 10, 600, 10);
+
+    env.ledger().set_sequence_number(110);
+    client.withdraw(&id, &recipient);
+    let stream = client.get_stream(&id);
+
+    assert_eq!(stream.status, StreamStatus::Completed);
+    assert!(stream.has_attestation);
+    assert_eq!(stream.attestation_id, id);
+    assert_eq!(stream.total_withdrawn, 500);
+    assert_eq!(token.balance(&recipient), 500);
+    assert_eq!(token.balance(&sender), 500);
 }

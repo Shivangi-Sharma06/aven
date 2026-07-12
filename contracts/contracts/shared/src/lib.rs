@@ -6,11 +6,14 @@ use soroban_sdk::{contracttype, Address, String};
 /// Used as both the "extend to" and "threshold" argument for extend_ttl calls.
 pub const LEDGER_BUMP: u32 = 535_680;
 
-/// Ledgers per second used to convert a per-second rate into a per-ledger rate.
+/// Seconds per ledger used to convert a per-second rate into a per-ledger rate.
 /// Stellar targets ~5s per ledger. All "per second" rates supplied by the
 /// frontend are converted to "per ledger" by multiplying by this constant
 /// before being stored, so on-chain math never has to divide.
 pub const LEDGERS_PER_UNIT: i128 = 5;
+
+/// Maximum UTF-8 byte length of human-readable stream/attestation titles.
+pub const MAX_TITLE_LEN: u32 = 80;
 
 /// Hard cap on how many attestation/stream ids we will iterate over in a
 /// single read call, to keep resource consumption bounded and predictable.
@@ -58,9 +61,10 @@ pub struct StreamRecord {
     pub status: StreamStatus,
     pub category: Category,
     pub title: String,
-    pub paused_at_ledger: u32,
     /// 0 means "not currently paused". Any other value is the ledger at
     /// which the current pause began.
+    pub paused_at_ledger: u32,
+    /// Total number of ledgers already spent paused across previous pauses.
     pub paused_duration_ledgers: u32,
     pub attestation_id: u64,
     /// 0 means "no attestation minted yet" (id 0 is never issued).

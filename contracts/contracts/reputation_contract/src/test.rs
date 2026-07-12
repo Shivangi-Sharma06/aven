@@ -79,9 +79,15 @@ impl MockAttestation {
     }
 }
 
-fn setup<'a>(env: &'a Env) -> (ReputationContractClient<'a>, MockAttestationClient<'a>, Address) {
-    let reputation_id = env.register(ReputationContract, ());
+fn setup<'a>(
+    env: &'a Env,
+) -> (
+    ReputationContractClient<'a>,
+    MockAttestationClient<'a>,
+    Address,
+) {
     let mock_id = env.register(MockAttestation, ());
+    let reputation_id = env.register(ReputationContract, (&mock_id,));
     (
         ReputationContractClient::new(env, &reputation_id),
         MockAttestationClient::new(env, &mock_id),
@@ -135,4 +141,26 @@ fn test_verify_claim_below_threshold() {
     mock.add(&recipient, &100_000_000, &Category::Salary, &100_000);
 
     assert!(!client.verify_claim(&mock_id, &recipient, &50));
+}
+
+#[test]
+fn test_spoofed_attestation_contract_scores_zero() {
+    let env = Env::default();
+    env.ledger().set_sequence_number(200_000);
+    let recipient = Address::generate(&env);
+    let (client, mock, _mock_id) = setup(&env);
+    let spoofed_id = env.register(MockAttestation, ());
+    mock.add(&recipient, &1_000_000_000, &Category::Grant, &199_000);
+
+    assert_eq!(client.compute_score(&spoofed_id, &recipient), 0);
+    assert!(!client.verify_claim(&spoofed_id, &recipient, &1));
+}
+
+#[test]
+fn test_negative_threshold_rejected() {
+    let env = Env::default();
+    let recipient = Address::generate(&env);
+    let (client, _mock, mock_id) = setup(&env);
+
+    assert!(!client.verify_claim(&mock_id, &recipient, &-1));
 }

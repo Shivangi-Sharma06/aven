@@ -1,9 +1,12 @@
 #![no_std]
 
-use shared::{Category, StreamRecord, StreamStatus, LEDGER_BUMP, LEDGERS_PER_UNIT, MAX_HISTORY_LEN};
+use shared::{
+    Category, StreamRecord, StreamStatus, LEDGERS_PER_UNIT, LEDGER_BUMP, MAX_HISTORY_LEN,
+    MAX_TITLE_LEN,
+};
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, symbol_short, token, vec, Address, Env,
-    String, Symbol, Vec,
+    contract, contracterror, contractevent, contractimpl, contracttype, token, vec, Address, Env,
+    IntoVal, String, Symbol, Vec,
 };
 
 #[contracttype]
@@ -37,28 +40,76 @@ pub enum Error {
     HistoryFull = 14,
 }
 
-const MAX_TITLE_LEN: u32 = 80;
+#[contractevent(topics = ["stream_created"])]
+pub struct StreamCreated {
+    #[topic]
+    pub stream_id: u64,
+    #[topic]
+    pub sender: Address,
+    #[topic]
+    pub recipient: Address,
+    pub asset: Address,
+    pub total_deposited: i128,
+}
+
+#[contractevent(topics = ["stream_withdrawn"])]
+pub struct StreamWithdrawn {
+    #[topic]
+    pub stream_id: u64,
+    #[topic]
+    pub recipient: Address,
+    pub amount: i128,
+}
+
+#[contractevent(topics = ["stream_paused"])]
+pub struct StreamPaused {
+    #[topic]
+    pub stream_id: u64,
+    pub paused_at_ledger: u32,
+}
+
+#[contractevent(topics = ["stream_resumed"])]
+pub struct StreamResumed {
+    #[topic]
+    pub stream_id: u64,
+    pub resumed_at_ledger: u32,
+}
+
+#[contractevent(topics = ["stream_cancelled"])]
+pub struct StreamCancelled {
+    #[topic]
+    pub stream_id: u64,
+    pub paid_to_recipient: i128,
+    pub refunded_to_sender: i128,
+}
+
+#[contractevent(topics = ["stream_completed"])]
+pub struct StreamCompleted {
+    #[topic]
+    pub stream_id: u64,
+    #[topic]
+    pub attestation_id: u64,
+    pub total_paid: i128,
+    pub refunded_to_sender: i128,
+}
 
 #[contract]
 pub struct StreamContract;
 
 #[contractimpl]
 impl StreamContract {
-    /// One-time setup. Stores the admin (upgrade coordination only - the
-    /// admin never has access to user funds) and the address of the
-    /// AttestationContract that this contract is allowed to call into on
-    /// stream completion.
-    pub fn init(env: Env, admin: Address, attestation_contract: Address) -> Result<(), Error> {
-        if env.storage().instance().has(&DataKey::Admin) {
-            return Err(Error::AlreadyInitialized);
-        }
+    /// Atomic deployment-time setup. The admin is reserved for deployment and
+    /// upgrade coordination only; user funds can only move through stream
+    /// lifecycle functions.
+    pub fn __constructor(env: Env, admin: Address, attestation_contract: Address) {
         env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage()
             .instance()
             .set(&DataKey::AttestationContract, &attestation_contract);
         env.storage().instance().set(&DataKey::NextStreamId, &1u64);
-        env.storage().instance().extend_ttl(LEDGER_BUMP, LEDGER_BUMP);
-        Ok(())
+        env.storage()
+            .instance()
+            .extend_ttl(LEDGER_BUMP, LEDGER_BUMP);
     }
 
     /// Creates a new stream. Pulls `total_deposited` of `asset` from
@@ -77,6 +128,7 @@ impl StreamContract {
     ) -> Result<u64, Error> {
         sender.require_auth();
         bump_instance(&env);
+        require_initialized(&env)?;
 
         if rate_per_second <= 0 {
             return Err(Error::InvalidRate);
@@ -112,7 +164,9 @@ impl StreamContract {
             .get(&DataKey::NextStreamId)
             .unwrap_or(1u64);
         let next_id = id.checked_add(1).ok_or(Error::Overflow)?;
-        env.storage().instance().set(&DataKey::NextStreamId, &next_id);
+        env.storage()
+            .instance()
+            .set(&DataKey::NextStreamId, &next_id);
 
         let record = StreamRecord {
             id,
@@ -135,9 +189,16 @@ impl StreamContract {
 
         save_stream(&env, &record);
         append_id(&env, DataKey::SenderStreams(sender), id)?;
-        append_id(&env, DataKey::RecipientStreams(recipient), id)?;
+        append_id(&env, DataKey::RecipientStreams(recipient.clone()), id)?;
 
-        env.events().publish((symbol_short!("created"), id), record.sender.clone());
+        StreamCreated {
+            stream_id: id,
+            sender: record.sender.clone(),
+            recipient,
+            asset: record.asset.clone(),
+            total_deposited,
+        }
+        .publish(&env);
 
         Ok(id)
     }
@@ -175,7 +236,12 @@ impl StreamContract {
             &withdrawable,
         );
 
-        env.events().publish((symbol_short!("withdrawn"), stream_id), withdrawable);
+        StreamWithdrawn {
+            stream_id,
+            recipient: stream.recipient.clone(),
+            amount: withdrawable,
+        }
+        .publish(&env);
 
         let elapsed = elapsed_active_ledgers(&env, &stream);
         if elapsed >= stream.duration_ledgers {
@@ -201,8 +267,11 @@ impl StreamContract {
         stream.paused_at_ledger = env.ledger().sequence();
         save_stream(&env, &stream);
 
-        env.events()
-            .publish((symbol_short!("paused"), stream_id), stream.paused_at_ledger);
+        StreamPaused {
+            stream_id,
+            paused_at_ledger: stream.paused_at_ledger,
+        }
+        .publish(&env);
         Ok(())
     }
 
@@ -228,7 +297,11 @@ impl StreamContract {
         stream.status = StreamStatus::Active;
         save_stream(&env, &stream);
 
-        env.events().publish((symbol_short!("resumed"), stream_id), now);
+        StreamResumed {
+            stream_id,
+            resumed_at_ledger: now,
+        }
+        .publish(&env);
         Ok(())
     }
 
@@ -274,8 +347,12 @@ impl StreamContract {
             );
         }
 
-        env.events()
-            .publish((symbol_short!("cancelled"), stream_id), earned);
+        StreamCancelled {
+            stream_id,
+            paid_to_recipient: earned,
+            refunded_to_sender: refund_to_sender,
+        }
+        .publish(&env);
         Ok(())
     }
 
@@ -313,6 +390,14 @@ fn bump_instance(env: &Env) {
     env.storage()
         .instance()
         .extend_ttl(LEDGER_BUMP, LEDGER_BUMP);
+}
+
+fn require_initialized(env: &Env) -> Result<(), Error> {
+    if env.storage().instance().has(&DataKey::AttestationContract) {
+        Ok(())
+    } else {
+        Err(Error::NotInitialized)
+    }
 }
 
 fn save_stream(env: &Env, stream: &StreamRecord) {
@@ -420,13 +505,15 @@ fn complete_stream(env: &Env, stream: &mut StreamRecord) -> Result<(), Error> {
         .instance()
         .get(&DataKey::AttestationContract)
         .ok_or(Error::NotInitialized)?;
+    let current_contract = env.current_contract_address();
 
     let args: Vec<soroban_sdk::Val> = vec![
         env,
+        current_contract.into_val(env),
         stream.id.into_val(env),
         stream.sender.clone().into_val(env),
         stream.recipient.clone().into_val(env),
-        stream.total_deposited.into_val(env),
+        stream.total_withdrawn.into_val(env),
         stream.asset.clone().into_val(env),
         stream.category.clone().into_val(env),
         stream.title.clone().into_val(env),
@@ -444,11 +531,15 @@ fn complete_stream(env: &Env, stream: &mut StreamRecord) -> Result<(), Error> {
     stream.has_attestation = true;
     save_stream(env, stream);
 
-    env.events().publish((symbol_short!("completed"), stream.id), attestation_id);
+    StreamCompleted {
+        stream_id: stream.id,
+        attestation_id,
+        total_paid: stream.total_withdrawn,
+        refunded_to_sender: remainder,
+    }
+    .publish(env);
 
     Ok(())
 }
-
-use soroban_sdk::IntoVal;
 
 mod test;

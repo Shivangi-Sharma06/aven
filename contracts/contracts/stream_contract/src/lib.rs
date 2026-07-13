@@ -1,7 +1,7 @@
 #![no_std]
 
 use shared::{
-    Category, CheckpointRecord, StreamRecord, StreamStatus, LEDGER_BUMP, LEDGERS_PER_UNIT,
+    Category, CheckpointRecord, StreamRecord, StreamStatus, LEDGERS_PER_UNIT, LEDGER_BUMP,
     MAX_CHECKPOINTS, MAX_HISTORY_LEN, MAX_TITLE_LEN,
 };
 use soroban_sdk::{
@@ -477,11 +477,7 @@ impl StreamContract {
         load_stream(&env, stream_id)
     }
 
-    pub fn get_checkpoint(
-        env: Env,
-        stream_id: u64,
-        index: u32,
-    ) -> Result<CheckpointRecord, Error> {
+    pub fn get_checkpoint(env: Env, stream_id: u64, index: u32) -> Result<CheckpointRecord, Error> {
         let stream = load_stream(&env, stream_id)?;
         if index >= stream.checkpoint_count {
             return Err(Error::IndexOutOfRange);
@@ -641,7 +637,9 @@ fn compute_withdrawable(env: &Env, stream: &StreamRecord) -> Result<i128, Error>
                 .ok_or(Error::Overflow)?
                 / 100
         };
-        total_earned = total_earned.checked_add(contribution).ok_or(Error::Overflow)?;
+        total_earned = total_earned
+            .checked_add(contribution)
+            .ok_or(Error::Overflow)?;
         i += 1;
     }
 

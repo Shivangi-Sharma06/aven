@@ -18,16 +18,17 @@ enum MockKey {
 }
 
 #[contract]
-struct MockAttestation;
+pub struct MockAttestation;
 
 #[contractimpl]
 impl MockAttestation {
     pub fn add(
         env: Env,
         recipient: Address,
-        total_paid: i128,
+        amount_paid: i128,
         category: Category,
         minted_at_ledger: u32,
+        client_confirmed: bool,
     ) -> u64 {
         let id: u64 = env.storage().instance().get(&MockKey::Next).unwrap_or(1);
         env.storage()
@@ -48,15 +49,17 @@ impl MockAttestation {
         let record = AttestationRecord {
             id,
             stream_id: id,
+            checkpoint_index: 0,
             sender,
             recipient: recipient.clone(),
-            total_paid,
+            amount_paid,
             asset: Address::generate(&env),
             category,
             title: String::from_str(&env, "Work"),
-            start_ledger: 1,
-            end_ledger: 2,
+            period_start_ledger: 1,
+            period_end_ledger: 2,
             minted_at_ledger,
+            client_confirmed,
         };
         env.storage()
             .persistent()
@@ -87,7 +90,7 @@ fn setup<'a>(
     Address,
 ) {
     let mock_id = env.register(MockAttestation, ());
-    let reputation_id = env.register(ReputationContract, (&mock_id,));
+    let reputation_id = env.register(ReputationContract, ());
     (
         ReputationContractClient::new(env, &reputation_id),
         MockAttestationClient::new(env, &mock_id),
@@ -111,8 +114,12 @@ fn test_compute_score_multiple() {
     let recipient = Address::generate(&env);
     let (client, mock, mock_id) = setup(&env);
 
-    mock.add(&recipient, &100_000_000, &Category::Freelance, &199_000);
-    mock.add(&recipient, &1_000_000_000, &Category::Grant, &100_000);
+    // Confirmed freelance: base 10 + 1 (100M/10M/10) = 11. recency HOT (150%), Category freelance (110%), Confirmed 100%
+    // 11 * 1.5 * 1.1 * 1.0 = 18.15 -> 18 points.
+    mock.add(&recipient, &100_000_000, &Category::Freelance, &199_000, &true);
+    // Confirmed grant: base 10 + 10 (1B/10M/10) = 20. recency HOT (150%), Category grant (130%), Confirmed 100%
+    // 20 * 1.5 * 1.3 * 1.0 = 39 points.
+    mock.add(&recipient, &1_000_000_000, &Category::Grant, &100_000, &true);
 
     assert_eq!(client.compute_score(&mock_id, &recipient), 57);
     let breakdown = client.get_score_breakdown(&mock_id, &recipient);
@@ -122,12 +129,30 @@ fn test_compute_score_multiple() {
 }
 
 #[test]
+fn test_confirmation_weight_scoring() {
+    let env = Env::default();
+    env.ledger().set_sequence_number(200_000);
+    let recipient = Address::generate(&env);
+    let (client, mock, mock_id) = setup(&env);
+
+    // Confirmed freelance: 18 points
+    mock.add(&recipient, &100_000_000, &Category::Freelance, &199_000, &true);
+    // Unconfirmed (timed-out) freelance: Confirmed 50%
+    // 11 * 1.5 * 1.1 * 0.5 = 9.075 -> 9 points
+    mock.add(&recipient, &100_000_000, &Category::Freelance, &199_000, &false);
+
+    assert_eq!(client.compute_score(&mock_id, &recipient), 27);
+    let breakdown = client.get_score_breakdown(&mock_id, &recipient);
+    assert_eq!(breakdown.freelance, 27);
+}
+
+#[test]
 fn test_verify_claim_above_threshold() {
     let env = Env::default();
     env.ledger().set_sequence_number(200_000);
     let recipient = Address::generate(&env);
     let (client, mock, mock_id) = setup(&env);
-    mock.add(&recipient, &1_000_000_000, &Category::Grant, &199_000);
+    mock.add(&recipient, &1_000_000_000, &Category::Grant, &199_000, &true);
 
     assert!(client.verify_claim(&mock_id, &recipient, &30));
 }
@@ -138,7 +163,7 @@ fn test_verify_claim_below_threshold() {
     env.ledger().set_sequence_number(200_000);
     let recipient = Address::generate(&env);
     let (client, mock, mock_id) = setup(&env);
-    mock.add(&recipient, &100_000_000, &Category::Salary, &100_000);
+    mock.add(&recipient, &100_000_000, &Category::Salary, &100_000, &true);
 
     assert!(!client.verify_claim(&mock_id, &recipient, &50));
 }
@@ -150,7 +175,7 @@ fn test_spoofed_attestation_contract_scores_zero() {
     let recipient = Address::generate(&env);
     let (client, mock, _mock_id) = setup(&env);
     let spoofed_id = env.register(MockAttestation, ());
-    mock.add(&recipient, &1_000_000_000, &Category::Grant, &199_000);
+    mock.add(&recipient, &1_000_000_000, &Category::Grant, &199_000, &true);
 
     assert_eq!(client.compute_score(&spoofed_id, &recipient), 0);
     assert!(!client.verify_claim(&spoofed_id, &recipient, &1));

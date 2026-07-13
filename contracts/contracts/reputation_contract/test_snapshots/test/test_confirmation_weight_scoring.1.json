@@ -183,7 +183,7 @@
                       "symbol": "amount_paid"
                     },
                     "val": {
-                      "i128": "1000000000"
+                      "i128": "100000000"
                     }
                   },
                   {
@@ -201,7 +201,7 @@
                     "val": {
                       "vec": [
                         {
-                          "symbol": "Grant"
+                          "symbol": "Freelance"
                         }
                       ]
                     }
@@ -219,7 +219,7 @@
                       "symbol": "client_confirmed"
                     },
                     "val": {
-                      "bool": true
+                      "bool": false
                     }
                   },
                   {
@@ -235,7 +235,7 @@
                       "symbol": "minted_at_ledger"
                     },
                     "val": {
-                      "u32": 100000
+                      "u32": 199000
                     }
                   },
                   {

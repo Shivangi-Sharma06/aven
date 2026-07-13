@@ -7,13 +7,15 @@ use soroban_sdk::{
     contract, contractimpl,
     testutils::{Address as _, Ledger},
     token::{StellarAssetClient, TokenClient},
-    Address, Env, String,
+    Address, Env, String, BytesN,
 };
 
 fn create_client<'a>(env: &'a Env, attestation_contract: &Address) -> StreamContractClient<'a> {
     let admin = Address::generate(env);
-    let contract_id = env.register(StreamContract, (&admin, attestation_contract));
-    StreamContractClient::new(env, &contract_id)
+    let contract_id = env.register(StreamContract, ());
+    let client = StreamContractClient::new(env, &contract_id);
+    client.init(&admin, attestation_contract);
+    client
 }
 
 #[contract]
@@ -23,22 +25,25 @@ struct MockAttestationContract;
 impl MockAttestationContract {
     #[allow(clippy::too_many_arguments)]
     pub fn mint_attestation(
+        _env: Env,
         caller: Address,
         stream_id: u64,
+        checkpoint_index: u32,
         _sender: Address,
         _recipient: Address,
-        total_paid: i128,
+        amount_paid: i128,
         _asset: Address,
         _category: Category,
         _title: String,
-        _start_ledger: u32,
-        _end_ledger: u32,
+        _period_start_ledger: u32,
+        _period_end_ledger: u32,
+        _client_confirmed: bool,
     ) -> u64 {
         caller.require_auth();
-        if total_paid <= 0 {
+        if amount_paid <= 0 {
             panic!("invalid payment");
         }
-        stream_id
+        stream_id * 1000 + (checkpoint_index as u64) + 1
     }
 }
 
@@ -61,6 +66,9 @@ fn create_stream(
     rate: i128,
     deposit: i128,
     duration: u32,
+    checkpoint_count: u32,
+    withdrawable_cap_percent: u32,
+    approval_timeout_ledgers: u32,
 ) -> u64 {
     client.create_stream(
         sender,
@@ -69,8 +77,11 @@ fn create_stream(
         asset,
         &deposit,
         &duration,
+        &checkpoint_count,
+        &withdrawable_cap_percent,
+        &approval_timeout_ledgers,
         &Category::Freelance,
-        &String::from_str(env, "Frontend work"),
+        &String::from_str(env, "Design sprint"),
     )
 }
 
@@ -80,33 +91,48 @@ fn test_create_stream_success() {
     env.mock_all_auths();
     let sender = Address::generate(&env);
     let recipient = Address::generate(&env);
-    let asset = create_asset(&env, &sender, 1_000);
+    let asset = create_asset(&env, &sender, 100_000);
     let client = create_client(&env, &Address::generate(&env));
 
-    let id = create_stream(&env, &client, &sender, &recipient, &asset, 10, 500, 10);
+    let id = create_stream(&env, &client, &sender, &recipient, &asset, 10, 20_000, 400, 4, 60, 50);
     let stream = client.get_stream(&id);
 
-    assert_eq!(stream.id, 1);
+    assert_eq!(stream.id, id);
     assert_eq!(stream.sender, sender);
     assert_eq!(stream.recipient, recipient);
-    assert_eq!(stream.total_deposited, 500);
-    assert_eq!(stream.rate_per_ledger, 50);
+    assert_eq!(stream.total_deposited, 20_000);
+    assert_eq!(stream.rate_per_ledger, 50); // 10 * 5 = 50
     assert_eq!(stream.status, StreamStatus::Active);
-    assert_eq!(client.get_sender_streams(&stream.sender).len(), 1);
-    assert_eq!(client.get_recipient_streams(&stream.recipient).len(), 1);
+    assert_eq!(stream.checkpoint_count, 4);
+    assert_eq!(stream.checkpoint_span_ledgers, 100);
+    assert_eq!(stream.withdrawable_cap_percent, 60);
+    assert_eq!(stream.approval_timeout_ledgers, 50);
 }
 
 #[test]
-#[should_panic]
 fn test_create_stream_insufficient_deposit() {
     let env = Env::default();
     env.mock_all_auths();
     let sender = Address::generate(&env);
     let recipient = Address::generate(&env);
-    let asset = create_asset(&env, &sender, 1_000);
+    let asset = create_asset(&env, &sender, 100_000);
     let client = create_client(&env, &Address::generate(&env));
 
-    create_stream(&env, &client, &sender, &recipient, &asset, 10, 499, 10);
+    // requires 50 * 400 = 20,000 deposit, we supply 19,999
+    let res = client.try_create_stream(
+        &sender,
+        &recipient,
+        &10,
+        &asset,
+        &19_999,
+        &400,
+        &4,
+        &60,
+        &50,
+        &Category::Freelance,
+        &String::from_str(&env, "Design sprint"),
+    );
+    assert_eq!(res.unwrap_err().unwrap(), Error::InsufficientDeposit);
 }
 
 #[test]
@@ -116,16 +142,93 @@ fn test_withdraw_partial() {
     env.ledger().set_sequence_number(100);
     let sender = Address::generate(&env);
     let recipient = Address::generate(&env);
-    let asset = create_asset(&env, &sender, 1_000);
+    let asset = create_asset(&env, &sender, 100_000);
     let token = TokenClient::new(&env, &asset);
     let client = create_client(&env, &Address::generate(&env));
-    let id = create_stream(&env, &client, &sender, &recipient, &asset, 10, 500, 10);
+    
+    let id = create_stream(&env, &client, &sender, &recipient, &asset, 10, 20_000, 400, 4, 60, 50);
 
-    env.ledger().set_sequence_number(105);
-    client.withdraw(&id, &recipient);
+    // Advance sequence number to 150 (elapsed: 50 ledgers)
+    env.ledger().set_sequence_number(150);
+    
+    let earned = client.compute_earned(&id);
+    assert_eq!(earned, 1500); // 50 * 50 = 2500, capped at 60% = 1500
+    
+    let withdrawn = client.withdraw(&id, &recipient);
+    assert_eq!(withdrawn, 1500);
+    assert_eq!(token.balance(&recipient), 1500);
+    assert_eq!(client.get_stream(&id).total_withdrawn, 1500);
+}
 
-    assert_eq!(token.balance(&recipient), 250);
-    assert_eq!(client.get_stream(&id).total_withdrawn, 250);
+#[test]
+fn test_submit_and_approve_checkpoint() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_sequence_number(100);
+    let sender = Address::generate(&env);
+    let recipient = Address::generate(&env);
+    let mock_attestation = env.register(MockAttestationContract, ());
+    let asset = create_asset(&env, &sender, 100_000);
+    let token = TokenClient::new(&env, &asset);
+    let client = create_client(&env, &mock_attestation);
+    
+    let id = create_stream(&env, &client, &sender, &recipient, &asset, 10, 20_000, 400, 4, 60, 50);
+
+    // Sequence to 200 (end of checkpoint 1 span)
+    env.ledger().set_sequence_number(200);
+    
+    // Earned: 100 * 50 = 5000. Unlocked before approval: 5000 * 60% = 3000
+    let withdrawn1 = client.withdraw(&id, &recipient);
+    assert_eq!(withdrawn1, 3000);
+    
+    // Submit checkpoint 1 (index 0)
+    let evidence_hash = BytesN::from_array(&env, &[1u8; 32]);
+    client.submit_checkpoint(&id, &recipient, &0, &evidence_hash);
+    
+    // Approve checkpoint 1
+    let attestation_id = client.approve_checkpoint(&id, &sender, &0);
+    assert_eq!(attestation_id, 1001);
+    
+    // Checkpoint record should show approved = true, attestation_id = 1001
+    let cp = client.get_checkpoint(&id, &0);
+    assert!(cp.approved);
+    assert!(!cp.auto_approved);
+    assert_eq!(cp.attestation_id, 1001);
+    
+    // After approval, the remaining 2000 is withdrawable
+    let withdrawn2 = client.withdraw(&id, &recipient);
+    assert_eq!(withdrawn2, 2000);
+    assert_eq!(token.balance(&recipient), 5000);
+}
+
+#[test]
+fn test_checkpoint_auto_approve_timeout() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_sequence_number(100);
+    let sender = Address::generate(&env);
+    let recipient = Address::generate(&env);
+    let mock_attestation = env.register(MockAttestationContract, ());
+    let asset = create_asset(&env, &sender, 100_000);
+    let client = create_client(&env, &mock_attestation);
+    
+    let id = create_stream(&env, &client, &sender, &recipient, &asset, 10, 20_000, 400, 4, 60, 50);
+
+    // Sequence to 250 (due at 200 + 50 timeout = 250)
+    env.ledger().set_sequence_number(250);
+    
+    // Withdraw should trigger auto-approval of checkpoint 1
+    // Total earned: 150 * 50 = 7500 (100 * 50 for checkpoint 1, plus 50 * 50 for in-progress checkpoint 2).
+    // Checkpoint 1: fully unlocked (5000)
+    // Checkpoint 2: partial capped (50 * 50 * 60% = 1500)
+    // Total withdrawable: 5000 + 1500 = 6500.
+    let withdrawn = client.withdraw(&id, &recipient);
+    assert_eq!(withdrawn, 6500);
+    
+    let cp = client.get_checkpoint(&id, &0);
+    assert!(!cp.approved);
+    assert!(cp.auto_approved);
+    assert_eq!(cp.attestation_id, 1001);
 }
 
 #[test]
@@ -135,132 +238,118 @@ fn test_pause_resume() {
     env.ledger().set_sequence_number(100);
     let sender = Address::generate(&env);
     let recipient = Address::generate(&env);
-    let asset = create_asset(&env, &sender, 1_000);
+    let asset = create_asset(&env, &sender, 100_000);
     let client = create_client(&env, &Address::generate(&env));
-    let id = create_stream(&env, &client, &sender, &recipient, &asset, 10, 500, 10);
+    let id = create_stream(&env, &client, &sender, &recipient, &asset, 10, 20_000, 400, 4, 60, 50);
 
-    env.ledger().set_sequence_number(103);
+    env.ledger().set_sequence_number(130);
     client.pause_stream(&id, &sender);
-    env.ledger().set_sequence_number(108);
+    env.ledger().set_sequence_number(180);
     client.resume_stream(&id, &sender);
     let stream = client.get_stream(&id);
 
-    assert_eq!(stream.paused_duration_ledgers, 5);
+    assert_eq!(stream.paused_duration_ledgers, 50);
     assert_eq!(stream.status, StreamStatus::Active);
 }
 
 #[test]
-fn test_cancel_returns_unstreamed() {
+fn test_cancel_stream_refunds() {
     let env = Env::default();
     env.mock_all_auths();
     env.ledger().set_sequence_number(100);
     let sender = Address::generate(&env);
     let recipient = Address::generate(&env);
-    let asset = create_asset(&env, &sender, 1_000);
+    let asset = create_asset(&env, &sender, 100_000);
     let token = TokenClient::new(&env, &asset);
     let client = create_client(&env, &Address::generate(&env));
-    let id = create_stream(&env, &client, &sender, &recipient, &asset, 10, 500, 10);
+    
+    let id = create_stream(&env, &client, &sender, &recipient, &asset, 10, 20_000, 400, 4, 60, 50);
 
-    env.ledger().set_sequence_number(102);
+    // Advance sequence number to 150
+    env.ledger().set_sequence_number(150);
+    
     client.cancel_stream(&id, &sender);
-
-    assert_eq!(token.balance(&sender), 900);
-    assert_eq!(client.get_stream(&id).status, StreamStatus::Cancelled);
+    
+    // Recipient should receive 1500 (the withdrawable portion)
+    assert_eq!(token.balance(&recipient), 1500);
+    // Sender should get refunded the remainder (initial 100_000 - 20_000 deposit + 18_500 refund = 98_500)
+    assert_eq!(token.balance(&sender), 98_500);
+    
+    let stream = client.get_stream(&id);
+    assert_eq!(stream.status, StreamStatus::Cancelled);
+    assert_eq!(stream.total_withdrawn, 1500);
 }
 
 #[test]
-fn test_cancel_pays_earned_to_recipient() {
-    let env = Env::default();
-    env.mock_all_auths();
-    env.ledger().set_sequence_number(100);
-    let sender = Address::generate(&env);
-    let recipient = Address::generate(&env);
-    let asset = create_asset(&env, &sender, 1_000);
-    let token = TokenClient::new(&env, &asset);
-    let client = create_client(&env, &Address::generate(&env));
-    let id = create_stream(&env, &client, &sender, &recipient, &asset, 10, 500, 10);
-
-    env.ledger().set_sequence_number(102);
-    client.cancel_stream(&id, &sender);
-
-    assert_eq!(token.balance(&recipient), 100);
-}
-
-#[test]
-#[should_panic]
 fn test_only_sender_can_pause() {
     let env = Env::default();
     env.mock_all_auths();
     let sender = Address::generate(&env);
     let recipient = Address::generate(&env);
     let other = Address::generate(&env);
-    let asset = create_asset(&env, &sender, 1_000);
+    let asset = create_asset(&env, &sender, 100_000);
     let client = create_client(&env, &Address::generate(&env));
-    let id = create_stream(&env, &client, &sender, &recipient, &asset, 10, 500, 10);
+    let id = create_stream(&env, &client, &sender, &recipient, &asset, 10, 20_000, 400, 4, 60, 50);
 
-    client.pause_stream(&id, &other);
+    let res = client.try_pause_stream(&id, &other);
+    assert_eq!(res.unwrap_err().unwrap(), Error::NotSender);
 }
 
 #[test]
-#[should_panic]
 fn test_only_recipient_can_withdraw() {
     let env = Env::default();
     env.mock_all_auths();
-    env.ledger().set_sequence_number(100);
     let sender = Address::generate(&env);
     let recipient = Address::generate(&env);
     let other = Address::generate(&env);
-    let asset = create_asset(&env, &sender, 1_000);
+    let asset = create_asset(&env, &sender, 100_000);
     let client = create_client(&env, &Address::generate(&env));
-    let id = create_stream(&env, &client, &sender, &recipient, &asset, 10, 500, 10);
+    let id = create_stream(&env, &client, &sender, &recipient, &asset, 10, 20_000, 400, 4, 60, 50);
 
-    env.ledger().set_sequence_number(101);
-    client.withdraw(&id, &other);
+    let res = client.try_withdraw(&id, &other);
+    assert_eq!(res.unwrap_err().unwrap(), Error::NotRecipient);
 }
 
 #[test]
-#[should_panic]
-fn test_overflow_protection() {
+fn test_validation_rules() {
     let env = Env::default();
     env.mock_all_auths();
     let sender = Address::generate(&env);
     let recipient = Address::generate(&env);
-    let asset = create_asset(&env, &sender, i128::MAX);
+    let asset = create_asset(&env, &sender, 100_000);
     let client = create_client(&env, &Address::generate(&env));
 
-    create_stream(
-        &env,
-        &client,
-        &sender,
-        &recipient,
-        &asset,
-        i128::MAX,
-        i128::MAX,
-        u32::MAX,
-    );
-}
+    // 1. Invalid rate
+    let res = client.try_create_stream(&sender, &recipient, &0, &asset, &20_000, &400, &4, &60, &50, &Category::Freelance, &String::from_str(&env, "a"));
+    assert_eq!(res.unwrap_err().unwrap(), Error::InvalidRate);
 
-#[test]
-fn test_withdraw_completion_mints_attestation_and_refunds_extra_deposit() {
-    let env = Env::default();
-    env.mock_all_auths();
-    env.ledger().set_sequence_number(100);
-    let sender = Address::generate(&env);
-    let recipient = Address::generate(&env);
-    let attestation_contract = env.register(MockAttestationContract, ());
-    let asset = create_asset(&env, &sender, 1_000);
-    let token = TokenClient::new(&env, &asset);
-    let client = create_client(&env, &attestation_contract);
-    let id = create_stream(&env, &client, &sender, &recipient, &asset, 10, 600, 10);
+    // 2. Invalid deposit
+    let res = client.try_create_stream(&sender, &recipient, &10, &asset, &0, &20_000, &4, &60, &50, &Category::Freelance, &String::from_str(&env, "a"));
+    assert_eq!(res.unwrap_err().unwrap(), Error::InvalidDeposit);
 
-    env.ledger().set_sequence_number(110);
-    client.withdraw(&id, &recipient);
-    let stream = client.get_stream(&id);
+    // 3. Invalid duration
+    let res = client.try_create_stream(&sender, &recipient, &10, &asset, &20_000, &0, &4, &60, &50, &Category::Freelance, &String::from_str(&env, "a"));
+    assert_eq!(res.unwrap_err().unwrap(), Error::InvalidDuration);
 
-    assert_eq!(stream.status, StreamStatus::Completed);
-    assert!(stream.has_attestation);
-    assert_eq!(stream.attestation_id, id);
-    assert_eq!(stream.total_withdrawn, 500);
-    assert_eq!(token.balance(&recipient), 500);
-    assert_eq!(token.balance(&sender), 500);
+    // 4. Invalid checkpoint count
+    let res = client.try_create_stream(&sender, &recipient, &10, &asset, &20_000, &400, &0, &60, &50, &Category::Freelance, &String::from_str(&env, "a"));
+    assert_eq!(res.unwrap_err().unwrap(), Error::InvalidCheckpointCount);
+
+    // 5. Duration not divisible
+    let res = client.try_create_stream(&sender, &recipient, &10, &asset, &20_000, &400, &3, &60, &50, &Category::Freelance, &String::from_str(&env, "a"));
+    assert_eq!(res.unwrap_err().unwrap(), Error::DurationNotDivisible);
+
+    // 6. Invalid cap percent
+    let res = client.try_create_stream(&sender, &recipient, &10, &asset, &20_000, &400, &4, &101, &50, &Category::Freelance, &String::from_str(&env, "a"));
+    assert_eq!(res.unwrap_err().unwrap(), Error::InvalidCapPercent);
+
+    // 7. Invalid timeout
+    let res = client.try_create_stream(&sender, &recipient, &10, &asset, &20_000, &400, &4, &60, &0, &Category::Freelance, &String::from_str(&env, "a"));
+    assert_eq!(res.unwrap_err().unwrap(), Error::InvalidTimeout);
+
+    // 8. Title too long
+    let rust_string = std::string::String::from("a").repeat(81);
+    let long_title = String::from_str(&env, &rust_string);
+    let res = client.try_create_stream(&sender, &recipient, &10, &asset, &20_000, &400, &4, &60, &50, &Category::Freelance, &long_title);
+    assert_eq!(res.unwrap_err().unwrap(), Error::TitleTooLong);
 }

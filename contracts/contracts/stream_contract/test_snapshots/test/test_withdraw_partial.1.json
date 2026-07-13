@@ -38,7 +38,7 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM"
                 },
                 {
-                  "i128": "1000"
+                  "i128": "100000"
                 }
               ]
             }
@@ -47,6 +47,7 @@
         }
       ]
     ],
+    [],
     [],
     [
       [
@@ -70,10 +71,19 @@
                   "address": "CCABDO7UZXYE4W6GVSEGSNNZTKSLFQGKXXQTH6OX7M7GKZ4Z6CUJNGZN"
                 },
                 {
-                  "i128": "500"
+                  "i128": "20000"
                 },
                 {
-                  "u32": 10
+                  "u32": 400
+                },
+                {
+                  "u32": 4
+                },
+                {
+                  "u32": 60
+                },
+                {
+                  "u32": 50
                 },
                 {
                   "vec": [
@@ -83,7 +93,7 @@
                   ]
                 },
                 {
-                  "string": "Frontend work"
+                  "string": "Design sprint"
                 }
               ]
             }
@@ -102,7 +112,7 @@
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOLZM"
                     },
                     {
-                      "i128": "500"
+                      "i128": "20000"
                     }
                   ]
                 }
@@ -113,6 +123,7 @@
         }
       ]
     ],
+    [],
     [
       [
         "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
@@ -140,7 +151,7 @@
   ],
   "ledger": {
     "protocol_version": 26,
-    "sequence_number": 105,
+    "sequence_number": 150,
     "timestamp": 0,
     "network_id": "0000000000000000000000000000000000000000000000000000000000000000",
     "base_reserve": 0,
@@ -227,7 +238,7 @@
           },
           "ext": "v0"
         },
-        "live_until": 6312104
+        "live_until": 6312149
       },
       {
         "entry": {
@@ -333,18 +344,18 @@
                 "map": [
                   {
                     "key": {
-                      "symbol": "asset"
+                      "symbol": "approval_timeout_ledgers"
                     },
                     "val": {
-                      "address": "CCABDO7UZXYE4W6GVSEGSNNZTKSLFQGKXXQTH6OX7M7GKZ4Z6CUJNGZN"
+                      "u32": 50
                     }
                   },
                   {
                     "key": {
-                      "symbol": "attestation_id"
+                      "symbol": "asset"
                     },
                     "val": {
-                      "u64": "0"
+                      "address": "CCABDO7UZXYE4W6GVSEGSNNZTKSLFQGKXXQTH6OX7M7GKZ4Z6CUJNGZN"
                     }
                   },
                   {
@@ -361,18 +372,26 @@
                   },
                   {
                     "key": {
-                      "symbol": "duration_ledgers"
+                      "symbol": "checkpoint_count"
                     },
                     "val": {
-                      "u32": 10
+                      "u32": 4
                     }
                   },
                   {
                     "key": {
-                      "symbol": "has_attestation"
+                      "symbol": "checkpoint_span_ledgers"
                     },
                     "val": {
-                      "bool": false
+                      "u32": 100
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "duration_ledgers"
+                    },
+                    "val": {
+                      "u32": 400
                     }
                   },
                   {
@@ -448,7 +467,7 @@
                       "symbol": "title"
                     },
                     "val": {
-                      "string": "Frontend work"
+                      "string": "Design sprint"
                     }
                   },
                   {
@@ -456,7 +475,7 @@
                       "symbol": "total_deposited"
                     },
                     "val": {
-                      "i128": "500"
+                      "i128": "20000"
                     }
                   },
                   {
@@ -464,7 +483,15 @@
                       "symbol": "total_withdrawn"
                     },
                     "val": {
-                      "i128": "250"
+                      "i128": "1500"
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "withdrawable_cap_percent"
+                    },
+                    "val": {
+                      "u32": 60
                     }
                   }
                 ]
@@ -473,7 +500,7 @@
           },
           "ext": "v0"
         },
-        "live_until": 535785
+        "live_until": 535830
       },
       {
         "entry": {
@@ -533,7 +560,7 @@
           },
           "ext": "v0"
         },
-        "live_until": 535785
+        "live_until": 535830
       },
       {
         "entry": {
@@ -560,7 +587,7 @@
                       "symbol": "amount"
                     },
                     "val": {
-                      "i128": "500"
+                      "i128": "80000"
                     }
                   },
                   {
@@ -612,7 +639,7 @@
                       "symbol": "amount"
                     },
                     "val": {
-                      "i128": "250"
+                      "i128": "1500"
                     }
                   },
                   {
@@ -637,7 +664,7 @@
           },
           "ext": "v0"
         },
-        "live_until": 518505
+        "live_until": 518550
       },
       {
         "entry": {
@@ -664,7 +691,7 @@
                       "symbol": "amount"
                     },
                     "val": {
-                      "i128": "250"
+                      "i128": "18500"
                     }
                   },
                   {
@@ -806,7 +833,7 @@
           },
           "ext": "v0"
         },
-        "live_until": 535785
+        "live_until": 535830
       }
     ]
   },

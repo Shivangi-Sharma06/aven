@@ -42,6 +42,14 @@
                 "map": [
                   {
                     "key": {
+                      "symbol": "amount_paid"
+                    },
+                    "val": {
+                      "i128": "100000000"
+                    }
+                  },
+                  {
+                    "key": {
                       "symbol": "asset"
                     },
                     "val": {
@@ -62,10 +70,18 @@
                   },
                   {
                     "key": {
-                      "symbol": "end_ledger"
+                      "symbol": "checkpoint_index"
                     },
                     "val": {
-                      "u32": 2
+                      "u32": 0
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "client_confirmed"
+                    },
+                    "val": {
+                      "bool": true
                     }
                   },
                   {
@@ -86,6 +102,22 @@
                   },
                   {
                     "key": {
+                      "symbol": "period_end_ledger"
+                    },
+                    "val": {
+                      "u32": 2
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "period_start_ledger"
+                    },
+                    "val": {
+                      "u32": 1
+                    }
+                  },
+                  {
+                    "key": {
                       "symbol": "recipient"
                     },
                     "val": {
@@ -102,14 +134,6 @@
                   },
                   {
                     "key": {
-                      "symbol": "start_ledger"
-                    },
-                    "val": {
-                      "u32": 1
-                    }
-                  },
-                  {
-                    "key": {
                       "symbol": "stream_id"
                     },
                     "val": {
@@ -122,14 +146,6 @@
                     },
                     "val": {
                       "string": "Work"
-                    }
-                  },
-                  {
-                    "key": {
-                      "symbol": "total_paid"
-                    },
-                    "val": {
-                      "i128": "100000000"
                     }
                   }
                 ]
@@ -221,20 +237,7 @@
                   "executable": {
                     "wasm": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
                   },
-                  "storage": [
-                    {
-                      "key": {
-                        "vec": [
-                          {
-                            "symbol": "AttestationContract"
-                          }
-                        ]
-                      },
-                      "val": {
-                        "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
-                      }
-                    }
-                  ]
+                  "storage": null
                 }
               }
             }

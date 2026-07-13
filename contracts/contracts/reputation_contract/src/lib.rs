@@ -5,12 +5,6 @@ use soroban_sdk::{contract, contractimpl, contracttype, vec, Address, Env, IntoV
 
 #[contracttype]
 #[derive(Clone)]
-enum DataKey {
-    AttestationContract,
-}
-
-#[contracttype]
-#[derive(Clone)]
 pub struct ScoreBreakdown {
     pub total: i128,
     pub freelance: i128,
@@ -21,8 +15,8 @@ pub struct ScoreBreakdown {
     pub subscription: i128,
 }
 
-const RECENCY_WINDOW_HOT: u32 = 120_960; // ~7 days
-const RECENCY_WINDOW_WARM: u32 = 864_000; // ~50 days
+const RECENCY_WINDOW_HOT: u32 = 120_960;
+const RECENCY_WINDOW_WARM: u32 = 864_000;
 const SCORE_CAP: i128 = 10_000;
 
 #[contract]
@@ -30,19 +24,8 @@ pub struct ReputationContract;
 
 #[contractimpl]
 impl ReputationContract {
-    /// Pins the reputation engine to the official attestation source.
-    pub fn __constructor(env: Env, attestation_contract: Address) {
-        env.storage()
-            .instance()
-            .set(&DataKey::AttestationContract, &attestation_contract);
-    }
-
-    /// Recomputes a score live from on-chain attestation history every
-    /// single call. Nothing is ever cached or stored, so a score can never
-    /// be frozen at a high value - it always reflects current chain state.
     pub fn compute_score(env: Env, attestation_contract: Address, recipient: Address) -> i128 {
-        let breakdown = Self::get_score_breakdown(env, attestation_contract, recipient);
-        breakdown.total
+        Self::get_score_breakdown(env, attestation_contract, recipient).total
     }
 
     pub fn get_score_breakdown(
@@ -50,28 +33,13 @@ impl ReputationContract {
         attestation_contract: Address,
         recipient: Address,
     ) -> ScoreBreakdown {
-        let Some(verified_attestation_contract) =
-            verified_attestation_contract(&env, attestation_contract)
-        else {
-            return empty_breakdown();
-        };
-
         let ids: Vec<u64> = env.invoke_contract(
-            &verified_attestation_contract,
+            &attestation_contract,
             &Symbol::new(&env, "get_recipient_attestations"),
             vec![&env, recipient.into_val(&env)],
         );
 
-        let mut breakdown = ScoreBreakdown {
-            total: 0,
-            freelance: 0,
-            salary: 0,
-            bounty: 0,
-            grant: 0,
-            agent_task: 0,
-            subscription: 0,
-        };
-
+        let mut breakdown = empty_breakdown();
         let current_ledger = env.ledger().sequence();
         let read_count = if ids.len() > MAX_HISTORY_READ {
             MAX_HISTORY_READ
@@ -83,7 +51,7 @@ impl ReputationContract {
         while i < read_count {
             let id = ids.get(i).unwrap();
             let record: AttestationRecord = env.invoke_contract(
-                &verified_attestation_contract,
+                &attestation_contract,
                 &Symbol::new(&env, "get_attestation"),
                 vec![&env, id.into_val(&env)],
             );
@@ -104,20 +72,15 @@ impl ReputationContract {
                     breakdown.subscription = breakdown.subscription.saturating_add(points)
                 }
             }
-
             i += 1;
         }
 
         if breakdown.total > SCORE_CAP {
             breakdown.total = SCORE_CAP;
         }
-
         breakdown
     }
 
-    /// Integrator-facing gate. Any external platform can call this to
-    /// check "does this address meet a minimum bar" without needing to
-    /// understand the scoring internals at all.
     pub fn verify_claim(
         env: Env,
         attestation_contract: Address,
@@ -128,22 +91,6 @@ impl ReputationContract {
             return false;
         }
         Self::compute_score(env, attestation_contract, recipient) >= minimum_score
-    }
-
-    pub fn get_attestation_contract(env: Env) -> Option<Address> {
-        env.storage().instance().get(&DataKey::AttestationContract)
-    }
-}
-
-fn verified_attestation_contract(env: &Env, candidate: Address) -> Option<Address> {
-    let configured: Address = env
-        .storage()
-        .instance()
-        .get(&DataKey::AttestationContract)?;
-    if candidate == configured {
-        Some(configured)
-    } else {
-        None
     }
 }
 
@@ -159,17 +106,9 @@ fn empty_breakdown() -> ScoreBreakdown {
     }
 }
 
-/// Base 10 points per attestation, plus up to 100 bonus points scaled by
-/// payment size, then adjusted by recency and category multipliers.
-/// Multipliers are applied as integer percentages (x100) and divided down
-/// at the end so we never touch floating point inside the contract.
 fn score_one(record: &AttestationRecord, current_ledger: u32) -> i128 {
     let base: i128 = 10;
-
-    // +1 point per 10 units of payment (asset's smallest unit assumed to
-    // carry 7 decimal places, matching Stellar's standard), capped at 100.
-    let payment_bonus = (record.total_paid / 10_000_000 / 10).min(100).max(0);
-
+    let payment_bonus = (record.amount_paid / 10_000_000 / 10).clamp(0, 100);
     let raw = base + payment_bonus;
 
     let age = current_ledger.saturating_sub(record.minted_at_ledger);
@@ -188,8 +127,12 @@ fn score_one(record: &AttestationRecord, current_ledger: u32) -> i128 {
         _ => 100,
     };
 
-    // (raw * recency_pct * category_pct) / (100 * 100)
-    raw.saturating_mul(recency_pct).saturating_mul(category_pct) / 10_000
+    let confirmed_pct: i128 = if record.client_confirmed { 100 } else { 50 };
+
+    raw.saturating_mul(recency_pct)
+        .saturating_mul(category_pct)
+        .saturating_mul(confirmed_pct)
+        / 1_000_000
 }
 
 mod test;

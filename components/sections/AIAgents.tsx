@@ -5,20 +5,20 @@ export default function AIAgents() {
       <div className="section-layout">
         <div>
           <h2>
-            A WALLET IS A WALLET.
+            PEOPLE OR AGENTS.
             <br />
-            WORK IS WORK.
+            GOOD WORK EARNS TRUST.
           </h2>
           <p className="section-copy">
-            Aven does not distinguish between human workers and autonomous agents at
-            the protocol level.
+            Aven gives human workers and autonomous agents the same way to get paid,
+            prove delivery, and build a track record others can inspect.
           </p>
           <p className="loud-copy">
-            THE SAME PAYMENT RAIL.
+            ONE PAYMENT RAIL.
             <br />
-            THE SAME WORK HISTORY.
+            PROOF FOR EVERY JOB.
             <br />
-            THE SAME REPUTATION SYSTEM.
+            REPUTATION THAT TRAVELS.
           </p>
         </div>
         <div className="section-visual agent-rails">

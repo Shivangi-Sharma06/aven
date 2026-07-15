@@ -6,10 +6,10 @@ export default function LiveStreamDemo() {
       <div className="section-kicker">02 / STREAM</div>
       <div className="section-layout section-layout--center">
         <div>
-          <h2>WATCH MONEY MOVE.</h2>
+          <h2>PAYMENT THAT KEEPS PACE.</h2>
           <p className="section-copy">
-            Aven calculates earned balances from elapsed time and a rate per second,
-            so value moves continuously without writing state every second.
+            No invoices to chase. No payday to wait for. Aven calculates what has been
+            earned from the agreed rate and elapsed time, directly on Stellar.
           </p>
         </div>
         <div className="section-visual stream-terminal">

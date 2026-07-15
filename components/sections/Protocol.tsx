@@ -5,31 +5,32 @@ export default function Protocol() {
       <div className="section-layout">
         <div>
           <h2>
-            THREE CONTRACTS.
+            TRUST, BUILT INTO
             <br />
-            ONE ECONOMIC PRIMITIVE.
+            THE PAYMENT.
           </h2>
         </div>
         <div className="section-visual protocol-stack">
           <article>
             <span>STREAM CONTRACT</span>
             <p>
-              Accepts deposits, tracks payment streams and calculates earned balances.
+              Holds the budget, tracks earned value, and enforces checkpoint-based
+              withdrawal limits.
             </p>
             <code>earned = (current_time - start_time) × rate_per_second</code>
           </article>
           <article>
             <span>ATTESTATION CONTRACT</span>
             <p>
-              Creates a permanent credential representing the completed economic
-              relationship.
+              Turns each finalized checkpoint into a permanent record of paid,
+              client-confirmed work.
             </p>
-            <code>sender · recipient · total paid · duration · category · proof</code>
+            <code>client · worker · amount · period · category · confirmation</code>
           </article>
           <article>
             <span>REPUTATION CONTRACT</span>
-            <p>Reputation is computed from raw attestation history.</p>
-            <code>NEVER STORED. ALWAYS RECOMPUTED.</code>
+            <p>Reads verified work history and computes a transparent reputation score.</p>
+            <code>NO REVIEWS. NO HIDDEN RANKING. JUST VERIFIED HISTORY.</code>
           </article>
         </div>
       </div>

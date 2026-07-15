@@ -115,9 +115,9 @@ export default function InfinitePageLoop({ panels }: InfinitePageLoopProps) {
         aria-hidden="true"
       >
         <div className="aven-layered-hero-copy">
-          <span>STREAMING VALUE · PROVING WORK</span>
+          <span>PAY FOR PROGRESS · KEEP THE PROOF</span>
           <strong>AVEN</strong>
-          <p>THE ECONOMIC LAYER FOR VERIFIED WORK.</p>
+          <p>PAYMENT, PROOF, AND REPUTATION FOR REAL WORK.</p>
         </div>
       </section>
     </main>

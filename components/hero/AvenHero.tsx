@@ -88,17 +88,17 @@ export default function AvenHero() {
           <AvenMorphLogo />
         </div>
         <p className="hero-copy__eyebrow" data-hero-reveal>
-          STREAMING VALUE.
+          PAY FOR PROGRESS.
           <br />
-          PROVING WORK.
+          KEEP THE PROOF.
         </p>
         <h1 data-hero-reveal>
-          <span>WORK HAPPENS CONTINUOUSLY.</span>
-          <span>PAYMENT SHOULD TOO.</span>
+          <span>WORK MOVES FORWARD.</span>
+          <span>PAYMENT SHOULD KEEP UP.</span>
         </h1>
         <p className="hero-copy__body" data-hero-reveal>
-          Aven streams payments in real time and turns completed work into permanent,
-          verifiable proof.
+          Aven lets clients fund work upfront, workers earn as they deliver, and every
+          approved checkpoint becomes verifiable history on Stellar.
         </p>
         <div data-hero-reveal>
           <LiveStreamCounter />

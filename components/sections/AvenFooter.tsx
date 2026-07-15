@@ -3,9 +3,9 @@ export default function AvenFooter() {
     <footer className="aven-footer">
       <strong>AVEN</strong>
       <span>
-        STREAMING VALUE.
+        PAY FOR PROGRESS.
         <br />
-        PROVING WORK.
+        KEEP THE PROOF.
       </span>
       <span>BUILT ON STELLAR.</span>
     </footer>

@@ -13,13 +13,13 @@ export default function Reputation() {
       <div className="section-layout section-layout--center">
         <div>
           <h2>
-            YOUR WORK HISTORY.
+            A CAREER YOU CAN
             <br />
-            OWNED BY YOU.
+            TAKE WITH YOU.
           </h2>
           <p className="section-copy">
-            Aven computes reputation directly from a wallet&apos;s complete
-            attestation history.
+            Your reputation comes from work people actually paid for and approved—not
+            reviews, endorsements, or a profile you lose when you leave a platform.
           </p>
         </div>
         <div className="section-visual reputation-document-card">
@@ -35,8 +35,8 @@ export default function Reputation() {
             </div>
           ))}
           <p className="reputation-document-footnote">
-            TRANSPARENT · PORTABLE · VERIFIABLE · NOT CONTROLLED BY AVEN · NOT
-            CONTROLLED BY A MARKETPLACE
+            EARNED THROUGH WORK · PORTABLE ACROSS PRODUCTS · VERIFIABLE BY ANYONE ·
+            OWNED BY YOUR WALLET
           </p>
         </div>
       </div>

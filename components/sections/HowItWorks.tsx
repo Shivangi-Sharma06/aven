@@ -12,20 +12,20 @@ export default function HowItWorks() {
       <div className="section-layout">
         <div>
           <h2>
-            WORK.
+            FROM AGREEMENT
             <br />
-            PAID IN REAL TIME.
+            TO PAYMENT.
             <br />
-            PROVEN FOREVER.
+            TO PROOF.
           </h2>
         </div>
         <div className="section-visual steps-grid">
           <article className="step-panel">
             <span>STEP 01</span>
-            <h3>CREATE A STREAM</h3>
+            <h3>FUND THE WORK</h3>
             <p>
-              A sender deposits funds into a Soroban smart contract and defines the
-              payment rate.
+              The client locks the agreed budget in a Stellar smart contract, then sets
+              the schedule and checkpoints.
             </p>
             <dl className="data-list">
               {streamDetails.map(([label, value]) => (
@@ -38,10 +38,10 @@ export default function HowItWorks() {
           </article>
           <article className="step-panel">
             <span>STEP 02</span>
-            <h3>MONEY FLOWS</h3>
+            <h3>PROGRESS UNLOCKS PAYMENT</h3>
             <p>
-              The recipient earns continuously as time passes and can withdraw the
-              earned balance at any moment.
+              Earnings accrue as the work moves forward. Checkpoints keep both sides
+              aligned before more funds become available.
             </p>
             <div className="stream-line" aria-hidden="true">
               <span>SENDER</span>
@@ -53,16 +53,16 @@ export default function HowItWorks() {
           </article>
           <article className="step-panel">
             <span>STEP 03</span>
-            <h3>WORK BECOMES PROOF</h3>
+            <h3>APPROVE. RECORD. REPEAT.</h3>
             <p>
-              When the stream completes, Aven creates a permanent Work Attestation
-              containing the participants, payment, duration and work category.
+              The worker submits a checkpoint. Once approved, Aven records who worked,
+              who paid, and what was completed as an on-chain attestation.
             </p>
             <div className="proof-stack" aria-label="Stream completion flow">
-              <strong>ACTIVE STREAM</strong>
-              <strong>STREAM COMPLETE</strong>
-              <strong>WORK ATTESTATION</strong>
-              <strong>✓ VERIFIED ON STELLAR</strong>
+              <strong>WORK FUNDED</strong>
+              <strong>CHECKPOINT SUBMITTED</strong>
+              <strong>CLIENT APPROVED</strong>
+              <strong>✓ ATTESTED ON STELLAR</strong>
             </div>
           </article>
         </div>

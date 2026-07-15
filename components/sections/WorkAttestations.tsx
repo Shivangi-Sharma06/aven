@@ -1,12 +1,12 @@
 const attestationRows = [
-  ['STATUS', 'VERIFIED'],
-  ['CATEGORY', 'SMART CONTRACT DEVELOPMENT'],
-  ['DURATION', '18 DAYS'],
-  ['TOTAL PAID', '2,450 USDC'],
+  ['STATUS', 'CLIENT CONFIRMED'],
+  ['WORK', 'SMART CONTRACT DEVELOPMENT'],
+  ['CHECKPOINT', '03 / 04'],
+  ['AMOUNT PAID', '2,450 USDC'],
   ['SENDER', 'GBX7...81F'],
   ['RECIPIENT', 'GDQ4...92A'],
-  ['TRANSACTION', '7fa3...192d'],
-  ['NETWORK', 'STELLAR'],
+  ['PERIOD', '18 DAYS'],
+  ['NETWORK', 'STELLAR TESTNET'],
 ]
 
 export default function WorkAttestations() {
@@ -15,17 +15,19 @@ export default function WorkAttestations() {
       <div className="section-kicker">03 / ATTESTATIONS</div>
       <div className="section-layout">
         <div>
-          <h2>PAYMENT BECOMES PROOF.</h2>
+          <h2>A RECEIPT FOR REAL WORK.</h2>
           <p className="section-copy">
-            Every completed stream leaves behind a permanent, portable record of real
-            economic activity.
+            Each approved checkpoint creates a record both sides can verify—without
+            asking a platform to vouch for them.
           </p>
           <p className="loud-copy">
-            NO SELF-REPORTED CLAIMS.
+            WHO DID THE WORK.
             <br />
-            NO PLATFORM BADGES.
+            WHO PAID FOR IT.
             <br />
-            THE PAYMENT ITSELF CREATES THE PROOF.
+            WHAT THEY CONFIRMED.
+            <br />
+            RECORDED ON STELLAR.
           </p>
         </div>
         <div className="section-visual attestation-card">

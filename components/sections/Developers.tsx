@@ -13,10 +13,10 @@ export default function Developers() {
       <div className="section-kicker">06 / DEVELOPERS</div>
       <div className="section-layout section-layout--center">
         <div>
-          <h2>BUILD ON THE WORK LAYER.</h2>
+          <h2>GIVE YOUR PRODUCT A WORK LAYER.</h2>
           <p className="section-copy">
-            Aven is designed as infrastructure that any Stellar application can
-            integrate.
+            Add funded work, milestone approvals, and portable reputation to any
+            Stellar product—without rebuilding the contracts yourself.
           </p>
         </div>
         <div className="section-visual developer-grid">
@@ -32,10 +32,11 @@ createStream({
   recipient,
   asset: "USDC",
   ratePerSecond,
+  checkpointCount: 4,
   category
 });`}</pre>
             <pre>{`// conceptual query
-getAttestations(wallet);`}</pre>
+getWorkHistory(wallet);`}</pre>
           </div>
         </div>
       </div>

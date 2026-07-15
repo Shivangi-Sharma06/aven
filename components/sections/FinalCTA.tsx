@@ -22,11 +22,11 @@ export default function FinalCTA() {
     <section className="aven-section final-cta">
       <div className="section-kicker">08 / START</div>
       <h2>
-        THE INTERNET HAS IDENTITY.
+        PAY FOR THE WORK.
         <br />
-        IT HAS MONEY.
+        KEEP THE PROOF.
         <br />
-        AVEN CONNECTS WORK TO BOTH.
+        BUILD A REPUTATION THAT LASTS.
       </h2>
       <div className="hero-actions">
         <button onClick={() => router.push('/stream/create')}>START A STREAM</button>

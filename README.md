@@ -55,7 +55,7 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-The current testnet RPC endpoint, network passphrase, and asset contract IDs are defined in `lib/contracts.ts`. Deployed contract IDs are stored in the generated clients under `bindings/*/src/index.ts`; no `.env` file is required for the checked-in testnet deployment.
+The current testnet RPC endpoint, network passphrase, and asset contract IDs are defined in `lib/contracts.ts`. Deployed contract IDs are stored in the generated clients under `contracts/bindings/*/src/index.ts`; no `.env` file is required for the checked-in testnet deployment.
 
 ## Validation
 
@@ -83,10 +83,10 @@ cargo build --target wasm32v1-none --release
 
 ```text
 app/                    Next.js routes and global styles
-bindings/               Generated TypeScript clients for deployed contracts
 components/             Wallet, navigation, app shell, and landing sections
 components/sections/    Aven protocol panels and infinite layered loop
 contracts/              Soroban Rust workspace
+  bindings/             Generated TypeScript clients for deployed contracts
   contracts/stream_contract/
   contracts/attestation_contract/
   contracts/reputation_contract/

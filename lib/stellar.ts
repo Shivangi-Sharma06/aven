@@ -81,7 +81,24 @@ export type CreateStreamInput = {
   ratePerSecond: number;
   category: StreamCategory;
   title: string;
+  checkpointCount?: number;
+  withdrawableCapPercent?: number;
+  approvalTimeoutLedgers?: number;
 };
+
+const DEFAULT_CHECKPOINT_COUNT = 4;
+const DEFAULT_WITHDRAWABLE_CAP_PERCENT = 60;
+const DEFAULT_APPROVAL_TIMEOUT_LEDGERS = 50;
+
+function checkpointCountFor(durationLedgers: number, requested?: number): number {
+  if (requested !== undefined) return requested;
+
+  for (let count = DEFAULT_CHECKPOINT_COUNT; count > 1; count -= 1) {
+    if (durationLedgers % count === 0) return count;
+  }
+
+  return 1;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -155,6 +172,11 @@ export async function createStream(
     asset: assetIdFor(data.asset),
     total_deposited: totalDeposited,
     duration_ledgers: data.durationLedgers,
+    checkpoint_count: checkpointCountFor(data.durationLedgers, data.checkpointCount),
+    withdrawable_cap_percent:
+      data.withdrawableCapPercent ?? DEFAULT_WITHDRAWABLE_CAP_PERCENT,
+    approval_timeout_ledgers:
+      data.approvalTimeoutLedgers ?? DEFAULT_APPROVAL_TIMEOUT_LEDGERS,
     category: { tag: data.category, values: undefined as any },
     title: data.title,
   });

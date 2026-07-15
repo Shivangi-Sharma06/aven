@@ -2,9 +2,9 @@
  * Aven — Contract client factory
  */
 
-import { Client as StreamClient, networks as streamNetworks } from "../bindings/stream/src/index";
-import { Client as AttestationClient, networks as attestNetworks } from "../bindings/attestation/src/index";
-import { Client as ReputationClient, networks as reputationNetworks } from "../bindings/reputation/src/index";
+import { Client as StreamClient, networks as streamNetworks } from "../contracts/bindings/stream/src/index";
+import { Client as AttestationClient, networks as attestNetworks } from "../contracts/bindings/attestation/src/index";
+import { Client as ReputationClient, networks as reputationNetworks } from "../contracts/bindings/reputation/src/index";
 import { signTransaction } from "@stellar/freighter-api";
 
 export const SOROBAN_RPC_URL = "https://soroban-testnet.stellar.org";

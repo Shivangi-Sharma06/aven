@@ -1,9 +1,8 @@
-import { randomUUID } from "node:crypto";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
-import { verifyWork } from "@/services/agent-runner/src/verify";
-import type { StreamJob } from "@/services/agent-runner/src/types";
+import { verifyWork } from "@/services/work-verifier/src/verify";
+import type { VerificationRequest } from "@/services/work-verifier/src/types";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -80,22 +79,12 @@ export async function POST(request: Request) {
       await writeFile(baselinePath, Buffer.from(await baseline.arrayBuffer()), { mode: 0o600 });
     }
 
-    const job: StreamJob = {
-      jobId: `manual-${randomUUID()}`,
-      recipient: "manual-verification",
-      asset: "manual-verification",
-      totalAmount: "1",
-      ratePerSecond: "1",
-      durationLedgers: 1,
-      checkpointCount: 1,
-      withdrawableCapPercent: 0,
-      approvalTimeoutLedgers: 1,
-      title: artifact.name,
+    const verificationRequest: VerificationRequest = {
       workType,
       artifactUrl: artifactPath,
       baselineUrl: baselinePath,
     };
-    const result = await verifyWork(job);
+    const result = await verifyWork(verificationRequest);
 
     return NextResponse.json({
       ...result,

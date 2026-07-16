@@ -30,6 +30,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [connecting, setConnecting] = useState(false);
   const [hasFreighter, setHasFreighter] = useState<boolean | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [walletError, setWalletError] = useState<string | null>(null);
 
   useEffect(() => {
     checkFreighterInstalled().then(setHasFreighter);
@@ -37,12 +38,24 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   const connect = useCallback(async () => {
     setConnecting(true);
+    setWalletError(null);
     try {
       const { address: addr } = await connectFreighter();
       setAddress(addr);
+      setHasFreighter(true);
+      setShowModal(false);
+    } catch (error) {
+      setWalletError(error instanceof Error ? error.message : String(error));
+      setHasFreighter(await checkFreighterInstalled());
     } finally {
       setConnecting(false);
     }
+  }, []);
+
+  const retryFreighterDetection = useCallback(async () => {
+    setWalletError(null);
+    setHasFreighter(null);
+    setHasFreighter(await checkFreighterInstalled());
   }, []);
 
   const disconnect = useCallback(() => {
@@ -70,7 +83,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           connecting={connecting}
           connected={Boolean(address)}
           address={address}
+          error={walletError}
           onConnect={connect}
+          onRetryDetection={retryFreighterDetection}
           onDisconnect={() => { disconnect(); setShowModal(false); }}
           onClose={() => setShowModal(false)}
         />
@@ -86,7 +101,9 @@ function ConnectWalletModal({
   connecting,
   connected,
   address,
+  error,
   onConnect,
+  onRetryDetection,
   onDisconnect,
   onClose,
 }: {
@@ -94,7 +111,9 @@ function ConnectWalletModal({
   connecting: boolean;
   connected: boolean;
   address: string | null;
+  error: string | null;
   onConnect: () => Promise<void>;
+  onRetryDetection: () => Promise<void>;
   onDisconnect: () => void;
   onClose: () => void;
 }) {
@@ -128,15 +147,27 @@ function ConnectWalletModal({
         ) : hasFreighter === false ? (
           <>
             <p className="wallet-modal-sub">
-              Freighter is a Stellar browser extension wallet. Install it to use Aven.
+              Aven could not detect Freighter in this browser. If it is already installed,
+              unlock it, allow it on localhost, and try the connection directly.
             </p>
-            <a
+            {error && <div className="wallet-modal-error">{error}</div>}
+            <button
               className="wallet-modal-btn"
+              onClick={onConnect}
+              disabled={connecting}
+            >
+              {connecting ? <span className="wallet-modal-spinner" /> : "Try Freighter Connection"}
+            </button>
+            <button className="wallet-modal-btn-secondary" onClick={onRetryDetection} disabled={connecting}>
+              Check Again
+            </button>
+            <a
+              className="wallet-modal-install-link"
               href="https://www.freighter.app/"
               target="_blank"
               rel="noopener noreferrer"
             >
-              Install Freighter →
+              Freighter is not installed? Download it ↗
             </a>
           </>
         ) : (
@@ -144,6 +175,7 @@ function ConnectWalletModal({
             <p className="wallet-modal-sub">
               Freighter will ask you to approve the connection to Aven.
             </p>
+            {error && <div className="wallet-modal-error">{error}</div>}
             <button
               className="wallet-modal-btn"
               onClick={onConnect}

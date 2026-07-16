@@ -20,5 +20,5 @@
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules", "gsap-skills", "v0id-site", "services/agent-runner"]
+  "exclude": ["node_modules", "gsap-skills", "v0id-site", "services/work-verifier"]
 }

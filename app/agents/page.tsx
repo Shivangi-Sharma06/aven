@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useWallet } from "@/components/WalletProvider";
 import { computeScore, verifyClaim, ScoreBreakdown } from "@/lib/stellar";
-import { AutomationConsole } from "@/components/agents/AutomationConsole";
 import { WorkVerificationConsole } from "@/components/agents/WorkVerificationConsole";
 
 type AgentEntry = {
@@ -13,11 +12,8 @@ type AgentEntry = {
   loading: boolean;
 };
 
-// Known agents on testnet - can be extended
-const KNOWN_AGENT_ADDRESSES: string[] = [];
-
 export default function AgentsPage() {
-  const { connected, address, openConnectModal } = useWallet();
+  const { connected, address } = useWallet();
   const router = useRouter();
   const [searchAddr, setSearchAddr] = useState("");
   const [searchResult, setSearchResult] = useState<AgentEntry | null>(null);
@@ -26,7 +22,7 @@ export default function AgentsPage() {
   const [minScore, setMinScore] = useState("100");
   const [claimResult, setClaimResult] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"verification" | "automation" | "reputation">("verification");
+  const [activeTab, setActiveTab] = useState<"verification" | "reputation">("verification");
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -66,11 +62,10 @@ export default function AgentsPage() {
     <div className="agents-wrap">
       <div className="agents-console-tabs" role="tablist" aria-label="Agent tools">
         <button className={activeTab === "verification" ? "active" : ""} onClick={() => setActiveTab("verification")} role="tab" aria-selected={activeTab === "verification"}>Verify Work</button>
-        <button className={activeTab === "automation" ? "active" : ""} onClick={() => setActiveTab("automation")} role="tab" aria-selected={activeTab === "automation"}>Automation</button>
         <button className={activeTab === "reputation" ? "active" : ""} onClick={() => setActiveTab("reputation")} role="tab" aria-selected={activeTab === "reputation"}>Reputation</button>
       </div>
 
-      {activeTab === "verification" ? <WorkVerificationConsole /> : activeTab === "automation" ? <AutomationConsole /> : <>
+      {activeTab === "verification" ? <WorkVerificationConsole /> : <>
       <div className="agents-header">
         <h1 className="agents-title">Reputation Lookup</h1>
         <p className="agents-sub">

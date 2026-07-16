@@ -5,6 +5,7 @@
 
 import {
   getAddress,
+  getNetwork,
   isConnected as freighterIsConnected,
   requestAccess,
 } from "@stellar/freighter-api";
@@ -17,6 +18,7 @@ import {
   toContractAmount,
   USDC_ASSET_ID,
   XLM_ASSET_ID,
+  NETWORK_PASSPHRASE,
 } from "./contracts";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -137,17 +139,27 @@ export async function checkFreighterInstalled(): Promise<boolean> {
   if (typeof window === "undefined") return false;
   try {
     const res = await freighterIsConnected();
-    if (typeof res === "boolean") return res;
-    return (res as { isConnected: boolean }).isConnected;
+    if (res.error) return false;
+    return Boolean(res.isConnected);
   } catch {
     return false;
   }
 }
 
 export async function connectWallet(): Promise<{ address: string; connected: boolean }> {
-  await requestAccess();
-  const res = await getAddress();
-  const address = typeof res === "string" ? res : (res as { address: string }).address;
+  const access = await requestAccess();
+  if (access.error) throw new Error(access.error.message);
+
+  const addressResult = access.address ? access : await getAddress();
+  if (addressResult.error) throw new Error(addressResult.error.message);
+  const address = addressResult.address;
+  if (!address) throw new Error("Freighter did not return an account address.");
+
+  const network = await getNetwork();
+  if (network.error) throw new Error(network.error.message);
+  if (network.networkPassphrase !== NETWORK_PASSPHRASE) {
+    throw new Error("Switch Freighter to Stellar Testnet, then try connecting again.");
+  }
   return { address, connected: true };
 }
 

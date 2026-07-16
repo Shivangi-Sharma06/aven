@@ -5,7 +5,6 @@ members = [
   "contracts/stream_contract",
   "contracts/attestation_contract",
   "contracts/reputation_contract",
-  "contracts/agent_mandate_contract",
 ]
 
 [workspace.dependencies]

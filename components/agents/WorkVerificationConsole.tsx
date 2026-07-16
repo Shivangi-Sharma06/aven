@@ -274,7 +274,7 @@ export function WorkVerificationConsole() {
             <div><span>Evidence hash</span><strong>Completed</strong></div>
             <div>
               <span>Deterministic checks</span>
-              <strong>{result.workType === "code" ? "Execution + structure" : "Text / image analysis"}</strong>
+              <strong>{result.workType === "code" ? "Syntax + structure" : "Text / image analysis"}</strong>
             </div>
             <div>
               <span>Groq report</span>
@@ -317,8 +317,8 @@ export function WorkVerificationConsole() {
           <p>Use this result as a preflight record. Payment still follows the normal stream and owner approval flow.</p>
         </div>
         <div>
-          <strong>Agent worker</strong>
-          <p>The runner performs this automatically, then checks mandate policy before it submits a stream to Stellar.</p>
+          <strong>AI agent worker</strong>
+          <p>An AI agent can submit its own work through the same verifier and receive payment through a normal stream where its wallet is the recipient.</p>
         </div>
       </aside>
     </div>

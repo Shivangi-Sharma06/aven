@@ -5,7 +5,6 @@
 import { Client as StreamClient, networks as streamNetworks } from "../contracts/bindings/stream/src/index";
 import { Client as AttestationClient, networks as attestNetworks } from "../contracts/bindings/attestation/src/index";
 import { Client as ReputationClient, networks as reputationNetworks } from "../contracts/bindings/reputation/src/index";
-import { Client as AgentMandateClient } from "../contracts/bindings/agent_mandate/src/index";
 import { signTransaction } from "@stellar/freighter-api";
 
 export const SOROBAN_RPC_URL = "https://soroban-testnet.stellar.org";
@@ -65,17 +64,5 @@ export function getReputationClient(publicKey: string) {
   return new ReputationClient({
     ...baseOptions(publicKey),
     contractId: reputationNetworks.testnet.contractId,
-  });
-}
-
-/** Mandates are deployed per owner-agent pair, so their address is supplied at runtime. */
-export function getAgentMandateClient(publicKey: string, contractId: string) {
-  if (!/^C[A-Z2-7]{55}$/.test(contractId)) {
-    throw new Error("Enter a valid Stellar mandate contract address (C…).");
-  }
-
-  return new AgentMandateClient({
-    ...baseOptions(publicKey),
-    contractId,
   });
 }

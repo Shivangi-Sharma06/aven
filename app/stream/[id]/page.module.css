@@ -157,6 +157,281 @@
   gap: 10px;
 }
 
+.work-session-section {
+  margin-top: 34px;
+  border-top: 1px solid var(--border);
+  color: var(--text-primary);
+}
+
+.work-session-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 28px 0 20px;
+}
+
+.work-session-heading h2 {
+  margin: 8px 0 0;
+  font-family: var(--font-space), sans-serif;
+  font-size: clamp(28px, 5vw, 52px);
+  letter-spacing: -0.05em;
+  text-transform: uppercase;
+}
+
+.work-session-eyebrow,
+.work-session-count,
+.work-session-summary span,
+.work-session-setup > span,
+.work-session-statement > span,
+.work-session-verification > span,
+.work-session-files > span,
+.work-session-timeline > span,
+.work-session-dispute label {
+  color: var(--text-mono);
+  font-family: var(--font-mono), monospace;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.work-session-count {
+  font-size: 18px;
+}
+
+.work-session-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.work-session-summary > div {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+  padding: 16px;
+}
+
+.work-session-summary > div + div {
+  border-left: 1px solid var(--border);
+}
+
+.work-session-summary strong {
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono), monospace;
+  font-size: 13px;
+}
+
+.work-session-setup {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+  border: 1px solid var(--border);
+  padding: 18px;
+  background: var(--surface-high);
+}
+
+.work-session-setup code {
+  color: var(--text-primary);
+  font-family: var(--font-mono), monospace;
+}
+
+.work-session-setup p {
+  max-width: 680px;
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+}
+
+.work-session-list {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.work-session-empty {
+  margin-top: 18px;
+  border: 1px solid var(--border);
+  padding: 28px;
+  color: var(--text-secondary);
+  background: var(--surface);
+  text-align: center;
+}
+
+.work-session-card {
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.work-session-card-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  padding: 0;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.work-session-card-header > div {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+}
+
+.work-session-card-header > div + div {
+  border-left: 1px solid var(--border);
+}
+
+.work-session-card-header span,
+.work-session-card-metrics,
+.work-session-deadline {
+  color: var(--text-secondary);
+  font-family: var(--font-mono), monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.work-session-card-header strong {
+  font-family: var(--font-space), sans-serif;
+  font-size: 17px;
+  text-transform: uppercase;
+}
+
+.work-session-card-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.work-session-deadline {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  color: var(--stream-paused);
+}
+
+.work-session-expanded {
+  display: grid;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.work-session-statement,
+.work-session-verification,
+.work-session-files,
+.work-session-timeline {
+  display: grid;
+  gap: 12px;
+  padding: 18px 16px;
+}
+
+.work-session-statement + .work-session-verification,
+.work-session-verification + .work-session-files,
+.work-session-files + .work-session-timeline {
+  border-top: 1px solid var(--border);
+}
+
+.work-session-statement p,
+.work-session-verification p,
+.work-session-timeline p {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.work-session-verification > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.work-session-verification code {
+  border: 1px solid var(--border);
+  padding: 6px 8px;
+  color: var(--stream-paused);
+  font-family: var(--font-mono), monospace;
+  font-size: 10px;
+}
+
+.work-session-files > div,
+.work-session-timeline > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 16px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.work-session-files code,
+.work-session-timeline time {
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+}
+
+.work-session-files span,
+.work-session-timeline strong {
+  color: var(--text-secondary);
+  font-family: var(--font-mono), monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.work-session-timeline p {
+  grid-column: 1 / -1;
+}
+
+.work-session-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 14px 16px;
+}
+
+.work-session-actions button,
+.work-session-dispute button {
+  border: 1px solid var(--border);
+  padding: 10px 13px;
+  background: var(--surface-high);
+  color: var(--text-primary);
+  font-family: var(--font-mono), monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.work-session-actions button:disabled,
+.work-session-dispute button:disabled {
+  color: var(--text-secondary);
+  cursor: not-allowed;
+}
+
+.work-session-dispute {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid var(--border);
+  padding: 16px;
+  background: var(--surface-high);
+}
+
+.work-session-dispute textarea {
+  min-height: 110px;
+  resize: vertical;
+  border: 1px solid var(--border);
+  padding: 12px;
+  background: var(--bg-dark);
+  color: var(--text-primary);
+  font: inherit;
+}
+
 @media (max-width: 767px) {
   .header,
   .details div {
@@ -166,5 +441,21 @@
 
   .bigCounter {
     font-size: 36px;
+  }
+
+  .work-session-summary,
+  .work-session-card-header {
+    grid-template-columns: 1fr;
+  }
+
+  .work-session-summary > div + div,
+  .work-session-card-header > div + div {
+    border-top: 1px solid var(--border);
+    border-left: 0;
+  }
+
+  .work-session-files > div,
+  .work-session-timeline > div {
+    grid-template-columns: 1fr;
   }
 }

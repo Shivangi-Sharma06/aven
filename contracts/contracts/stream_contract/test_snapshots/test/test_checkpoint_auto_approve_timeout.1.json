@@ -722,6 +722,14 @@
                 "map": [
                   {
                     "key": {
+                      "symbol": "active_duration_seconds"
+                    },
+                    "val": {
+                      "u64": "0"
+                    }
+                  },
+                  {
+                    "key": {
                       "symbol": "amount"
                     },
                     "val": {
@@ -735,6 +743,12 @@
                     "val": {
                       "u32": 300
                     }
+                  },
+                  {
+                    "key": {
+                      "symbol": "evidence_hash"
+                    },
+                    "val": "void"
                   },
                   {
                     "key": {
@@ -770,6 +784,14 @@
                     },
                     "val": {
                       "u64": "1"
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "work_start_ledger"
+                    },
+                    "val": {
+                      "u32": 0
                     }
                   }
                 ]

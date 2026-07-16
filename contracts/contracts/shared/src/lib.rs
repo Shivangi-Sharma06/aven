@@ -20,6 +20,9 @@ pub const MAX_HISTORY_READ: u32 = 100;
 /// Hard cap on how many ids are stored against a single address.
 pub const MAX_HISTORY_LEN: u32 = 1000;
 
+/// Maximum UTF-8 byte length of a withdrawal / work-session request ID.
+pub const MAX_REQUEST_ID_LEN: u32 = 64;
+
 #[contracttype]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum StreamStatus {
@@ -38,6 +41,14 @@ pub enum Category {
     Grant,
     AgentTask,
     Subscription,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum AttestationKind {
+    Checkpoint,      // finalized checkpoint payment
+    WorkSession,     // verified work-session payment (verifier-backed)
+    LegacyReviewed,  // request_withdrawal path (no verifier)
 }
 
 #[contracttype]
@@ -80,8 +91,10 @@ pub struct CheckpointRecord {
 #[derive(Clone)]
 pub struct AttestationRecord {
     pub id: u64,
+    pub kind: AttestationKind,
     pub stream_id: u64,
-    pub checkpoint_index: u32,
+    pub request_id: String,          // session/request ID; empty string for checkpoint
+    pub checkpoint_index: u32,       // 0 for work-session / legacy
     pub sender: Address,
     pub recipient: Address,
     pub amount_paid: i128,
@@ -90,6 +103,10 @@ pub struct AttestationRecord {
     pub title: String,
     pub period_start_ledger: u32,
     pub period_end_ledger: u32,
+    pub active_duration_seconds: u64, // 0 for checkpoint / legacy
     pub minted_at_ledger: u32,
     pub client_confirmed: bool,
+    pub auto_released: bool,          // true when deadline expired without client action
+    pub verifier: Option<Address>,    // None for checkpoint / legacy paths
+    pub report_hash: Option<BytesN<32>>, // SHA-256 of verification report; None otherwise
 }

@@ -3,7 +3,8 @@
 extern crate std;
 
 use super::*;
-use soroban_sdk::{testutils::Address as _, Address, Env, String};
+use shared::AttestationKind;
+use soroban_sdk::{testutils::Address as _, Address, BytesN, Env, String};
 
 fn setup() -> (
     Env,
@@ -34,7 +35,9 @@ fn mint_sample(
     env.mock_all_auths();
     client.mint_attestation(
         caller,
+        &AttestationKind::Checkpoint,
         &7, // stream_id
+        &String::from_str(env, ""),  // request_id (empty for checkpoint)
         &0, // checkpoint_index
         sender,
         recipient,
@@ -44,7 +47,11 @@ fn mint_sample(
         &String::from_str(env, "Design sprint"),
         &10, // period_start_ledger
         &20, // period_end_ledger
+        &0,  // active_duration_seconds
         &true, // client_confirmed
+        &false, // auto_released
+        &None, // verifier
+        &None::<BytesN<32>>, // report_hash
     )
 }
 
@@ -55,6 +62,7 @@ fn test_mint_success() {
     
     let record = client.get_attestation(&id);
     assert_eq!(record.id, id);
+    assert_eq!(record.kind, AttestationKind::Checkpoint);
     assert_eq!(record.stream_id, 7);
     assert_eq!(record.checkpoint_index, 0);
     assert_eq!(record.sender, sender);
@@ -63,7 +71,11 @@ fn test_mint_success() {
     assert_eq!(record.category, Category::Freelance);
     assert_eq!(record.period_start_ledger, 10);
     assert_eq!(record.period_end_ledger, 20);
+    assert_eq!(record.active_duration_seconds, 0);
     assert!(record.client_confirmed);
+    assert!(!record.auto_released);
+    assert_eq!(record.verifier, None);
+    assert_eq!(record.report_hash, None);
 }
 
 #[test]
@@ -73,7 +85,9 @@ fn test_mint_only_by_stream_contract() {
     
     let res = client.try_mint_attestation(
         &unauthorized_caller,
+        &AttestationKind::Checkpoint,
         &7,
+        &String::from_str(&env, ""),
         &0,
         &sender,
         &recipient,
@@ -83,7 +97,11 @@ fn test_mint_only_by_stream_contract() {
         &String::from_str(&env, "Design sprint"),
         &10,
         &20,
+        &0,
         &true,
+        &false,
+        &None,
+        &None::<BytesN<32>>,
     );
     assert_eq!(res.unwrap_err().unwrap(), Error::Unauthorized);
 }
@@ -113,7 +131,9 @@ fn test_invalid_payment_rejected() {
     
     let res = client.try_mint_attestation(
         &stream_contract,
+        &AttestationKind::Checkpoint,
         &7,
+        &String::from_str(&env, ""),
         &0,
         &sender,
         &recipient,
@@ -123,7 +143,11 @@ fn test_invalid_payment_rejected() {
         &String::from_str(&env, "Zero pay"),
         &10,
         &20,
+        &0,
         &true,
+        &false,
+        &None,
+        &None::<BytesN<32>>,
     );
     assert_eq!(res.unwrap_err().unwrap(), Error::InvalidPayment);
 }
@@ -134,7 +158,9 @@ fn test_invalid_ledger_range_rejected() {
     
     let res = client.try_mint_attestation(
         &stream_contract,
+        &AttestationKind::Checkpoint,
         &7,
+        &String::from_str(&env, ""),
         &0,
         &sender,
         &recipient,
@@ -144,7 +170,11 @@ fn test_invalid_ledger_range_rejected() {
         &String::from_str(&env, "Invalid range"),
         &20, // start > end
         &10,
+        &0,
         &true,
+        &false,
+        &None,
+        &None::<BytesN<32>>,
     );
     assert_eq!(res.unwrap_err().unwrap(), Error::InvalidLedgerRange);
 }
@@ -159,7 +189,9 @@ fn test_title_too_long_rejected() {
     
     let res = client.try_mint_attestation(
         &stream_contract,
+        &AttestationKind::Checkpoint,
         &7,
+        &String::from_str(&env, ""),
         &0,
         &sender,
         &recipient,
@@ -169,7 +201,11 @@ fn test_title_too_long_rejected() {
         &long_title,
         &10,
         &20,
+        &0,
         &true,
+        &false,
+        &None,
+        &None::<BytesN<32>>,
     );
     assert_eq!(res.unwrap_err().unwrap(), Error::TitleTooLong);
 }
@@ -182,7 +218,9 @@ fn test_get_recipient_attestations() {
     // Mint another one for the same recipient
     let id2 = client.mint_attestation(
         &stream_contract,
+        &AttestationKind::Checkpoint,
         &8,
+        &String::from_str(&env, ""),
         &1,
         &sender,
         &recipient,
@@ -192,11 +230,99 @@ fn test_get_recipient_attestations() {
         &String::from_str(&env, "Second attestation"),
         &30,
         &40,
+        &0,
         &true,
+        &false,
+        &None,
+        &None::<BytesN<32>>,
     );
     
     let attestations = client.get_recipient_attestations(&recipient);
     assert_eq!(attestations.len(), 2);
     assert_eq!(attestations.get(0).unwrap(), id1);
     assert_eq!(attestations.get(1).unwrap(), id2);
+}
+
+#[test]
+fn test_get_sender_attestations() {
+    let (env, client, stream_contract, sender, recipient) = setup();
+    let id1 = mint_sample(&env, &client, &stream_contract, &sender, &recipient);
+
+    let id2 = client.mint_attestation(
+        &stream_contract,
+        &AttestationKind::WorkSession,
+        &8,
+        &String::from_str(&env, "ws-2"),
+        &0,
+        &sender,
+        &recipient,
+        &200_000_000,
+        &Address::generate(&env),
+        &Category::Freelance,
+        &String::from_str(&env, "Work session"),
+        &30,
+        &40,
+        &3600,
+        &true,
+        &false,
+        &None,
+        &None::<BytesN<32>>,
+    );
+
+    let attestations = client.get_sender_attestations(&sender);
+    assert_eq!(attestations.len(), 2);
+    assert_eq!(attestations.get(0).unwrap(), id1);
+    assert_eq!(attestations.get(1).unwrap(), id2);
+}
+
+#[test]
+fn test_duplicate_work_session_attestation_rejected() {
+    let (env, client, stream_contract, sender, recipient) = setup();
+    let evidence = BytesN::from_array(&env, &[42u8; 32]);
+
+    // First mint should succeed
+    let id = client.mint_attestation(
+        &stream_contract,
+        &AttestationKind::WorkSession,
+        &7,
+        &String::from_str(&env, "session-1"),
+        &0,
+        &sender,
+        &recipient,
+        &500_000_000,
+        &Address::generate(&env),
+        &Category::Freelance,
+        &String::from_str(&env, "Work session 1"),
+        &10,
+        &20,
+        &3600,
+        &true,
+        &false,
+        &None,
+        &Some(evidence.clone()),
+    );
+    assert!(id > 0);
+
+    // Second mint with same stream_id + request_id should fail
+    let res = client.try_mint_attestation(
+        &stream_contract,
+        &AttestationKind::WorkSession,
+        &7,
+        &String::from_str(&env, "session-1"),
+        &0,
+        &sender,
+        &recipient,
+        &500_000_000,
+        &Address::generate(&env),
+        &Category::Freelance,
+        &String::from_str(&env, "Work session 1 dup"),
+        &10,
+        &20,
+        &3600,
+        &true,
+        &false,
+        &None,
+        &Some(evidence),
+    );
+    assert_eq!(res.unwrap_err().unwrap(), Error::DuplicateAttestation);
 }

@@ -44,6 +44,14 @@
                 "map": [
                   {
                     "key": {
+                      "symbol": "active_duration_seconds"
+                    },
+                    "val": {
+                      "u64": "0"
+                    }
+                  },
+                  {
+                    "key": {
                       "symbol": "amount_paid"
                     },
                     "val": {
@@ -56,6 +64,14 @@
                     },
                     "val": {
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "auto_released"
+                    },
+                    "val": {
+                      "bool": false
                     }
                   },
                   {
@@ -96,6 +112,18 @@
                   },
                   {
                     "key": {
+                      "symbol": "kind"
+                    },
+                    "val": {
+                      "vec": [
+                        {
+                          "symbol": "Checkpoint"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "key": {
                       "symbol": "minted_at_ledger"
                     },
                     "val": {
@@ -128,6 +156,20 @@
                   },
                   {
                     "key": {
+                      "symbol": "report_hash"
+                    },
+                    "val": "void"
+                  },
+                  {
+                    "key": {
+                      "symbol": "request_id"
+                    },
+                    "val": {
+                      "string": ""
+                    }
+                  },
+                  {
+                    "key": {
                       "symbol": "sender"
                     },
                     "val": {
@@ -149,6 +191,12 @@
                     "val": {
                       "string": "Work"
                     }
+                  },
+                  {
+                    "key": {
+                      "symbol": "verifier"
+                    },
+                    "val": "void"
                   }
                 ]
               }
@@ -180,6 +228,14 @@
                 "map": [
                   {
                     "key": {
+                      "symbol": "active_duration_seconds"
+                    },
+                    "val": {
+                      "u64": "0"
+                    }
+                  },
+                  {
+                    "key": {
                       "symbol": "amount_paid"
                     },
                     "val": {
@@ -192,6 +248,14 @@
                     },
                     "val": {
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "auto_released"
+                    },
+                    "val": {
+                      "bool": true
                     }
                   },
                   {
@@ -232,6 +296,18 @@
                   },
                   {
                     "key": {
+                      "symbol": "kind"
+                    },
+                    "val": {
+                      "vec": [
+                        {
+                          "symbol": "Checkpoint"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "key": {
                       "symbol": "minted_at_ledger"
                     },
                     "val": {
@@ -264,6 +340,20 @@
                   },
                   {
                     "key": {
+                      "symbol": "report_hash"
+                    },
+                    "val": "void"
+                  },
+                  {
+                    "key": {
+                      "symbol": "request_id"
+                    },
+                    "val": {
+                      "string": ""
+                    }
+                  },
+                  {
+                    "key": {
                       "symbol": "sender"
                     },
                     "val": {
@@ -285,6 +375,12 @@
                     "val": {
                       "string": "Work"
                     }
+                  },
+                  {
+                    "key": {
+                      "symbol": "verifier"
+                    },
+                    "val": "void"
                   }
                 ]
               }

@@ -3,6 +3,7 @@
 extern crate std;
 
 use super::*;
+use shared::AttestationKind;
 use soroban_sdk::{
     contract, contractimpl,
     testutils::{Address as _, Ledger},
@@ -27,7 +28,9 @@ impl MockAttestationContract {
     pub fn mint_attestation(
         _env: Env,
         caller: Address,
+        _kind: AttestationKind,
         stream_id: u64,
+        _request_id: String,
         checkpoint_index: u32,
         _sender: Address,
         _recipient: Address,
@@ -37,7 +40,11 @@ impl MockAttestationContract {
         _title: String,
         _period_start_ledger: u32,
         _period_end_ledger: u32,
+        _active_duration_seconds: u64,
         _client_confirmed: bool,
+        _auto_released: bool,
+        _verifier: Option<Address>,
+        _report_hash: Option<BytesN<32>>,
     ) -> u64 {
         caller.require_auth();
         if amount_paid <= 0 {
@@ -161,7 +168,8 @@ fn test_withdraw_partial() {
     let recipient = Address::generate(&env);
     let asset = create_asset(&env, &sender, 100_000);
     let token = TokenClient::new(&env, &asset);
-    let client = create_client(&env, &Address::generate(&env));
+    let mock_attestation = env.register(MockAttestationContract, ());
+    let client = create_client(&env, &mock_attestation);
 
     let id = create_stream(
         &env, &client, &sender, &recipient, &asset, 10, 20_000, 400, 4, 60, 50,
@@ -353,7 +361,8 @@ fn test_exact_withdrawal_requires_approval_and_cannot_repeat() {
     let recipient = Address::generate(&env);
     let asset = create_asset(&env, &sender, 100_000);
     let token = TokenClient::new(&env, &asset);
-    let client = create_client(&env, &Address::generate(&env));
+    let mock_attestation = env.register(MockAttestationContract, ());
+    let client = create_client(&env, &mock_attestation);
     let id = create_stream(
         &env, &client, &sender, &recipient, &asset, 10, 20_000, 400, 4, 60, 50,
     );
@@ -502,7 +511,7 @@ fn test_verifier_can_reserve_exact_session_payment() {
     env.ledger().set_sequence_number(150);
     let session_id = String::from_str(&env, "session-verified");
     let evidence = BytesN::from_array(&env, &[9; 32]);
-    client.verify_work(&id, &session_id, &1_000, &evidence);
+    client.verify_work(&id, &session_id, &1_000, &evidence, &3600, &140);
 
     let direct = client.try_request_withdrawal(
         &id,
@@ -515,6 +524,9 @@ fn test_verifier_can_reserve_exact_session_payment() {
     let record = client.get_withdrawal(&id, &session_id);
     assert_eq!(record.amount, 1_000);
     assert_eq!(record.status, WithdrawalStatus::Pending);
+    assert_eq!(record.evidence_hash, Some(evidence));
+    assert_eq!(record.work_start_ledger, 140);
+    assert_eq!(record.active_duration_seconds, 3600);
     assert_eq!(client.compute_available(&id), 500);
 }
 

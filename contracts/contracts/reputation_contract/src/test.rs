@@ -3,6 +3,7 @@
 extern crate std;
 
 use super::*;
+use shared::AttestationKind;
 use soroban_sdk::{
     contract, contractimpl, contracttype,
     testutils::{Address as _, Ledger},
@@ -48,7 +49,9 @@ impl MockAttestation {
         let sender = Address::generate(&env);
         let record = AttestationRecord {
             id,
+            kind: AttestationKind::Checkpoint,
             stream_id: id,
+            request_id: String::from_str(&env, ""),
             checkpoint_index: 0,
             sender,
             recipient: recipient.clone(),
@@ -58,8 +61,12 @@ impl MockAttestation {
             title: String::from_str(&env, "Work"),
             period_start_ledger: 1,
             period_end_ledger: 2,
+            active_duration_seconds: 0,
             minted_at_ledger,
             client_confirmed,
+            auto_released: !client_confirmed,
+            verifier: None,
+            report_hash: None,
         };
         env.storage()
             .persistent()

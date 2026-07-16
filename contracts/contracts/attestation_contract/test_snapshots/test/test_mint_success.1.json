@@ -20,7 +20,17 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
                 },
                 {
+                  "vec": [
+                    {
+                      "symbol": "Checkpoint"
+                    }
+                  ]
+                },
+                {
                   "u64": "7"
+                },
+                {
+                  "string": ""
                 },
                 {
                   "u32": 0
@@ -54,8 +64,16 @@
                   "u32": 20
                 },
                 {
+                  "u64": "0"
+                },
+                {
                   "bool": true
-                }
+                },
+                {
+                  "bool": false
+                },
+                "void",
+                "void"
               ]
             }
           },
@@ -117,6 +135,14 @@
                 "map": [
                   {
                     "key": {
+                      "symbol": "active_duration_seconds"
+                    },
+                    "val": {
+                      "u64": "0"
+                    }
+                  },
+                  {
+                    "key": {
                       "symbol": "amount_paid"
                     },
                     "val": {
@@ -129,6 +155,14 @@
                     },
                     "val": {
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4"
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "auto_released"
+                    },
+                    "val": {
+                      "bool": false
                     }
                   },
                   {
@@ -169,6 +203,18 @@
                   },
                   {
                     "key": {
+                      "symbol": "kind"
+                    },
+                    "val": {
+                      "vec": [
+                        {
+                          "symbol": "Checkpoint"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "key": {
                       "symbol": "minted_at_ledger"
                     },
                     "val": {
@@ -201,6 +247,20 @@
                   },
                   {
                     "key": {
+                      "symbol": "report_hash"
+                    },
+                    "val": "void"
+                  },
+                  {
+                    "key": {
+                      "symbol": "request_id"
+                    },
+                    "val": {
+                      "string": ""
+                    }
+                  },
+                  {
+                    "key": {
                       "symbol": "sender"
                     },
                     "val": {
@@ -222,6 +282,12 @@
                     "val": {
                       "string": "Design sprint"
                     }
+                  },
+                  {
+                    "key": {
+                      "symbol": "verifier"
+                    },
+                    "val": "void"
                   }
                 ]
               }
@@ -245,6 +311,37 @@
                   },
                   {
                     "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
+                  }
+                ]
+              },
+              "durability": "persistent",
+              "val": {
+                "vec": [
+                  {
+                    "u64": "1"
+                  }
+                ]
+              }
+            }
+          },
+          "ext": "v0"
+        },
+        "live_until": 535680
+      },
+      {
+        "entry": {
+          "last_modified_ledger_seq": 0,
+          "data": {
+            "contract_data": {
+              "ext": "v0",
+              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
+              "key": {
+                "vec": [
+                  {
+                    "symbol": "SenderAttestations"
+                  },
+                  {
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                   }
                 ]
               },

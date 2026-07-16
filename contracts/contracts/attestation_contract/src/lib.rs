@@ -1,9 +1,12 @@
 #![no_std]
 
-use shared::{AttestationRecord, Category, LEDGER_BUMP, MAX_HISTORY_LEN, MAX_TITLE_LEN};
+use shared::{
+    AttestationKind, AttestationRecord, Category, LEDGER_BUMP, MAX_HISTORY_LEN, MAX_REQUEST_ID_LEN,
+    MAX_TITLE_LEN,
+};
 use soroban_sdk::{
-    contract, contracterror, contractevent, contractimpl, contracttype, vec, Address, Env, String,
-    Vec,
+    contract, contracterror, contractevent, contractimpl, contracttype, vec, Address, BytesN, Env,
+    String, Vec,
 };
 
 #[contracttype]
@@ -14,6 +17,8 @@ enum DataKey {
     NextAttestationId,
     Attestation(u64),
     RecipientAttestations(Address),
+    WorkSessionAttestation(u64, String), // (stream_id, request_id) → u64 attestation_id
+    SenderAttestations(Address),
 }
 
 #[contracterror]
@@ -29,6 +34,7 @@ pub enum Error {
     InvalidPayment = 7,
     InvalidLedgerRange = 8,
     TitleTooLong = 9,
+    DuplicateAttestation = 10,
 }
 
 #[contractevent(topics = ["attestation_minted"])]
@@ -41,7 +47,9 @@ pub struct AttestationMinted {
     pub checkpoint_index: u32,
     pub recipient: Address,
     pub amount_paid: i128,
+    pub kind: AttestationKind,
     pub client_confirmed: bool,
+    pub auto_released: bool,
 }
 
 #[contract]
@@ -70,7 +78,9 @@ impl AttestationContract {
     pub fn mint_attestation(
         env: Env,
         caller: Address,
+        kind: AttestationKind,
         stream_id: u64,
+        request_id: String,
         checkpoint_index: u32,
         sender: Address,
         recipient: Address,
@@ -80,7 +90,11 @@ impl AttestationContract {
         title: String,
         period_start_ledger: u32,
         period_end_ledger: u32,
+        active_duration_seconds: u64,
         client_confirmed: bool,
+        auto_released: bool,
+        verifier: Option<Address>,
+        report_hash: Option<BytesN<32>>,
     ) -> Result<u64, Error> {
         caller.require_auth();
 
@@ -102,6 +116,18 @@ impl AttestationContract {
             return Err(Error::TitleTooLong);
         }
 
+        // Duplicate prevention for WorkSession and LegacyReviewed kinds
+        if kind == AttestationKind::WorkSession || kind == AttestationKind::LegacyReviewed {
+            if request_id.len() > MAX_REQUEST_ID_LEN {
+                return Err(Error::TitleTooLong);
+            }
+            let dup_key =
+                DataKey::WorkSessionAttestation(stream_id, request_id.clone());
+            if env.storage().persistent().has(&dup_key) {
+                return Err(Error::DuplicateAttestation);
+            }
+        }
+
         env.storage()
             .instance()
             .extend_ttl(LEDGER_BUMP, LEDGER_BUMP);
@@ -118,9 +144,11 @@ impl AttestationContract {
 
         let record = AttestationRecord {
             id,
+            kind: kind.clone(),
             stream_id,
+            request_id: request_id.clone(),
             checkpoint_index,
-            sender,
+            sender: sender.clone(),
             recipient: recipient.clone(),
             amount_paid,
             asset,
@@ -128,8 +156,12 @@ impl AttestationContract {
             title,
             period_start_ledger,
             period_end_ledger,
+            active_duration_seconds,
             minted_at_ledger: env.ledger().sequence(),
             client_confirmed,
+            auto_released,
+            verifier,
+            report_hash,
         };
 
         let key = DataKey::Attestation(id);
@@ -138,20 +170,51 @@ impl AttestationContract {
             .persistent()
             .extend_ttl(&key, LEDGER_BUMP, LEDGER_BUMP);
 
-        let list_key = DataKey::RecipientAttestations(recipient);
-        let mut list: Vec<u64> = env
+        // Store duplicate-prevention key for WorkSession / LegacyReviewed
+        if kind == AttestationKind::WorkSession || kind == AttestationKind::LegacyReviewed {
+            let dup_key =
+                DataKey::WorkSessionAttestation(stream_id, request_id);
+            env.storage().persistent().set(&dup_key, &id);
+            env.storage()
+                .persistent()
+                .extend_ttl(&dup_key, LEDGER_BUMP, LEDGER_BUMP);
+        }
+
+        // Append to recipient attestation index
+        let recipient_key = DataKey::RecipientAttestations(recipient.clone());
+        let mut recipient_list: Vec<u64> = env
             .storage()
             .persistent()
-            .get(&list_key)
+            .get(&recipient_key)
             .unwrap_or(vec![&env]);
-        if list.len() >= MAX_HISTORY_LEN {
+        if recipient_list.len() >= MAX_HISTORY_LEN {
             return Err(Error::HistoryFull);
         }
-        list.push_back(id);
-        env.storage().persistent().set(&list_key, &list);
+        recipient_list.push_back(id);
         env.storage()
             .persistent()
-            .extend_ttl(&list_key, LEDGER_BUMP, LEDGER_BUMP);
+            .set(&recipient_key, &recipient_list);
+        env.storage()
+            .persistent()
+            .extend_ttl(&recipient_key, LEDGER_BUMP, LEDGER_BUMP);
+
+        // Append to sender attestation index
+        let sender_key = DataKey::SenderAttestations(sender);
+        let mut sender_list: Vec<u64> = env
+            .storage()
+            .persistent()
+            .get(&sender_key)
+            .unwrap_or(vec![&env]);
+        if sender_list.len() >= MAX_HISTORY_LEN {
+            return Err(Error::HistoryFull);
+        }
+        sender_list.push_back(id);
+        env.storage()
+            .persistent()
+            .set(&sender_key, &sender_list);
+        env.storage()
+            .persistent()
+            .extend_ttl(&sender_key, LEDGER_BUMP, LEDGER_BUMP);
 
         AttestationMinted {
             attestation_id: id,
@@ -159,7 +222,9 @@ impl AttestationContract {
             checkpoint_index,
             recipient: record.recipient.clone(),
             amount_paid,
+            kind: record.kind,
             client_confirmed,
+            auto_released,
         }
         .publish(&env);
 
@@ -181,6 +246,15 @@ impl AttestationContract {
 
     pub fn get_recipient_attestations(env: Env, recipient: Address) -> Vec<u64> {
         let key = DataKey::RecipientAttestations(recipient);
+        let ids = env.storage().persistent().get(&key).unwrap_or(vec![&env]);
+        env.storage()
+            .persistent()
+            .extend_ttl(&key, LEDGER_BUMP, LEDGER_BUMP);
+        ids
+    }
+
+    pub fn get_sender_attestations(env: Env, sender: Address) -> Vec<u64> {
+        let key = DataKey::SenderAttestations(sender);
         let ids = env.storage().persistent().get(&key).unwrap_or(vec![&env]);
         env.storage()
             .persistent()

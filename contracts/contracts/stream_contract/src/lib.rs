@@ -1,8 +1,8 @@
 #![no_std]
 
 use shared::{
-    Category, CheckpointRecord, StreamRecord, StreamStatus, LEDGERS_PER_UNIT, LEDGER_BUMP,
-    MAX_CHECKPOINTS, MAX_HISTORY_LEN, MAX_TITLE_LEN,
+    AttestationKind, Category, CheckpointRecord, StreamRecord, StreamStatus, LEDGERS_PER_UNIT,
+    LEDGER_BUMP, MAX_CHECKPOINTS, MAX_HISTORY_LEN, MAX_TITLE_LEN,
 };
 use soroban_sdk::{
     contract, contracterror, contractevent, contractimpl, contracttype, token, vec, Address,
@@ -22,7 +22,6 @@ enum DataKey {
     Withdrawal(u64, String),
     ReservedWithdrawals(u64),
     Verifier,
-    WorkEvidence(u64, String),
 }
 
 const MAX_WITHDRAWAL_REQUEST_ID_LEN: u32 = 64;
@@ -45,6 +44,9 @@ pub struct WithdrawalRecord {
     pub requested_at_ledger: u32,
     pub deadline_ledger: u32,
     pub status: WithdrawalStatus,
+    pub evidence_hash: Option<BytesN<32>>,
+    pub work_start_ledger: u32,
+    pub active_duration_seconds: u64,
 }
 
 #[contracterror]
@@ -235,6 +237,8 @@ impl StreamContract {
         request_id: String,
         amount: i128,
         evidence_hash: BytesN<32>,
+        active_duration_seconds: u64,
+        work_start_ledger: u32,
     ) -> Result<(), Error> {
         let verifier: Address = env
             .storage()
@@ -255,11 +259,9 @@ impl StreamContract {
 
         let key = DataKey::Withdrawal(stream_id, request_id.clone());
         if let Some(existing) = env.storage().persistent().get::<_, WithdrawalRecord>(&key) {
-            let evidence_key = DataKey::WorkEvidence(stream_id, request_id.clone());
-            let existing_hash: Option<BytesN<32>> = env.storage().persistent().get(&evidence_key);
             if existing.amount == amount
                 && existing.status == WithdrawalStatus::Pending
-                && existing_hash == Some(evidence_hash)
+                && existing.evidence_hash == Some(evidence_hash)
             {
                 return Ok(());
             }
@@ -285,6 +287,9 @@ impl StreamContract {
             requested_at_ledger,
             deadline_ledger,
             status: WithdrawalStatus::Pending,
+            evidence_hash: Some(evidence_hash.clone()),
+            work_start_ledger,
+            active_duration_seconds,
         };
         save_withdrawal(&env, &record);
         save_reserved(
@@ -294,13 +299,6 @@ impl StreamContract {
                 .checked_add(amount)
                 .ok_or(Error::Overflow)?,
         );
-        let evidence_key = DataKey::WorkEvidence(stream_id, request_id.clone());
-        env.storage()
-            .persistent()
-            .set(&evidence_key, &evidence_hash);
-        env.storage()
-            .persistent()
-            .extend_ttl(&evidence_key, LEDGER_BUMP, LEDGER_BUMP);
 
         WorkVerified {
             stream_id,
@@ -557,6 +555,9 @@ impl StreamContract {
             requested_at_ledger,
             deadline_ledger,
             status: WithdrawalStatus::Pending,
+            evidence_hash: None,
+            work_start_ledger: 0,
+            active_duration_seconds: 0,
         };
         save_withdrawal(&env, &record);
         save_reserved(
@@ -655,13 +656,16 @@ impl StreamContract {
         }
         require_withdrawable_status(&stream)?;
         let mut record = load_withdrawal(&env, stream_id, &request_id)?;
-        match record.status {
-            WithdrawalStatus::Approved => {}
-            WithdrawalStatus::Pending if env.ledger().sequence() >= record.deadline_ledger => {}
+
+        // Determine whether this is an explicit approval or auto-release
+        let auto_released = match record.status {
+            WithdrawalStatus::Approved => false,
+            WithdrawalStatus::Pending if env.ledger().sequence() >= record.deadline_ledger => true,
             WithdrawalStatus::Pending => return Err(Error::WithdrawalNotApproved),
             WithdrawalStatus::Disputed => return Err(Error::WithdrawalDisputed),
             WithdrawalStatus::Withdrawn => return Err(Error::NothingToWithdraw),
-        }
+        };
+        let client_confirmed = !auto_released;
 
         finalize_due_checkpoints(&env, &stream)?;
         if record.amount > compute_withdrawable(&env, &stream)? {
@@ -681,11 +685,70 @@ impl StreamContract {
         save_reserved(&env, stream_id, next_reserved);
         save_withdrawal(&env, &record);
 
+        // Transfer tokens to the recipient
         token::Client::new(&env, &stream.asset).transfer(
             &env.current_contract_address(),
             &recipient,
             &record.amount,
         );
+
+        // Determine attestation kind based on whether evidence was provided
+        let kind = if record.evidence_hash.is_some() {
+            AttestationKind::WorkSession
+        } else {
+            AttestationKind::LegacyReviewed
+        };
+
+        // Resolve verifier address (only present for WorkSession kind)
+        let verifier: Option<Address> = if kind == AttestationKind::WorkSession {
+            env.storage().instance().get(&DataKey::Verifier)
+        } else {
+            None
+        };
+
+        // Determine period boundaries
+        let period_start = if record.work_start_ledger > 0 {
+            record.work_start_ledger
+        } else {
+            record.requested_at_ledger
+        };
+        let period_end = env.ledger().sequence();
+
+        // Mint attestation atomically after successful transfer
+        let attestation_contract: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::AttestationContract)
+            .ok_or(Error::NotInitialized)?;
+
+        let args: Vec<soroban_sdk::Val> = vec![
+            &env,
+            env.current_contract_address().into_val(&env),  // caller
+            kind.into_val(&env),                              // kind
+            stream.id.into_val(&env),                         // stream_id
+            request_id.clone().into_val(&env),                // request_id
+            0u32.into_val(&env),                              // checkpoint_index
+            stream.sender.clone().into_val(&env),             // sender
+            stream.recipient.clone().into_val(&env),          // recipient
+            record.amount.into_val(&env),                     // amount_paid
+            stream.asset.clone().into_val(&env),              // asset
+            stream.category.clone().into_val(&env),           // category
+            stream.title.clone().into_val(&env),              // title
+            period_start.into_val(&env),                      // period_start_ledger
+            period_end.into_val(&env),                        // period_end_ledger
+            record.active_duration_seconds.into_val(&env),    // active_duration_seconds
+            client_confirmed.into_val(&env),                  // client_confirmed
+            auto_released.into_val(&env),                     // auto_released
+            verifier.into_val(&env),                          // verifier
+            record.evidence_hash.into_val(&env),              // report_hash
+        ];
+
+        let _attestation_id: u64 = env.invoke_contract(
+            &attestation_contract,
+            &Symbol::new(&env, "mint_attestation"),
+            args,
+        );
+
         StreamWithdrawn {
             stream_id,
             recipient,
@@ -1111,20 +1174,28 @@ fn finalize_checkpoint(
         .get(&DataKey::AttestationContract)
         .ok_or(Error::NotInitialized)?;
 
+    let auto_released = !client_confirmed;
+
     let args: Vec<soroban_sdk::Val> = vec![
         env,
-        env.current_contract_address().into_val(env),
-        stream.id.into_val(env),
-        checkpoint.index.into_val(env),
-        stream.sender.clone().into_val(env),
-        stream.recipient.clone().into_val(env),
-        amount_paid.into_val(env),
-        stream.asset.clone().into_val(env),
-        stream.category.clone().into_val(env),
-        stream.title.clone().into_val(env),
-        period_start.into_val(env),
-        period_end.into_val(env),
-        client_confirmed.into_val(env),
+        env.current_contract_address().into_val(env),           // caller
+        AttestationKind::Checkpoint.into_val(env),               // kind
+        stream.id.into_val(env),                                 // stream_id
+        String::from_str(env, "").into_val(env),                 // request_id (empty for checkpoint)
+        checkpoint.index.into_val(env),                          // checkpoint_index
+        stream.sender.clone().into_val(env),                     // sender
+        stream.recipient.clone().into_val(env),                  // recipient
+        amount_paid.into_val(env),                               // amount_paid
+        stream.asset.clone().into_val(env),                      // asset
+        stream.category.clone().into_val(env),                   // category
+        stream.title.clone().into_val(env),                      // title
+        period_start.into_val(env),                              // period_start_ledger
+        period_end.into_val(env),                                // period_end_ledger
+        0u64.into_val(env),                                      // active_duration_seconds
+        client_confirmed.into_val(env),                          // client_confirmed
+        auto_released.into_val(env),                             // auto_released
+        Option::<Address>::None.into_val(env),                   // verifier
+        Option::<BytesN<32>>::None.into_val(env),                // report_hash
     ];
 
     let attestation_id: u64 = env.invoke_contract(

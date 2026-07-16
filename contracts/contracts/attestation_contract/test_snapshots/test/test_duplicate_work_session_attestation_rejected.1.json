@@ -1,18 +1,93 @@
 {
   "generators": {
-    "address": 3,
+    "address": 7,
     "nonce": 0,
     "mux_id": 0
   },
   "auth": [
     [],
     [],
-    [],
+    [
+      [
+        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
+        {
+          "function": {
+            "contract_fn": {
+              "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
+              "function_name": "mint_attestation",
+              "args": [
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                },
+                {
+                  "vec": [
+                    {
+                      "symbol": "WorkSession"
+                    }
+                  ]
+                },
+                {
+                  "u64": "7"
+                },
+                {
+                  "string": "session-1"
+                },
+                {
+                  "u32": 0
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
+                },
+                {
+                  "i128": "500000000"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4"
+                },
+                {
+                  "vec": [
+                    {
+                      "symbol": "Freelance"
+                    }
+                  ]
+                },
+                {
+                  "string": "Work session 1"
+                },
+                {
+                  "u32": 10
+                },
+                {
+                  "u32": 20
+                },
+                {
+                  "u64": "3600"
+                },
+                {
+                  "bool": true
+                },
+                {
+                  "bool": false
+                },
+                "void",
+                {
+                  "bytes": "2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a"
+                }
+              ]
+            }
+          },
+          "sub_invocations": []
+        }
+      ]
+    ],
     []
   ],
   "ledger": {
     "protocol_version": 26,
-    "sequence_number": 200000,
+    "sequence_number": 0,
     "timestamp": 0,
     "network_id": "0000000000000000000000000000000000000000000000000000000000000000",
     "base_reserve": 0,
@@ -27,6 +102,26 @@
             "contract_data": {
               "ext": "v0",
               "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
+              "key": {
+                "ledger_key_nonce": {
+                  "nonce": "801925984706572462"
+                }
+              },
+              "durability": "temporary",
+              "val": "void"
+            }
+          },
+          "ext": "v0"
+        },
+        "live_until": 6311999
+      },
+      {
+        "entry": {
+          "last_modified_ledger_seq": 0,
+          "data": {
+            "contract_data": {
+              "ext": "v0",
+              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
               "key": {
                 "vec": [
                   {
@@ -45,7 +140,7 @@
                       "symbol": "active_duration_seconds"
                     },
                     "val": {
-                      "u64": "0"
+                      "u64": "3600"
                     }
                   },
                   {
@@ -53,7 +148,7 @@
                       "symbol": "amount_paid"
                     },
                     "val": {
-                      "i128": "100000000"
+                      "i128": "500000000"
                     }
                   },
                   {
@@ -61,7 +156,7 @@
                       "symbol": "asset"
                     },
                     "val": {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4"
                     }
                   },
                   {
@@ -79,7 +174,7 @@
                     "val": {
                       "vec": [
                         {
-                          "symbol": "Salary"
+                          "symbol": "Freelance"
                         }
                       ]
                     }
@@ -115,7 +210,7 @@
                     "val": {
                       "vec": [
                         {
-                          "symbol": "Checkpoint"
+                          "symbol": "WorkSession"
                         }
                       ]
                     }
@@ -125,7 +220,7 @@
                       "symbol": "minted_at_ledger"
                     },
                     "val": {
-                      "u32": 100000
+                      "u32": 0
                     }
                   },
                   {
@@ -133,7 +228,7 @@
                       "symbol": "period_end_ledger"
                     },
                     "val": {
-                      "u32": 2
+                      "u32": 20
                     }
                   },
                   {
@@ -141,7 +236,7 @@
                       "symbol": "period_start_ledger"
                     },
                     "val": {
-                      "u32": 1
+                      "u32": 10
                     }
                   },
                   {
@@ -149,21 +244,23 @@
                       "symbol": "recipient"
                     },
                     "val": {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM"
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
                     }
                   },
                   {
                     "key": {
                       "symbol": "report_hash"
                     },
-                    "val": "void"
+                    "val": {
+                      "bytes": "2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a"
+                    }
                   },
                   {
                     "key": {
                       "symbol": "request_id"
                     },
                     "val": {
-                      "string": ""
+                      "string": "session-1"
                     }
                   },
                   {
@@ -171,7 +268,7 @@
                       "symbol": "sender"
                     },
                     "val": {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM"
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                     }
                   },
                   {
@@ -179,7 +276,7 @@
                       "symbol": "stream_id"
                     },
                     "val": {
-                      "u64": "1"
+                      "u64": "7"
                     }
                   },
                   {
@@ -187,7 +284,7 @@
                       "symbol": "title"
                     },
                     "val": {
-                      "string": "Work"
+                      "string": "Work session 1"
                     }
                   },
                   {
@@ -202,7 +299,7 @@
           },
           "ext": "v0"
         },
-        "live_until": 204095
+        "live_until": 535680
       },
       {
         "entry": {
@@ -210,14 +307,14 @@
           "data": {
             "contract_data": {
               "ext": "v0",
-              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
+              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
               "key": {
                 "vec": [
                   {
-                    "symbol": "Recipient"
+                    "symbol": "RecipientAttestations"
                   },
                   {
-                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM"
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
                   }
                 ]
               },
@@ -233,7 +330,7 @@
           },
           "ext": "v0"
         },
-        "live_until": 204095
+        "live_until": 535680
       },
       {
         "entry": {
@@ -241,35 +338,60 @@
           "data": {
             "contract_data": {
               "ext": "v0",
-              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
-              "key": "ledger_key_contract_instance",
+              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
+              "key": {
+                "vec": [
+                  {
+                    "symbol": "SenderAttestations"
+                  },
+                  {
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                  }
+                ]
+              },
               "durability": "persistent",
               "val": {
-                "contract_instance": {
-                  "executable": {
-                    "wasm": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-                  },
-                  "storage": [
-                    {
-                      "key": {
-                        "vec": [
-                          {
-                            "symbol": "Next"
-                          }
-                        ]
-                      },
-                      "val": {
-                        "u64": "2"
-                      }
-                    }
-                  ]
-                }
+                "vec": [
+                  {
+                    "u64": "1"
+                  }
+                ]
               }
             }
           },
           "ext": "v0"
         },
-        "live_until": 204095
+        "live_until": 535680
+      },
+      {
+        "entry": {
+          "last_modified_ledger_seq": 0,
+          "data": {
+            "contract_data": {
+              "ext": "v0",
+              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
+              "key": {
+                "vec": [
+                  {
+                    "symbol": "WorkSessionAttestation"
+                  },
+                  {
+                    "u64": "7"
+                  },
+                  {
+                    "string": "session-1"
+                  }
+                ]
+              },
+              "durability": "persistent",
+              "val": {
+                "u64": "1"
+              }
+            }
+          },
+          "ext": "v0"
+        },
+        "live_until": 535680
       },
       {
         "entry": {
@@ -285,14 +407,51 @@
                   "executable": {
                     "wasm": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
                   },
-                  "storage": null
+                  "storage": [
+                    {
+                      "key": {
+                        "vec": [
+                          {
+                            "symbol": "Admin"
+                          }
+                        ]
+                      },
+                      "val": {
+                        "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM"
+                      }
+                    },
+                    {
+                      "key": {
+                        "vec": [
+                          {
+                            "symbol": "NextAttestationId"
+                          }
+                        ]
+                      },
+                      "val": {
+                        "u64": "2"
+                      }
+                    },
+                    {
+                      "key": {
+                        "vec": [
+                          {
+                            "symbol": "StreamContract"
+                          }
+                        ]
+                      },
+                      "val": {
+                        "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                      }
+                    }
+                  ]
                 }
               }
             }
           },
           "ext": "v0"
         },
-        "live_until": 204095
+        "live_until": 535680
       },
       {
         "entry": {
@@ -306,7 +465,7 @@
           },
           "ext": "v0"
         },
-        "live_until": 204095
+        "live_until": 535680
       }
     ]
   },

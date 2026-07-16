@@ -69,6 +69,12 @@ export async function POST(request: Request) {
       ratePerSecond: formatAmountUnits(ratePerSecondUnits(stream)),
       billableSeconds: report.session.activeSeconds,
     };
+    // Excluded paths are useful in the worker's private local report, but the
+    // dashboard only needs the aggregate privacy counts. Do not persist their
+    // names server-side.
+    report.changes.changedFiles = report.changes.changedFiles.filter(
+      (file) => file.includedInVerification,
+    );
 
     const now = new Date().toISOString();
     const session = addTimelineEvent(

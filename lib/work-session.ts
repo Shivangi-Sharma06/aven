@@ -15,6 +15,7 @@ export type SessionStatus =
   | "DISPUTED"
   | "RESPONSE_SUBMITTED"
   | "RELEASE_ELIGIBLE"
+  | "RELEASING"
   | "RELEASED"
   | "FAILED";
 

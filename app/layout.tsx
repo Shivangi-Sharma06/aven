@@ -29,7 +29,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
       </head>
       <body className={`${inter.variable} ${spaceGrotesk.variable} ${jetbrains.variable}`}>
-        <MantineProvider defaultColorScheme="dark">
+        <MantineProvider defaultColorScheme="light">
           <ModalsProvider>
             <Notifications />
             <WalletProvider>

@@ -158,6 +158,14 @@
 }
 
 .work-session-section {
+  --text-primary: #000;
+  --text-secondary: rgba(0, 0, 0, 0.56);
+  --text-mono: rgba(0, 0, 0, 0.52);
+  --border: rgba(0, 0, 0, 0.18);
+  --surface: #fff;
+  --surface-high: #f6f6f3;
+  --bg-dark: #fff;
+  --stream-paused: #7a5200;
   margin-top: 34px;
   border-top: 1px solid var(--border);
   color: var(--text-primary);

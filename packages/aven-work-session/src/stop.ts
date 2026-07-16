@@ -75,7 +75,14 @@ export async function stopCommand(options: StopOptions) {
     return;
   }
 
-  const result = await submitReport(config, report);
+  const submittedReport = {
+    ...report,
+    changes: {
+      ...report.changes,
+      changedFiles: report.changes.changedFiles.filter((file) => file.includedInVerification),
+    },
+  };
+  const result = await submitReport(config, submittedReport);
   await deleteSession(repositoryRoot);
   process.stdout.write(`Work session submitted: ${result.sessionId} (${result.status}).\n`);
   process.stdout.write(`Review it in ${config.dashboardUrl}/stream/${config.streamId}.\n`);

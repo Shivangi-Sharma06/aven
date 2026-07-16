@@ -206,10 +206,21 @@ export default function StreamDetailPage() {
     setSessionAction(`${session.id}:release`);
     setError(null);
     setTxResult(null);
+    let transactionSucceeded = false;
+    const preparePath = `/api/work-sessions/${encodeURIComponent(session.id)}/release/prepare`;
+    const cancelPath = `/api/work-sessions/${encodeURIComponent(session.id)}/release/cancel`;
     try {
+      const prepared = await fetch(preparePath, {
+        method: "POST",
+        headers: await walletHeaders(preparePath),
+        body: "{}",
+      });
+      const preparedData = await prepared.json();
+      if (!prepared.ok) throw new Error(preparedData.error ?? "The release could not be prepared.");
       const result = STRICT_REVIEWED_WITHDRAWALS
         ? await withdrawReviewed(id, address, session.id)
         : await withdrawEarned(id, address);
+      transactionSucceeded = true;
       const path = `/api/work-sessions/${encodeURIComponent(session.id)}/release`;
       const response = await fetch(path, {
         method: "POST",
@@ -217,10 +228,23 @@ export default function StreamDetailPage() {
         body: JSON.stringify({ txHash: result.txHash }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? "The release transaction succeeded, but its work-session record could not be updated.");
+      if (!response.ok) {
+        throw new Error(data.error ?? "The transaction succeeded but its record could not be updated. Do not submit another withdrawal.");
+      }
       setTxResult(`Released ${result.amount.toFixed(7)} ${stream?.asset} · tx: ${result.txHash.slice(0, 10)}…`);
       await Promise.all([load(), loadSessions()]);
     } catch (caught) {
+      if (!transactionSucceeded) {
+        try {
+          await fetch(cancelPath, {
+            method: "POST",
+            headers: await walletHeaders(cancelPath),
+            body: "{}",
+          });
+        } catch {
+          // Preserve the original wallet/transaction error.
+        }
+      }
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
       setSessionAction(null);
@@ -273,7 +297,7 @@ export default function StreamDetailPage() {
     ? Math.min(100, (stream.totalWithdrawn / stream.totalDeposited) * 100)
     : 0;
   const pendingAmount = sumRequested(sessions, ["WITHDRAWAL_REQUESTED", "PENDING_CLIENT_REVIEW", "APPROVED"]);
-  const releasedAmount = sumRequested(sessions, ["RELEASED", "RELEASE_ELIGIBLE"]);
+  const releasedAmount = sumRequested(sessions, ["RELEASED", "RELEASE_ELIGIBLE", "RELEASING"]);
   const disputedAmount = sumRequested(sessions, ["DISPUTED", "RESPONSE_SUBMITTED"]);
 
   return (
@@ -432,8 +456,13 @@ export default function StreamDetailPage() {
                           )}
                         </div>
                         <div className={styles["work-session-files"]}>
-                          <span>Changed files</span>
-                          {report.changes.changedFiles.map((file) => (
+                          <span>
+                            Changed files
+                            {report.privacy.excludedFileCount > 0
+                              ? ` · ${report.privacy.excludedFileCount} privacy-excluded`
+                              : ""}
+                          </span>
+                          {report.changes.changedFiles.filter((file) => file.includedInVerification).map((file) => (
                             <div key={`${file.path}:${file.changeType}`}>
                               <code>{file.path}</code>
                               <span>{file.changeType} · +{file.additions ?? 0} / -{file.deletions ?? 0}</span>

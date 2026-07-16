@@ -140,6 +140,18 @@ function decimalAmountToContract(value: string): bigint {
   return BigInt(match[1]) * 10_000_000n + BigInt((match[2] ?? "").padEnd(7, "0"));
 }
 
+function transactionHash(sent: any): string {
+  const value =
+    sent?.sendTransactionResponse?.hash ??
+    sent?.getTransactionResponse?.txHash ??
+    sent?.hash;
+  if (typeof value === "string" && /^[a-f\d]{64}$/i.test(value)) return value.toLowerCase();
+  if (value instanceof Uint8Array && value.byteLength === 32) {
+    return Array.from(value, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  }
+  throw new Error("Stellar confirmed the transaction but did not return a valid transaction hash.");
+}
+
 const ANON_ADDR = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
 
 // ─── Wallet ───────────────────────────────────────────────────────────────────
@@ -204,7 +216,7 @@ export async function createStream(
 
   const sent = await tx.signAndSend();
   const raw = (sent as any).result?.unwrap?.() ?? (sent as any).result ?? 0n;
-  return { streamId: String(raw), txHash: (sent as any).hash ?? "" };
+  return { streamId: String(raw), txHash: transactionHash(sent) };
 }
 
 export async function pauseStream(streamId: string, callerAddress: string): Promise<void> {
@@ -235,7 +247,7 @@ export async function withdrawEarned(
   const raw = (sent as any).result?.unwrap?.() ?? 0n;
   return {
     amount: fromContractAmount(toBigInt(raw)),
-    txHash: (sent as any).hash ?? "",
+    txHash: transactionHash(sent),
   };
 }
 
@@ -298,7 +310,7 @@ export async function withdrawReviewed(
   const raw = (sent as any).result?.unwrap?.() ?? 0n;
   return {
     amount: fromContractAmount(toBigInt(raw)),
-    txHash: (sent as any).hash ?? "",
+    txHash: transactionHash(sent),
   };
 }
 

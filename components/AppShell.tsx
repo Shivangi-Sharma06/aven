@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, PlusCircle, User, ShieldCheck, Cpu, Wallet, LogOut } from "lucide-react";
+import { LayoutDashboard, PlusCircle, User, ShieldCheck, Award, Wallet, LogOut } from "lucide-react";
 import { useWallet } from "./WalletProvider";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -40,8 +40,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <span>Verify</span>
         </Link>
         <Link href="/agents" className={`nav-item ${pathname === "/agents" ? "active" : ""}`}>
-          <Cpu size={20} />
-          <span>Agents</span>
+          <Award size={20} />
+          <span>Reputation</span>
         </Link>
 
         <div className="nav-wallet-status">

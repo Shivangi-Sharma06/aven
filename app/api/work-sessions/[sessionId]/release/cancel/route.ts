@@ -15,23 +15,10 @@ export async function POST(request: Request, context: { params: Promise<{ sessio
   const wallet = authenticateWalletRequest(request);
   const stream = await getOnchainStream(session.streamId);
   if (!wallet || !stream || !addressesEqual(wallet, stream.recipient)) {
-    return apiError("Only the stream recipient can record this release.", 403);
+    return apiError("Only the stream recipient can cancel this release attempt.", 403);
   }
-  if (session.status === "RELEASED") return NextResponse.json(session);
-  if (session.status !== "RELEASING") {
-    return apiError(`Cannot release funds while the session is ${session.status}.`, 409);
-  }
-
-  const body = await request.json().catch(() => ({})) as { txHash?: string };
-  const txHash = body.txHash?.trim() ?? "";
-  if (!/^[a-f\d]{64}$/i.test(txHash)) return apiError("A valid Stellar transaction hash is required.");
-  session.releasedTxHash = txHash;
-  addTimelineEvent(
-    session,
-    "RELEASED",
-    "worker",
-    `Released ${session.requestedAmount ?? "0.0000000"} through transaction ${txHash}.`,
-  );
+  if (session.status !== "RELEASING") return NextResponse.json(session);
+  addTimelineEvent(session, "RELEASE_ELIGIBLE", "worker", "Stellar release was cancelled before submission.");
   await putSession(session);
   return NextResponse.json(session);
 }

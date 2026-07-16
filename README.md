@@ -4,7 +4,7 @@
 
 Aven turns economic activity into verifiable work history. Payments stream as work happens; completed streams create attestations; those attestations become a portable reputation record owned by the worker.
 
-The repository contains the Aven web app, its editorial GSAP-powered landing page, three Soroban smart contracts, generated TypeScript bindings, and a static work-verification service.
+The repository contains the Aven web app, its editorial GSAP-powered landing page, three Soroban smart contracts, generated TypeScript bindings, and the `aven-stellar` work-session package.
 
 ## How it works
 
@@ -26,7 +26,7 @@ flowchart LR
 - `/stream/[id]` — inspect and manage a stream
 - `/profile/[address]` — public work history and reputation
 - `/verify` — verify an attestation or reputation claim
-- `/agents` — work verification and reputation lookup for human and AI workers
+- `/agents` — on-chain reputation lookup for human and AI workers
 - `/cli/authorize` — wallet-signed authorization for the local work-session CLI
 - `/stream/[id]` — also contains the client/worker work-session review ledger
 
@@ -73,8 +73,6 @@ cd contracts
 cargo test
 ```
 
-The `/agents` work-verification UI submits code, writing, or images to `/api/work-verification`. Code is parsed for static syntax and structure only; uploaded programs are never executed. Static checks work without an LLM key. Set `GROQ_API_KEY` and optionally `GROQ_MODEL` to add an AI-generated review summary. Manual verification is disabled in production unless `ENABLE_MANUAL_VERIFICATION=true`; production deployments should also add authentication and rate limiting.
-
 ## Work sessions
 
 [`aven-stellar`](https://www.npmjs.com/package/aven-stellar) is the published CLI that connects Git activity to an existing Aven stream without executing project code or collecting full file contents. It requires Node.js 20 or newer and must be run inside a Git repository:
@@ -118,7 +116,6 @@ contracts/              Soroban Rust workspace
   contracts/shared/
 lib/contracts.ts        Testnet config and contract client factories
 lib/stellar.ts          Wallet and on-chain application operations
-services/work-verifier/ Static artifact analysis and optional Groq report generation
 packages/aven-work-session/ Source for the published `aven-stellar` CLI
 ```
 

@@ -31,7 +31,6 @@ async function main() {
     .command("stop")
     .description("Stop the session, generate a report, and optionally submit it.")
     .option("--message <text>", "Worker statement")
-    .option("--amount <amount>", "Payment amount to request")
     .option("--submit", "Submit without an additional confirmation")
     .action(stopCommand);
 

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { Keypair } from "@stellar/stellar-sdk";
 import { getCliToken, type CliScope } from "./cli-auth-store";
 import { getStreamClient, USDC_ASSET_ID } from "./contracts";
@@ -5,6 +6,8 @@ import type { WorkSession, WorkSessionEvent, WorkSessionReport } from "./work-se
 
 const ANONYMOUS_ADDRESS = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
 const AMOUNT_PATTERN = /^(0|[1-9]\d*)(?:\.(\d{1,7}))?$/;
+const SIGN_MESSAGE_PREFIX = "Stellar Signed Message:\n";
+const SECONDS_PER_LEDGER = 5n;
 
 export type OnchainStream = {
   id: string;
@@ -13,6 +16,7 @@ export type OnchainStream = {
   asset: "USDC" | "XLM";
   status: "active" | "paused" | "completed" | "cancelled";
   approvalTimeoutLedgers: number;
+  ratePerLedgerUnits: bigint;
   totalDepositedUnits: bigint;
   totalWithdrawnUnits: bigint;
 };
@@ -36,6 +40,7 @@ export async function getOnchainStream(streamId: string): Promise<OnchainStream 
       asset: record.asset === USDC_ASSET_ID ? "USDC" : "XLM",
       status: status as OnchainStream["status"],
       approvalTimeoutLedgers: Number(record.approval_timeout_ledgers),
+      ratePerLedgerUnits: BigInt(String(record.rate_per_ledger)),
       totalDepositedUnits: BigInt(String(record.total_deposited)),
       totalWithdrawnUnits: BigInt(String(record.total_withdrawn)),
     };
@@ -62,6 +67,22 @@ export function formatAmountUnits(value: bigint): string {
   return `${whole}.${fractional}`;
 }
 
+export function ratePerSecondUnits(stream: OnchainStream) {
+  return stream.ratePerLedgerUnits / SECONDS_PER_LEDGER;
+}
+
+export function calculateSessionPaymentUnits(
+  stream: OnchainStream,
+  activeSeconds: number,
+  earnedUnits: bigint,
+) {
+  if (!Number.isSafeInteger(activeSeconds) || activeSeconds < 0) {
+    throw new Error("Active session time must be a non-negative whole number of seconds.");
+  }
+  const sessionUnits = ratePerSecondUnits(stream) * BigInt(activeSeconds);
+  return sessionUnits < earnedUnits ? sessionUnits : earnedUnits;
+}
+
 export function addressesEqual(left: string, right: string) {
   return left.trim().toUpperCase() === right.trim().toUpperCase();
 }
@@ -81,7 +102,10 @@ export function verifyWalletSignature(
     const signatureBytes = /^[a-f\d]{128}$/i.test(signature)
       ? Buffer.from(signature, "hex")
       : Buffer.from(signature, "base64");
-    return Keypair.fromPublicKey(walletAddress).verify(Buffer.from(message, "utf8"), signatureBytes);
+    const messageHash = createHash("sha256")
+      .update(`${SIGN_MESSAGE_PREFIX}${message}`, "utf8")
+      .digest();
+    return Keypair.fromPublicKey(walletAddress).verify(messageHash, signatureBytes);
   } catch {
     return false;
   }
@@ -141,6 +165,13 @@ export function validateWorkSessionReport(value: unknown): asserts value is Work
     report.session.idleSeconds < 0
   ) {
     throw new Error("Session durations must be non-negative numbers.");
+  }
+  if (
+    !Number.isSafeInteger(report.session.activeSeconds) ||
+    !Number.isSafeInteger(report.session.totalSeconds) ||
+    report.session.activeSeconds > report.session.totalSeconds
+  ) {
+    throw new Error("Active session time must be a whole number no greater than total session time.");
   }
   if (!Array.isArray(report.changes.changedFiles) || !Array.isArray(report.changes.commits)) {
     throw new Error("Changed files and commits must be arrays.");

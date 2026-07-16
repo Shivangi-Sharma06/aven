@@ -90,6 +90,9 @@ export type WorkSessionReport = {
   paymentRequest: {
     requestedAmount: string;
     asset: "USDC" | "XLM";
+    calculation?: "active_time_x_stream_rate";
+    ratePerSecond?: string;
+    billableSeconds?: number;
   };
   privacy: {
     profile: "standard";
@@ -119,6 +122,7 @@ export type WorkSession = {
   reviewDeadlineAt?: string;
   disputeReason?: string;
   workerResponse?: string;
+  releasedTxHash?: string;
   submittedAt?: string;
   timeline?: WorkSessionEvent[];
   createdAt: string;

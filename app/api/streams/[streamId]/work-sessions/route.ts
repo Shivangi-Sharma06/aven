@@ -6,6 +6,7 @@ import {
   formatAmountUnits,
   getEarnedUnits,
   getOnchainStream,
+  ratePerSecondUnits,
   roleForWallet,
 } from "@/lib/work-session-server";
 
@@ -32,6 +33,7 @@ export async function GET(
       "x-aven-worker-address": stream.recipient,
       "x-aven-client-address": stream.sender,
       "x-aven-earned": formatAmountUnits(earnedUnits),
+      "x-aven-rate-per-second": formatAmountUnits(ratePerSecondUnits(stream)),
     },
   });
 }

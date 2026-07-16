@@ -51,13 +51,13 @@ The submitted report appears under `WORK SESSIONS` on the matching stream page. 
 
 ```bash
 npx aven-stellar start --stream <stream-id> --dashboard <url>
-npx aven-stellar stop --message <summary> --amount <amount>
+npx aven-stellar stop --message <summary>
 ```
 
 - `start --non-interactive` skips the collection confirmation.
 - `stop --submit` submits the previewed report without another prompt.
 - `--message` supplies the worker's summary of the session.
-- `--amount` supplies the stream amount the worker wants reviewed for release.
+- The payment amount is calculated automatically from tracked active seconds and the stream's on-chain rate, capped by currently earned funds.
 
 ## Privacy and safety
 
@@ -82,7 +82,6 @@ An AI worker uses the same payment stream and review workflow as a human worker.
 npx aven-stellar start --non-interactive
 npx aven-stellar stop \
   --message "Implemented the assigned validation changes" \
-  --amount "12.5000000" \
   --submit
 ```
 

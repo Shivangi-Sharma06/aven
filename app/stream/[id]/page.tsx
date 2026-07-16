@@ -13,6 +13,11 @@ import {
   resumeStream,
   cancelStream,
   withdrawEarned,
+  requestReviewedWithdrawal,
+  approveReviewedWithdrawal,
+  disputeReviewedWithdrawal,
+  withdrawReviewed,
+  STRICT_REVIEWED_WITHDRAWALS,
   StreamObject,
 } from "@/lib/stellar";
 import styles from "./page.module.css";
@@ -149,9 +154,12 @@ export default function StreamDetailPage() {
     if (signed.error || !signed.signedMessage) {
       throw new Error(signed.error?.message ?? "The wallet did not return a signature.");
     }
+    if (signed.signerAddress && signed.signerAddress.toUpperCase() !== address.toUpperCase()) {
+      throw new Error("Freighter signed with a different account. Switch wallets and try again.");
+    }
     const signature = typeof signed.signedMessage === "string"
       ? signed.signedMessage
-      : signed.signedMessage.toString("base64");
+      : window.btoa(Array.from(signed.signedMessage, (byte) => String.fromCharCode(byte)).join(""));
     return {
       "content-type": "application/json",
       "x-aven-wallet": address,
@@ -160,11 +168,21 @@ export default function StreamDetailPage() {
     };
   }
 
-  async function mutateSession(sessionId: string, action: "request-withdrawal" | "approve" | "dispute", body?: object) {
+  async function mutateSession(sessionId: string, action: "request-withdrawal" | "approve" | "dispute" | "release", body?: object) {
     const path = `/api/work-sessions/${encodeURIComponent(sessionId)}/${action}`;
     setSessionAction(`${sessionId}:${action}`);
     setError(null);
     try {
+      const session = sessions.find((candidate) => candidate.id === sessionId);
+      if (STRICT_REVIEWED_WITHDRAWALS && address && session) {
+        if (action === "request-withdrawal") {
+          const amount = session.requestedAmount ?? session.report?.paymentRequest.requestedAmount;
+          if (!amount) throw new Error("This work session has no calculated payment amount.");
+          await requestReviewedWithdrawal(id, address, session.id, amount);
+        }
+        if (action === "approve") await approveReviewedWithdrawal(id, address, session.id);
+        if (action === "dispute") await disputeReviewedWithdrawal(id, address, session.id);
+      }
       const response = await fetch(path, {
         method: "POST",
         headers: await walletHeaders(path),
@@ -176,6 +194,32 @@ export default function StreamDetailPage() {
       setDisputeSession(null);
       setDisputeReason("");
       await loadSessions();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setSessionAction(null);
+    }
+  }
+
+  async function releaseSession(session: WorkSession) {
+    if (!address) return;
+    setSessionAction(`${session.id}:release`);
+    setError(null);
+    setTxResult(null);
+    try {
+      const result = STRICT_REVIEWED_WITHDRAWALS
+        ? await withdrawReviewed(id, address, session.id)
+        : await withdrawEarned(id, address);
+      const path = `/api/work-sessions/${encodeURIComponent(session.id)}/release`;
+      const response = await fetch(path, {
+        method: "POST",
+        headers: await walletHeaders(path),
+        body: JSON.stringify({ txHash: result.txHash }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "The release transaction succeeded, but its work-session record could not be updated.");
+      setTxResult(`Released ${result.amount.toFixed(7)} ${stream?.asset} · tx: ${result.txHash.slice(0, 10)}…`);
+      await Promise.all([load(), loadSessions()]);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
@@ -422,6 +466,15 @@ export default function StreamDetailPage() {
                           {actionBusy ? "Requesting…" : "Request withdrawal"}
                         </button>
                       )}
+                      {isRecipient && session.status === "RELEASE_ELIGIBLE" && (
+                        <button
+                          type="button"
+                          disabled={actionBusy}
+                          onClick={() => releaseSession(session)}
+                        >
+                          {actionBusy ? "Releasing…" : `Withdraw ${session.requestedAmount ?? report?.paymentRequest.requestedAmount ?? "0.0000000"} ${stream.asset}`}
+                        </button>
+                      )}
                       {isSender && session.status === "PENDING_CLIENT_REVIEW" && (
                         <>
                           <button type="button" disabled={actionBusy} onClick={() => setApproveSession(session)}>Approve</button>
@@ -486,16 +539,6 @@ export default function StreamDetailPage() {
                 id="stream-cancel-btn"
               >
                 {actionLoading === "cancel" ? "…" : "Cancel Stream"}
-              </button>
-            )}
-            {isRecipient && (stream.status === "active" || stream.status === "paused") && (
-              <button
-                className="stream-action-btn stream-action-btn--primary"
-                onClick={() => doAction("withdraw")}
-                disabled={!!actionLoading}
-                id="stream-withdraw-btn"
-              >
-                {actionLoading === "withdraw" ? "…" : "Withdraw Earned"}
               </button>
             )}
           </div>

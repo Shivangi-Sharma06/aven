@@ -33,6 +33,9 @@ export type StreamCategory =
   | "Subscription";
 export type StreamAsset = "USDC" | "XLM";
 
+export const STRICT_REVIEWED_WITHDRAWALS =
+  process.env.NEXT_PUBLIC_STRICT_REVIEWED_WITHDRAWALS === "true";
+
 export type StreamObject = {
   id: string;
   sender: string;
@@ -131,6 +134,12 @@ function toBigInt(v: unknown): bigint {
   return BigInt(String(v));
 }
 
+function decimalAmountToContract(value: string): bigint {
+  const match = /^(0|[1-9]\d*)(?:\.(\d{1,7}))?$/.exec(value);
+  if (!match) throw new Error("Invalid Stellar amount.");
+  return BigInt(match[1]) * 10_000_000n + BigInt((match[2] ?? "").padEnd(7, "0"));
+}
+
 const ANON_ADDR = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
 
 // ─── Wallet ───────────────────────────────────────────────────────────────────
@@ -222,6 +231,69 @@ export async function withdrawEarned(
 ): Promise<{ amount: number; txHash: string }> {
   const client = getStreamClient(callerAddress);
   const tx = await client.withdraw({ stream_id: BigInt(streamId), caller: callerAddress });
+  const sent = await tx.signAndSend();
+  const raw = (sent as any).result?.unwrap?.() ?? 0n;
+  return {
+    amount: fromContractAmount(toBigInt(raw)),
+    txHash: (sent as any).hash ?? "",
+  };
+}
+
+export async function requestReviewedWithdrawal(
+  streamId: string,
+  recipientAddress: string,
+  requestId: string,
+  amount: string,
+): Promise<void> {
+  const client = getStreamClient(recipientAddress);
+  const tx = await client.request_withdrawal({
+    stream_id: BigInt(streamId),
+    recipient: recipientAddress,
+    request_id: requestId,
+    amount: decimalAmountToContract(amount),
+  });
+  await tx.signAndSend();
+}
+
+export async function approveReviewedWithdrawal(
+  streamId: string,
+  senderAddress: string,
+  requestId: string,
+): Promise<void> {
+  const client = getStreamClient(senderAddress);
+  const tx = await client.approve_withdrawal({
+    stream_id: BigInt(streamId),
+    sender: senderAddress,
+    request_id: requestId,
+  });
+  await tx.signAndSend();
+}
+
+export async function disputeReviewedWithdrawal(
+  streamId: string,
+  senderAddress: string,
+  requestId: string,
+): Promise<void> {
+  const client = getStreamClient(senderAddress);
+  const tx = await client.dispute_withdrawal({
+    stream_id: BigInt(streamId),
+    sender: senderAddress,
+    request_id: requestId,
+  });
+  await tx.signAndSend();
+}
+
+export async function withdrawReviewed(
+  streamId: string,
+  recipientAddress: string,
+  requestId: string,
+): Promise<{ amount: number; txHash: string }> {
+  const client = getStreamClient(recipientAddress);
+  const tx = await client.withdraw_approved({
+    stream_id: BigInt(streamId),
+    recipient: recipientAddress,
+    request_id: requestId,
+  });
   const sent = await tx.signAndSend();
   const raw = (sent as any).result?.unwrap?.() ?? 0n;
   return {

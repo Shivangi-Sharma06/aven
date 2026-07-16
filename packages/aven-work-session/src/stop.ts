@@ -9,7 +9,6 @@ import { deleteSession, readSession, writeSession } from "./session.js";
 
 export type StopOptions = {
   message?: string;
-  amount?: string;
   submit?: boolean;
 };
 
@@ -56,13 +55,15 @@ export async function stopCommand(options: StopOptions) {
 
   const stream = await inspectStream(config.dashboardUrl, config.streamId, config.token);
   const message = options.message ?? await question("What did you work on during this session?");
-  const amount = options.amount ?? await question(
-    `Amount to request in ${config.asset} (current stream earnings: ${stream.earned})`,
-  );
-  if (!amount) throw new Error("A requested amount is required.");
-  const report = await buildReport(repositoryRoot, config, session, message, amount);
+  const report = await buildReport(repositoryRoot, config, session, message, {
+    earned: stream.earned,
+    ratePerSecond: stream.ratePerSecond,
+  });
   await saveLocalReport(repositoryRoot, report);
   printReport(report);
+  process.stdout.write(
+    `Payment was calculated from ${report.session.activeSeconds}s of tracked active time at the stream rate.\n`,
+  );
 
   let shouldSubmit = options.submit === true;
   if (!options.submit) {

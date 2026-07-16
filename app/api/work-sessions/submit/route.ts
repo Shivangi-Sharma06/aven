@@ -7,9 +7,11 @@ import {
   addTimelineEvent,
   addressesEqual,
   authenticateCliRequest,
+  calculateSessionPaymentUnits,
+  formatAmountUnits,
   getEarnedUnits,
   getOnchainStream,
-  parseAmountUnits,
+  ratePerSecondUnits,
   validateWorkSessionReport,
 } from "@/lib/work-session-server";
 
@@ -51,11 +53,22 @@ export async function POST(request: Request) {
     if (report.paymentRequest.asset !== stream.asset) {
       return apiError("The report asset does not match the stream asset.");
     }
-    const requestedUnits = parseAmountUnits(report.paymentRequest.requestedAmount);
     const earnedUnits = await getEarnedUnits(stream.id);
-    if (requestedUnits <= 0n || requestedUnits > earnedUnits) {
-      return apiError("The requested amount must be positive and cannot exceed current stream earnings.");
+    const calculatedUnits = calculateSessionPaymentUnits(
+      stream,
+      report.session.activeSeconds,
+      earnedUnits,
+    );
+    if (calculatedUnits <= 0n) {
+      return apiError("No payment has accrued for this session's tracked active time.", 409);
     }
+    report.paymentRequest = {
+      requestedAmount: formatAmountUnits(calculatedUnits),
+      asset: stream.asset,
+      calculation: "active_time_x_stream_rate",
+      ratePerSecond: formatAmountUnits(ratePerSecondUnits(stream)),
+      billableSeconds: report.session.activeSeconds,
+    };
 
     const now = new Date().toISOString();
     const session = addTimelineEvent(

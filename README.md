@@ -92,9 +92,9 @@ On first use, `start` asks for the Aven dashboard URL and stream ID, opens `/cli
 
 The CLI creates `.avenignore` with private-file defaults, records relative paths and Git statistics, and stores recoverable local state under `.aven/`. `stop` calculates the session report and previews it before submission. Submitted sessions appear in the `WORK SESSIONS` section on `/stream/[id]`, where the worker can request review and the stream sender can approve or dispute the request.
 
-The report contains session timing, branch and commit metadata, file-level change statistics, and the worker's statement. It does not contain complete source files, keystrokes, screenshots, environment files, wallet secret keys, or excluded paths. The CLI never executes the tracked project or installs its dependencies.
+The report contains session timing, branch and commit metadata, file-level change statistics, and the worker's statement. Its payment amount is calculated automatically from tracked active seconds and the stream's on-chain rate, capped by currently earned funds; workers do not enter their own amount. The report does not contain complete source files, keystrokes, screenshots, environment files, wallet secret keys, or excluded paths. The CLI never executes the tracked project or installs its dependencies.
 
-Work-session review is intentionally application-layer state in this release. `RELEASE_ELIGIBLE` means the review requirement has passed; the unchanged Stellar stream contract remains authoritative for actual withdrawals and does not enforce these off-chain review records.
+The currently deployed testnet contract uses the compatibility release path: the dashboard hides unrestricted withdrawal and exposes release only after verification and client approval (or review timeout). The contract source also includes strict reviewed withdrawals that reserve an exact session amount on-chain, support approval/dispute/timeout release, and reject the legacy unrestricted withdrawal entry point. After deploying that contract version, set `NEXT_PUBLIC_STRICT_REVIEWED_WITHDRAWALS=true` so the dashboard uses the strict methods.
 
 To build the contract WASM artifacts:
 

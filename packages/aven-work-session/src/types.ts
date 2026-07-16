@@ -56,7 +56,13 @@ export type WorkSessionReport = {
     flags: string[];
     summary: string;
   };
-  paymentRequest: { requestedAmount: string; asset: "USDC" | "XLM" };
+  paymentRequest: {
+    requestedAmount: string;
+    asset: "USDC" | "XLM";
+    calculation?: "active_time_x_stream_rate";
+    ratePerSecond?: string;
+    billableSeconds?: number;
+  };
   privacy: {
     profile: "standard";
     excludedFileCount: number;

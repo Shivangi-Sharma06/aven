@@ -85,6 +85,21 @@ fn create_stream(
     )
 }
 
+fn approved_withdrawal(
+    env: &Env,
+    client: &StreamContractClient,
+    stream_id: u64,
+    sender: &Address,
+    recipient: &Address,
+    request_id: &str,
+    amount: i128,
+) -> i128 {
+    let request_id = String::from_str(env, request_id);
+    client.request_withdrawal(&stream_id, recipient, &request_id, &amount);
+    client.approve_withdrawal(&stream_id, sender, &request_id);
+    client.withdraw_approved(&stream_id, recipient, &request_id)
+}
+
 #[test]
 fn test_create_stream_success() {
     let env = Env::default();
@@ -154,7 +169,7 @@ fn test_withdraw_partial() {
     let earned = client.compute_earned(&id);
     assert_eq!(earned, 1500); // 50 * 50 = 2500, capped at 60% = 1500
     
-    let withdrawn = client.withdraw(&id, &recipient);
+    let withdrawn = approved_withdrawal(&env, &client, id, &sender, &recipient, "session-1", 1500);
     assert_eq!(withdrawn, 1500);
     assert_eq!(token.balance(&recipient), 1500);
     assert_eq!(client.get_stream(&id).total_withdrawn, 1500);
@@ -178,7 +193,7 @@ fn test_submit_and_approve_checkpoint() {
     env.ledger().set_sequence_number(200);
     
     // Earned: 100 * 50 = 5000. Unlocked before approval: 5000 * 60% = 3000
-    let withdrawn1 = client.withdraw(&id, &recipient);
+    let withdrawn1 = approved_withdrawal(&env, &client, id, &sender, &recipient, "session-1", 3000);
     assert_eq!(withdrawn1, 3000);
     
     // Submit checkpoint 1 (index 0)
@@ -196,7 +211,7 @@ fn test_submit_and_approve_checkpoint() {
     assert_eq!(cp.attestation_id, 1001);
     
     // After approval, the remaining 2000 is withdrawable
-    let withdrawn2 = client.withdraw(&id, &recipient);
+    let withdrawn2 = approved_withdrawal(&env, &client, id, &sender, &recipient, "session-2", 2000);
     assert_eq!(withdrawn2, 2000);
     assert_eq!(token.balance(&recipient), 5000);
 }
@@ -222,7 +237,10 @@ fn test_checkpoint_auto_approve_timeout() {
     // Checkpoint 1: fully unlocked (5000)
     // Checkpoint 2: partial capped (50 * 50 * 60% = 1500)
     // Total withdrawable: 5000 + 1500 = 6500.
-    let withdrawn = client.withdraw(&id, &recipient);
+    let request_id = String::from_str(&env, "session-timeout");
+    client.request_withdrawal(&id, &recipient, &request_id, &6500);
+    env.ledger().set_sequence_number(300);
+    let withdrawn = client.withdraw_approved(&id, &recipient, &request_id);
     assert_eq!(withdrawn, 6500);
     
     let cp = client.get_checkpoint(&id, &0);
@@ -308,6 +326,111 @@ fn test_only_recipient_can_withdraw() {
 
     let res = client.try_withdraw(&id, &other);
     assert_eq!(res.unwrap_err().unwrap(), Error::NotRecipient);
+}
+
+#[test]
+fn test_exact_withdrawal_requires_approval_and_cannot_repeat() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_sequence_number(100);
+    let sender = Address::generate(&env);
+    let recipient = Address::generate(&env);
+    let asset = create_asset(&env, &sender, 100_000);
+    let token = TokenClient::new(&env, &asset);
+    let client = create_client(&env, &Address::generate(&env));
+    let id = create_stream(&env, &client, &sender, &recipient, &asset, 10, 20_000, 400, 4, 60, 50);
+    env.ledger().set_sequence_number(150);
+
+    let request_id = String::from_str(&env, "session-exact");
+    client.request_withdrawal(&id, &recipient, &request_id, &1000);
+    assert_eq!(client.compute_available(&id), 500);
+    assert_eq!(
+        client.try_withdraw_approved(&id, &recipient, &request_id).unwrap_err().unwrap(),
+        Error::WithdrawalNotApproved
+    );
+    client.approve_withdrawal(&id, &sender, &request_id);
+    assert_eq!(client.withdraw_approved(&id, &recipient, &request_id), 1000);
+    assert_eq!(token.balance(&recipient), 1000);
+    assert_eq!(client.compute_earned(&id), 500);
+    assert_eq!(
+        client.try_withdraw_approved(&id, &recipient, &request_id).unwrap_err().unwrap(),
+        Error::NothingToWithdraw
+    );
+}
+
+#[test]
+fn test_request_validation_and_reservation() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_sequence_number(100);
+    let sender = Address::generate(&env);
+    let recipient = Address::generate(&env);
+    let other = Address::generate(&env);
+    let asset = create_asset(&env, &sender, 100_000);
+    let client = create_client(&env, &Address::generate(&env));
+    let id = create_stream(&env, &client, &sender, &recipient, &asset, 10, 20_000, 400, 4, 60, 50);
+    env.ledger().set_sequence_number(150);
+    let request_id = String::from_str(&env, "session-validation");
+
+    assert_eq!(
+        client.try_request_withdrawal(&id, &recipient, &request_id, &0).unwrap_err().unwrap(),
+        Error::InvalidAmount
+    );
+    assert_eq!(
+        client.try_request_withdrawal(&id, &recipient, &request_id, &1501).unwrap_err().unwrap(),
+        Error::AmountExceedsWithdrawable
+    );
+    assert_eq!(
+        client.try_request_withdrawal(&id, &other, &request_id, &1).unwrap_err().unwrap(),
+        Error::NotRecipient
+    );
+    client.request_withdrawal(&id, &recipient, &request_id, &1000);
+    let second = String::from_str(&env, "session-second");
+    assert_eq!(
+        client.try_request_withdrawal(&id, &recipient, &second, &501).unwrap_err().unwrap(),
+        Error::AmountExceedsWithdrawable
+    );
+}
+
+#[test]
+fn test_dispute_blocks_release_and_frees_reservation() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_sequence_number(100);
+    let sender = Address::generate(&env);
+    let recipient = Address::generate(&env);
+    let other = Address::generate(&env);
+    let asset = create_asset(&env, &sender, 100_000);
+    let client = create_client(&env, &Address::generate(&env));
+    let id = create_stream(&env, &client, &sender, &recipient, &asset, 10, 20_000, 400, 4, 60, 50);
+    env.ledger().set_sequence_number(150);
+    let request_id = String::from_str(&env, "session-disputed");
+    client.request_withdrawal(&id, &recipient, &request_id, &1000);
+    assert_eq!(
+        client.try_dispute_withdrawal(&id, &other, &request_id).unwrap_err().unwrap(),
+        Error::NotSender
+    );
+    client.dispute_withdrawal(&id, &sender, &request_id);
+    assert_eq!(client.compute_available(&id), 1500);
+    assert_eq!(
+        client.try_withdraw_approved(&id, &recipient, &request_id).unwrap_err().unwrap(),
+        Error::WithdrawalDisputed
+    );
+}
+
+#[test]
+fn test_legacy_unreviewed_withdrawal_is_blocked() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let sender = Address::generate(&env);
+    let recipient = Address::generate(&env);
+    let asset = create_asset(&env, &sender, 100_000);
+    let client = create_client(&env, &Address::generate(&env));
+    let id = create_stream(&env, &client, &sender, &recipient, &asset, 10, 20_000, 400, 4, 60, 50);
+    assert_eq!(
+        client.try_withdraw(&id, &recipient).unwrap_err().unwrap(),
+        Error::WithdrawalApprovalRequired
+    );
 }
 
 #[test]

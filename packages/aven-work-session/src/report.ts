@@ -2,12 +2,32 @@ import { captureGitState, collectChanges, collectCommits, repositoryIdentifier }
 import { createPrivacyFilter } from "./privacy.js";
 import type { AvenConfig, LocalSession, WorkSessionReport } from "./types.js";
 
-export function normalizeAmount(value: string) {
+function amountUnits(value: string) {
   const match = /^(0|[1-9]\d*)(?:\.(\d{1,7}))?$/.exec(value.trim());
-  if (!match) throw new Error("Amount must be a positive decimal with at most seven decimal places.");
-  const normalized = `${match[1]}.${(match[2] ?? "").padEnd(7, "0")}`;
-  if (normalized === "0.0000000") throw new Error("Requested amount must be greater than zero.");
-  return normalized;
+  if (!match) throw new Error("The stream returned an invalid payment amount.");
+  return BigInt(match[1]) * 10_000_000n + BigInt((match[2] ?? "").padEnd(7, "0"));
+}
+
+function formatAmountUnits(value: bigint) {
+  const whole = value / 10_000_000n;
+  const fractional = (value % 10_000_000n).toString().padStart(7, "0");
+  return `${whole}.${fractional}`;
+}
+
+export function calculateAutomaticPayment(
+  ratePerSecond: string,
+  activeSeconds: number,
+  earned: string,
+) {
+  if (!ratePerSecond) throw new Error("The dashboard did not return the stream payment rate.");
+  const rateUnits = amountUnits(ratePerSecond);
+  const earnedUnits = amountUnits(earned);
+  const sessionUnits = rateUnits * BigInt(activeSeconds);
+  const paymentUnits = sessionUnits < earnedUnits ? sessionUnits : earnedUnits;
+  if (paymentUnits <= 0n) {
+    throw new Error("No payment has accrued for the tracked active time yet.");
+  }
+  return formatAmountUnits(paymentUnits);
 }
 
 export async function buildReport(
@@ -15,7 +35,7 @@ export async function buildReport(
   config: AvenConfig,
   session: LocalSession,
   message: string,
-  amount: string,
+  payment: { earned: string; ratePerSecond: string },
 ): Promise<WorkSessionReport> {
   const endedAt = new Date();
   const endingState = await captureGitState(repositoryRoot);
@@ -30,6 +50,11 @@ export async function buildReport(
   const unmeasured = Math.max(0, totalSeconds - measured);
   const activeSeconds = session.activeSeconds + Math.min(unmeasured, 600);
   const idleSeconds = Math.max(0, totalSeconds - activeSeconds);
+  const requestedAmount = calculateAutomaticPayment(
+    payment.ratePerSecond,
+    activeSeconds,
+    payment.earned,
+  );
   const included = changes.changedFiles.filter((file) => file.includedInVerification);
   const substantive = included.filter((file) => file.category === "source" || file.category === "test");
   const flags: string[] = [];
@@ -81,7 +106,13 @@ export async function buildReport(
         ? "Local static metadata checks found no obvious issues."
         : `Local review found ${flags.length} signal(s): ${flags.join(", ")}.`,
     },
-    paymentRequest: { requestedAmount: normalizeAmount(amount), asset: config.asset },
+    paymentRequest: {
+      requestedAmount,
+      asset: config.asset,
+      calculation: "active_time_x_stream_rate",
+      ratePerSecond: payment.ratePerSecond,
+      billableSeconds: activeSeconds,
+    },
     privacy: {
       profile: "standard",
       excludedFileCount: changes.excludedFileCount,

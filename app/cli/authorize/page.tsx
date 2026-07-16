@@ -4,6 +4,25 @@ import { useEffect, useState } from "react";
 import { signMessage } from "@stellar/freighter-api";
 import { useWallet } from "@/components/WalletProvider";
 
+function signatureToBase64(signature: string | Uint8Array) {
+  if (typeof signature === "string") return signature;
+  let binary = "";
+  for (const byte of signature) binary += String.fromCharCode(byte);
+  return window.btoa(binary);
+}
+
+function authorizationErrorMessage(caught: unknown) {
+  if (caught instanceof Error) return caught.message;
+  if (caught && typeof caught === "object" && "message" in caught) {
+    const message = (caught as { message?: unknown }).message;
+    if (typeof message === "string" && message) return message;
+  }
+  if (caught instanceof Event) {
+    return "Freighter could not complete the signing request. Unlock the wallet and try again.";
+  }
+  return "Freighter could not complete the authorization request.";
+}
+
 export default function CliAuthorizePage() {
   const { address, connected, connect, connecting } = useWallet();
   const [deviceCode, setDeviceCode] = useState("");
@@ -25,9 +44,10 @@ export default function CliAuthorizePage() {
       if (result.error || !result.signedMessage) {
         throw new Error(result.error?.message ?? "The wallet did not return a signature.");
       }
-      const signature = typeof result.signedMessage === "string"
-        ? result.signedMessage
-        : Buffer.from(result.signedMessage).toString("base64");
+      if (result.signerAddress && result.signerAddress.toUpperCase() !== address.toUpperCase()) {
+        throw new Error("Freighter signed with a different account. Switch to the stream recipient and try again.");
+      }
+      const signature = signatureToBase64(result.signedMessage);
       const response = await fetch("/api/cli/auth/authorize", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -37,7 +57,7 @@ export default function CliAuthorizePage() {
       if (!response.ok) throw new Error(data.error ?? "Authorization failed.");
       setStatus("authorized");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : String(caught));
+      setError(authorizationErrorMessage(caught));
       setStatus("ready");
     }
   }

@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { checkFreighterInstalled, connectWallet as connectFreighter, disconnectWallet as disconnectFreighter } from "@/lib/stellar";
+import { checkFreighterInstalled, connectWallet as connectFreighter, disconnectWallet as disconnectFreighter, restoreWallet } from "@/lib/stellar";
 
 export type WalletContextValue = {
   address: string | null;
@@ -33,6 +33,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     checkFreighterInstalled().then(setHasFreighter);
+    restoreWallet().then((addr) => {
+      if (addr) setAddress(addr);
+    });
   }, []);
 
   const connect = useCallback(async () => {

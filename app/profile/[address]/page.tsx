@@ -151,7 +151,7 @@ export default function ProfilePage() {
                   <AttestationCard
                     key={att.id}
                     attestation={att}
-                    onView={() => router.push(`/verify?id=${att.id}`)}
+                    onView={() => router.push(`/verify/${att.id}`)}
                   />
                 ))}
               </div>
@@ -196,9 +196,9 @@ function AttestationCard({ attestation, onView }: { attestation: AttestationObje
       </div>
       <div className="attestation-title">{attestation.title}</div>
       <div className="attestation-meta">
-        <span>{attestation.totalPaid.toFixed(2)} {attestation.asset}</span>
+        <span>{attestation.amountPaid.toFixed(2)} {attestation.asset}</span>
         <span>·</span>
-        <span>ledger {attestation.startLedger.toLocaleString()} → {attestation.endLedger.toLocaleString()}</span>
+        <span>checkpoint #{attestation.checkpointIndex} · ledger {attestation.periodStartLedger.toLocaleString()} → {attestation.periodEndLedger.toLocaleString()}</span>
       </div>
       <div className="attestation-verified-badge">✓ On-Chain Verified</div>
     </div>

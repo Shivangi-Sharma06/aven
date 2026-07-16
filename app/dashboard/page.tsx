@@ -133,13 +133,32 @@ export default function DashboardPage() {
             Receiving ({receivingStreams.length})
           </button>
         </div>
-        <button
-          className="dash-create-btn"
-          onClick={() => router.push("/stream/create")}
-          id="dashboard-create-stream"
-        >
-          + New Stream
-        </button>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          <button className="form-btn-secondary" onClick={load} disabled={loading} id="dashboard-refresh">
+            Refresh
+          </button>
+          <button
+            className="form-btn-secondary"
+            onClick={() => router.push("/register-issuer")}
+            id="dashboard-init-attestation"
+          >
+            Init Attestation
+          </button>
+          <button
+            className="form-btn-secondary"
+            onClick={() => router.push("/register-sender")}
+            id="dashboard-init-stream"
+          >
+            Init Stream
+          </button>
+          <button
+            className="dash-create-btn"
+            onClick={() => router.push("/stream/create")}
+            id="dashboard-create-stream"
+          >
+            + New Stream
+          </button>
+        </div>
       </div>
 
       {error && <div className="dash-error">{error}</div>}

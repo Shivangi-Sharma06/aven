@@ -8,6 +8,7 @@ import {
   isConnected as freighterIsConnected,
   requestAccess,
 } from "@stellar/freighter-api";
+import { Buffer } from "buffer";
 
 import {
   getStreamClient,
@@ -15,6 +16,17 @@ import {
   getReputationClient,
   fromContractAmount,
   toContractAmount,
+  USDC_ASSET_ID,
+  XLM_ASSET_ID,
+  STREAM_CONTRACT_ID,
+  ATTESTATION_CONTRACT_ID,
+  REPUTATION_CONTRACT_ID,
+} from "./contracts";
+
+export {
+  STREAM_CONTRACT_ID,
+  ATTESTATION_CONTRACT_ID,
+  REPUTATION_CONTRACT_ID,
   USDC_ASSET_ID,
   XLM_ASSET_ID,
 } from "./contracts";
@@ -44,9 +56,12 @@ export type StreamObject = {
   status: StreamStatus;
   category: StreamCategory;
   title: string;
-  hasAttestation: boolean;
-  attestationId?: string;
   pausedAtLedger?: number;
+  pausedDurationLedgers: number;
+  checkpointCount: number;
+  checkpointSpanLedgers: number;
+  withdrawableCapPercent: number;
+  approvalTimeoutLedgers: number;
 };
 
 export type AttestationObject = {
@@ -54,13 +69,26 @@ export type AttestationObject = {
   streamId: string;
   recipient: string;
   sender: string;
+  checkpointIndex: number;
   category: StreamCategory;
   title: string;
-  totalPaid: number;
+  amountPaid: number;
   asset: StreamAsset;
-  startLedger: number;
-  endLedger: number;
+  periodStartLedger: number;
+  periodEndLedger: number;
   mintedAtLedger: number;
+  clientConfirmed: boolean;
+};
+
+export type CheckpointObject = {
+  streamId: string;
+  index: number;
+  dueLedger: number;
+  submitted: boolean;
+  approved: boolean;
+  autoApproved: boolean;
+  attestationId: string | null;
+  evidenceHash: string;
 };
 
 export type ScoreBreakdown = {
@@ -79,26 +107,12 @@ export type CreateStreamInput = {
   asset: StreamAsset;
   durationLedgers: number;
   ratePerSecond: number;
+  checkpointCount: number;
+  withdrawableCapPercent: number;
+  approvalTimeoutLedgers: number;
   category: StreamCategory;
   title: string;
-  checkpointCount?: number;
-  withdrawableCapPercent?: number;
-  approvalTimeoutLedgers?: number;
 };
-
-const DEFAULT_CHECKPOINT_COUNT = 4;
-const DEFAULT_WITHDRAWABLE_CAP_PERCENT = 60;
-const DEFAULT_APPROVAL_TIMEOUT_LEDGERS = 50;
-
-function checkpointCountFor(durationLedgers: number, requested?: number): number {
-  if (requested !== undefined) return requested;
-
-  for (let count = DEFAULT_CHECKPOINT_COUNT; count > 1; count -= 1) {
-    if (durationLedgers % count === 0) return count;
-  }
-
-  return 1;
-}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -129,6 +143,23 @@ function toBigInt(v: unknown): bigint {
   return BigInt(String(v));
 }
 
+function bufferFromHex(value: string): Buffer {
+  const normalized = value.trim().replace(/^0x/i, "");
+  if (normalized.length % 2 !== 0) {
+    throw new Error("Evidence hash must be an even-length hex string");
+  }
+  return Buffer.from(normalized, "hex");
+}
+
+/** SHA-256 hash of UTF-8 text, returned as 64-char hex (for checkpoint evidence). */
+export async function hashEvidenceText(text: string): Promise<string> {
+  const data = new TextEncoder().encode(text.trim());
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 const ANON_ADDR = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
 
 // ─── Wallet ───────────────────────────────────────────────────────────────────
@@ -141,6 +172,20 @@ export async function checkFreighterInstalled(): Promise<boolean> {
     return (res as { isConnected: boolean }).isConnected;
   } catch {
     return false;
+  }
+}
+
+/** Restore an existing Freighter session without prompting the user. */
+export async function restoreWallet(): Promise<string | null> {
+  if (typeof window === "undefined") return null;
+  try {
+    const installed = await checkFreighterInstalled();
+    if (!installed) return null;
+    const res = await getAddress();
+    const address = typeof res === "string" ? res : (res as { address: string }).address;
+    return address || null;
+  } catch {
+    return null;
   }
 }
 
@@ -172,11 +217,9 @@ export async function createStream(
     asset: assetIdFor(data.asset),
     total_deposited: totalDeposited,
     duration_ledgers: data.durationLedgers,
-    checkpoint_count: checkpointCountFor(data.durationLedgers, data.checkpointCount),
-    withdrawable_cap_percent:
-      data.withdrawableCapPercent ?? DEFAULT_WITHDRAWABLE_CAP_PERCENT,
-    approval_timeout_ledgers:
-      data.approvalTimeoutLedgers ?? DEFAULT_APPROVAL_TIMEOUT_LEDGERS,
+    checkpoint_count: data.checkpointCount,
+    withdrawable_cap_percent: data.withdrawableCapPercent,
+    approval_timeout_ledgers: data.approvalTimeoutLedgers,
     category: { tag: data.category, values: undefined as any },
     title: data.title,
   });
@@ -190,6 +233,63 @@ export async function pauseStream(streamId: string, callerAddress: string): Prom
   const client = getStreamClient(callerAddress);
   const tx = await client.pause_stream({ stream_id: BigInt(streamId), caller: callerAddress });
   await tx.signAndSend();
+}
+
+export async function submitCheckpoint(
+  streamId: string,
+  workerAddress: string,
+  index: number,
+  evidenceHashHex: string
+): Promise<void> {
+  const client = getStreamClient(workerAddress);
+  const tx = await client.submit_checkpoint({
+    stream_id: BigInt(streamId),
+    worker: workerAddress,
+    index,
+    evidence_hash: bufferFromHex(evidenceHashHex),
+  });
+  await tx.signAndSend();
+}
+
+export async function approveCheckpoint(
+  streamId: string,
+  senderAddress: string,
+  index: number
+): Promise<string> {
+  const client = getStreamClient(senderAddress);
+  const tx = await client.approve_checkpoint({
+    stream_id: BigInt(streamId),
+    sender: senderAddress,
+    index,
+  });
+  const sent = await tx.signAndSend();
+  const raw = (sent as any).result?.unwrap?.() ?? (sent as any).result ?? 0n;
+  return String(raw);
+}
+
+export async function settleCheckpoints(streamId: string, callerAddress: string): Promise<number> {
+  const client = getStreamClient(callerAddress);
+  const tx = await client.settle_checkpoints({ stream_id: BigInt(streamId) });
+  const sent = await tx.signAndSend();
+  const raw = (sent as any).result?.unwrap?.() ?? (sent as any).result ?? 0n;
+  return Number(raw);
+}
+
+export async function getCheckpoint(
+  streamId: string,
+  index: number,
+  callerAddress?: string
+): Promise<CheckpointObject | null> {
+  const addr = callerAddress ?? ANON_ADDR;
+  const client = getStreamClient(addr);
+  try {
+    const tx = await client.get_checkpoint({ stream_id: BigInt(streamId), index });
+    const record = (tx.result as any)?.unwrap?.() ?? tx.result;
+    if (!record) return null;
+    return mapCheckpointRecord(record);
+  } catch {
+    return null;
+  }
 }
 
 export async function resumeStream(streamId: string, callerAddress: string): Promise<void> {
@@ -281,9 +381,25 @@ function mapStreamRecord(r: any): StreamObject {
     status: statusFromTag(r.status?.tag ?? "Active"),
     category: categoryFromTag(r.category?.tag ?? "Freelance"),
     title: r.title,
-    hasAttestation: Boolean(r.has_attestation),
-    attestationId: r.has_attestation ? String(r.attestation_id) : undefined,
     pausedAtLedger: r.paused_at_ledger ? Number(r.paused_at_ledger) : undefined,
+    pausedDurationLedgers: Number(r.paused_duration_ledgers ?? 0),
+    checkpointCount: Number(r.checkpoint_count ?? 0),
+    checkpointSpanLedgers: Number(r.checkpoint_span_ledgers ?? 0),
+    withdrawableCapPercent: Number(r.withdrawable_cap_percent ?? 0),
+    approvalTimeoutLedgers: Number(r.approval_timeout_ledgers ?? 0),
+  };
+}
+
+function mapCheckpointRecord(r: any): CheckpointObject {
+  return {
+    streamId: String(r.stream_id),
+    index: Number(r.index),
+    dueLedger: Number(r.due_ledger),
+    submitted: Boolean(r.submitted),
+    approved: Boolean(r.approved),
+    autoApproved: Boolean(r.auto_approved),
+    attestationId: r.attestation_id ? String(r.attestation_id) : null,
+    evidenceHash: Buffer.from(r.evidence_hash ?? []).toString("hex"),
   };
 }
 
@@ -331,24 +447,39 @@ function mapAttestationRecord(r: any): AttestationObject {
     streamId: String(r.stream_id),
     recipient: r.recipient,
     sender: r.sender,
+    checkpointIndex: Number(r.checkpoint_index),
     category: categoryFromTag(r.category?.tag ?? "Freelance"),
     title: r.title,
-    totalPaid: fromContractAmount(toBigInt(r.total_paid)),
+    amountPaid: fromContractAmount(toBigInt(r.amount_paid)),
     asset: assetFromId(r.asset),
-    startLedger: Number(r.start_ledger),
-    endLedger: Number(r.end_ledger),
+    periodStartLedger: Number(r.period_start_ledger),
+    periodEndLedger: Number(r.period_end_ledger),
     mintedAtLedger: Number(r.minted_at_ledger),
+    clientConfirmed: Boolean(r.client_confirmed),
   };
+}
+
+// ─── Contract initialization helpers ─────────────────────────────────────────
+
+export async function initStreamContract(admin: string, attestationContract: string): Promise<void> {
+  const client = getStreamClient(admin);
+  const tx = await client.init({ admin, attestation_contract: attestationContract });
+  await tx.signAndSend();
+}
+
+export async function initAttestationContract(admin: string, streamContract: string): Promise<void> {
+  const client = getAttestationClient(admin);
+  const tx = await client.init({ admin, stream_contract: streamContract });
+  await tx.signAndSend();
 }
 
 // ─── Reputation contract ──────────────────────────────────────────────────────
 
 export async function computeScore(address: string): Promise<ScoreBreakdown> {
   const client = getReputationClient(address);
-  const attestationContractId = getAttestationClient(address).options.contractId;
   try {
     const tx = await client.get_score_breakdown({
-      attestation_contract: attestationContractId,
+      attestation_contract: ATTESTATION_CONTRACT_ID,
       recipient: address,
     });
     const r: any = tx.result;
@@ -366,12 +497,24 @@ export async function computeScore(address: string): Promise<ScoreBreakdown> {
   }
 }
 
+export async function computeTotalScore(address: string): Promise<number> {
+  const client = getReputationClient(address);
+  try {
+    const tx = await client.compute_score({
+      attestation_contract: ATTESTATION_CONTRACT_ID,
+      recipient: address,
+    });
+    return fromContractAmount(toBigInt(tx.result ?? 0n));
+  } catch {
+    return 0;
+  }
+}
+
 export async function verifyClaim(address: string, minimumScore: number): Promise<boolean> {
   const client = getReputationClient(address);
-  const attestationContractId = getAttestationClient(address).options.contractId;
   try {
     const tx = await client.verify_claim({
-      attestation_contract: attestationContractId,
+      attestation_contract: ATTESTATION_CONTRACT_ID,
       recipient: address,
       minimum_score: toContractAmount(minimumScore),
     });

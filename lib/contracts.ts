@@ -15,6 +15,9 @@ export const NETWORK_PASSPHRASE = "Test SDF Network ; September 2015";
 export const USDC_ASSET_ID = "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA";
 /** Native XLM SAC on testnet */
 export const XLM_ASSET_ID = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC";
+export const STREAM_CONTRACT_ID = streamNetworks.testnet.contractId;
+export const ATTESTATION_CONTRACT_ID = attestNetworks.testnet.contractId;
+export const REPUTATION_CONTRACT_ID = reputationNetworks.testnet.contractId;
 
 /** 7 decimal fixed-point, same as Stellar stroops */
 export function toContractAmount(human: number): bigint {
@@ -50,21 +53,21 @@ function baseOptions(publicKey: string) {
 export function getStreamClient(publicKey: string) {
   return new StreamClient({
     ...baseOptions(publicKey),
-    contractId: streamNetworks.testnet.contractId,
+    contractId: STREAM_CONTRACT_ID,
   });
 }
 
 export function getAttestationClient(publicKey: string) {
   return new AttestationClient({
     ...baseOptions(publicKey),
-    contractId: attestNetworks.testnet.contractId,
+    contractId: ATTESTATION_CONTRACT_ID,
   });
 }
 
 export function getReputationClient(publicKey: string) {
   return new ReputationClient({
     ...baseOptions(publicKey),
-    contractId: reputationNetworks.testnet.contractId,
+    contractId: REPUTATION_CONTRACT_ID,
   });
 }
 

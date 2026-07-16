@@ -96,16 +96,26 @@ function VerifyContent() {
                 <div className="verify-record-item">
                   <div className="verify-record-label">Total Paid</div>
                   <div className="verify-record-value">
-                    {result.record.totalPaid.toFixed(4)} {result.record.asset}
+                    {result.record.amountPaid.toFixed(4)} {result.record.asset}
                   </div>
                 </div>
                 <div className="verify-record-item">
                   <div className="verify-record-label">Stream ID</div>
-                  <div className="verify-record-value">#{result.record.streamId}</div>
+                  <div className="verify-record-value">
+                    <a href={`/stream/${result.record.streamId}`}>#{result.record.streamId}</a>
+                  </div>
                 </div>
                 <div className="verify-record-item">
                   <div className="verify-record-label">Minted at ledger</div>
                   <div className="verify-record-value">{result.record.mintedAtLedger.toLocaleString()}</div>
+                </div>
+                <div className="verify-record-item">
+                  <div className="verify-record-label">Checkpoint</div>
+                  <div className="verify-record-value">#{result.record.checkpointIndex}</div>
+                </div>
+                <div className="verify-record-item">
+                  <div className="verify-record-label">Confirmed</div>
+                  <div className="verify-record-value">{result.record.clientConfirmed ? "Yes" : "No"}</div>
                 </div>
               </div>
 

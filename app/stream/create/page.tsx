@@ -23,6 +23,9 @@ export default function CreateStreamPage() {
   const [totalAmount, setTotalAmount] = useState("");
   const [durationDays, setDurationDays] = useState("7");
   const [ratePerSecond, setRatePerSecond] = useState("");
+  const [checkpointCount, setCheckpointCount] = useState("4");
+  const [withdrawableCapPercent, setWithdrawableCapPercent] = useState("60");
+  const [approvalTimeoutLedgers, setApprovalTimeoutLedgers] = useState("50");
   const [category, setCategory] = useState<Category>("Freelance");
   const [asset, setAsset] = useState<Asset>("USDC");
   const [title, setTitle] = useState("");
@@ -44,6 +47,9 @@ export default function CreateStreamPage() {
     const total = parseFloat(totalAmount);
     const days = parseFloat(durationDays);
     const rate = parseFloat(ratePerSecond || computedRate);
+    const checkpoints = parseInt(checkpointCount, 10);
+    const capPercent = parseInt(withdrawableCapPercent, 10);
+    const timeoutLedgers = parseInt(approvalTimeoutLedgers, 10);
 
 
     if (!recipient.startsWith("G") || recipient.length < 56) {
@@ -53,6 +59,15 @@ export default function CreateStreamPage() {
     if (!title.trim()) { setError("Title is required"); return; }
     if (!total || total <= 0) { setError("Total amount must be > 0"); return; }
     if (!days || days <= 0) { setError("Duration must be > 0"); return; }
+    if (!checkpoints || checkpoints <= 0) { setError("Checkpoint count must be > 0"); return; }
+    if (capPercent < 0 || capPercent > 100) { setError("Withdrawable cap must be between 0 and 100"); return; }
+    if (!timeoutLedgers || timeoutLedgers <= 0) { setError("Approval timeout must be > 0"); return; }
+
+    const ledgers = Math.round(days * LEDGERS_PER_DAY);
+    if (ledgers % checkpoints !== 0) {
+      setError(`Duration must divide evenly into ${checkpoints} checkpoints (adjust days or checkpoint count)`);
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -61,8 +76,11 @@ export default function CreateStreamPage() {
         recipient,
         totalAmount: total,
         asset,
-        durationLedgers: Math.round(days * LEDGERS_PER_DAY),
+        durationLedgers: ledgers,
         ratePerSecond: rate,
+        checkpointCount: checkpoints,
+        withdrawableCapPercent: capPercent,
+        approvalTimeoutLedgers: timeoutLedgers,
         category,
         title: title.trim(),
       };
@@ -215,6 +233,47 @@ export default function CreateStreamPage() {
               value={ratePerSecond}
               onChange={(e) => setRatePerSecond(e.target.value)}
               id="stream-rate"
+            />
+          </div>
+        </div>
+
+        <div className="form-row">
+          <div className="form-section" style={{ flex: 1 }}>
+            <label className="form-label">Checkpoint Count *</label>
+            <input
+              className="form-input"
+              type="number"
+              min="1"
+              max="30"
+              value={checkpointCount}
+              onChange={(e) => setCheckpointCount(e.target.value)}
+              required
+              id="stream-checkpoint-count"
+            />
+          </div>
+          <div className="form-section" style={{ flex: 1 }}>
+            <label className="form-label">Withdrawable Cap % *</label>
+            <input
+              className="form-input"
+              type="number"
+              min="0"
+              max="100"
+              value={withdrawableCapPercent}
+              onChange={(e) => setWithdrawableCapPercent(e.target.value)}
+              required
+              id="stream-cap-percent"
+            />
+          </div>
+          <div className="form-section" style={{ flex: 1 }}>
+            <label className="form-label">Approval Timeout (ledgers) *</label>
+            <input
+              className="form-input"
+              type="number"
+              min="1"
+              value={approvalTimeoutLedgers}
+              onChange={(e) => setApprovalTimeoutLedgers(e.target.value)}
+              required
+              id="stream-approval-timeout"
             />
           </div>
         </div>

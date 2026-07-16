@@ -4,7 +4,7 @@
 
 Aven turns economic activity into verifiable work history. Payments stream as work happens; completed streams create attestations; those attestations become a portable reputation record owned by the worker.
 
-The repository contains the Aven web app, its editorial GSAP-powered landing page, three Soroban smart contracts, generated TypeScript bindings, and the `aven-stellar` work-session package.
+The repository contains the Aven web app, its editorial GSAP-powered landing page, four Soroban contract crates, generated TypeScript bindings, and the `aven-stellar` work-session package. Three contracts are live on testnet; the new work-stream contract is ready for its first deployment.
 
 ## How it works
 
@@ -15,6 +15,7 @@ flowchart LR
 ```
 
 - **Stream** — creates, pauses, resumes, cancels, and settles time-based USDC or XLM payments.
+- **Work stream** — the replacement stream contract. It ties exact session payments to verifier records, client review, timeout release, and dispute resolution.
 - **Attestation** — mints a permanent work record from a completed stream.
 - **Reputation** — calculates a score and category breakdown from verified attestations.
 
@@ -92,14 +93,14 @@ The CLI creates `.avenignore` with private-file defaults, records relative paths
 
 The report contains session timing, branch and commit metadata, file-level change statistics, and the worker's statement. Its payment amount is calculated automatically from tracked active seconds and the stream's on-chain rate, capped by currently earned funds; workers do not enter their own amount. The report does not contain complete source files, keystrokes, screenshots, environment files, wallet secret keys, or excluded paths. The CLI never executes the tracked project or installs its dependencies.
 
-The currently deployed testnet contract uses the compatibility release path: the dashboard hides unrestricted withdrawal and exposes release only after verification and client approval (or review timeout). The contract source also includes strict reviewed withdrawals that reserve an exact session amount on-chain, support approval/dispute/timeout release, and reject the legacy unrestricted withdrawal entry point. After deploying that contract version, set `NEXT_PUBLIC_STRICT_REVIEWED_WITHDRAWALS=true` so the dashboard uses the strict methods.
+The currently deployed testnet contract uses the compatibility release path. The new `work_stream_contract` is a clean replacement: only the configured verifier can record a payable session, the amount cannot exceed on-chain earnings, and the worker can withdraw only after client approval or an unanswered review deadline. Disputes stay locked for the configured arbitrator. Deployment and initialization details are in [`contracts/contracts/work_stream_contract/README.md`](contracts/contracts/work_stream_contract/README.md).
 
 To build the contract WASM artifacts:
 
 ```bash
 rustup target add wasm32v1-none
 cd contracts
-cargo build --target wasm32v1-none --release
+stellar contract build --package work_stream_contract
 ```
 
 ## Repository structure
@@ -111,6 +112,7 @@ components/sections/    Aven protocol panels and infinite layered loop
 contracts/              Soroban Rust workspace
   bindings/             Generated TypeScript clients for deployed contracts
   contracts/stream_contract/
+  contracts/work_stream_contract/
   contracts/attestation_contract/
   contracts/reputation_contract/
   contracts/shared/

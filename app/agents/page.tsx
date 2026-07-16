@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useWallet } from "@/components/WalletProvider";
 import { computeScore, verifyClaim, ScoreBreakdown } from "@/lib/stellar";
 import { AutomationConsole } from "@/components/agents/AutomationConsole";
+import { WorkVerificationConsole } from "@/components/agents/WorkVerificationConsole";
 
 type AgentEntry = {
   address: string;
@@ -25,7 +26,7 @@ export default function AgentsPage() {
   const [minScore, setMinScore] = useState("100");
   const [claimResult, setClaimResult] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"automation" | "reputation">("automation");
+  const [activeTab, setActiveTab] = useState<"verification" | "automation" | "reputation">("verification");
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -64,11 +65,12 @@ export default function AgentsPage() {
   return (
     <div className="agents-wrap">
       <div className="agents-console-tabs" role="tablist" aria-label="Agent tools">
+        <button className={activeTab === "verification" ? "active" : ""} onClick={() => setActiveTab("verification")} role="tab" aria-selected={activeTab === "verification"}>Verify Work</button>
         <button className={activeTab === "automation" ? "active" : ""} onClick={() => setActiveTab("automation")} role="tab" aria-selected={activeTab === "automation"}>Automation</button>
         <button className={activeTab === "reputation" ? "active" : ""} onClick={() => setActiveTab("reputation")} role="tab" aria-selected={activeTab === "reputation"}>Reputation</button>
       </div>
 
-      {activeTab === "automation" ? <AutomationConsole /> : <>
+      {activeTab === "verification" ? <WorkVerificationConsole /> : activeTab === "automation" ? <AutomationConsole /> : <>
       <div className="agents-header">
         <h1 className="agents-title">Reputation Lookup</h1>
         <p className="agents-sub">

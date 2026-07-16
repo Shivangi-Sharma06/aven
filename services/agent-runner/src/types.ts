@@ -1,5 +1,6 @@
 export type JobState =
   | "received"
+  | "verifying"
   | "submitting"
   | "executed"
   | "pending_owner"
@@ -17,6 +18,9 @@ export type StreamJob = {
   withdrawableCapPercent: number;
   approvalTimeoutLedgers: number;
   title: string;
+  workType: "code" | "creative";
+  artifactUrl: string;
+  baselineUrl?: string;
 };
 
 export type JobRecord = {
@@ -29,6 +33,11 @@ export type JobRecord = {
   streamId?: string;
   transactionHash?: string;
   failureReason?: string;
+  workType?: "code" | "creative";
+  verificationScore?: number;
+  verificationSummary?: string;
+  evidenceHash?: string;
+  verificationFlags?: string[];
   createdAt: string;
   updatedAt: string;
 };

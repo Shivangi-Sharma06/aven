@@ -3,6 +3,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { requestId, submitJob } from "./stellar.ts";
 import { JobStore } from "./jobs.ts";
 import type { JobRecord, StreamJob } from "./types.ts";
+import { verifyWork, type VerificationResult } from "./verify.ts";
 
 const mandateAddress = required("AGENT_MANDATE_ADDRESS");
 const agentSecret = required("AGENT_SECRET_KEY");
@@ -11,6 +12,7 @@ if (hmacSecret.length < 32) throw new Error("RUNNER_HMAC_SECRET must be at least
 
 const port = Number(process.env.PORT ?? 8787);
 const store = new JobStore(process.env.RUNNER_DATA_FILE ?? "./data/jobs.json");
+const jobRoutePrefix = "/jobs/";
 await store.open();
 
 function required(name: string) {
@@ -48,6 +50,14 @@ const server = createServer(async (request, response) => {
     if (request.method === "GET" && request.url === "/health") {
       return json(response, 200, { ok: true, network: "stellar:testnet" });
     }
+    if (request.method === "GET" && request.url?.startsWith(jobRoutePrefix)) {
+      const jobId = decodeURIComponent(request.url.slice(jobRoutePrefix.length));
+      if (!jobId) return json(response, 400, { error: "jobId is required" });
+      const key = `${mandateAddress}:${requestId(jobId).toString("hex")}`;
+      const record = store.get(key);
+      if (!record) return json(response, 404, { error: "Job not found" });
+      return json(response, 200, record);
+    }
     if (request.method !== "POST" || request.url !== "/jobs") {
       return json(response, 404, { error: "Not found" });
     }
@@ -57,7 +67,18 @@ const server = createServer(async (request, response) => {
       return json(response, 401, { error: "Invalid job signature" });
     }
     const job = JSON.parse(payload.toString("utf8")) as StreamJob;
-    if (!job.jobId?.trim()) return json(response, 400, { error: "jobId is required" });
+    if (typeof job.jobId !== "string" || !job.jobId.trim()) {
+      return json(response, 400, { error: "jobId is required" });
+    }
+    if (job.workType !== "code" && job.workType !== "creative") {
+      return json(response, 400, { error: "workType must be either code or creative" });
+    }
+    if (typeof job.artifactUrl !== "string" || !job.artifactUrl.trim()) {
+      return json(response, 400, { error: "artifactUrl is required" });
+    }
+    if (job.baselineUrl !== undefined && typeof job.baselineUrl !== "string") {
+      return json(response, 400, { error: "baselineUrl must be a string" });
+    }
 
     const key = `${mandateAddress}:${requestId(job.jobId).toString("hex")}`;
     const existing = store.get(key);
@@ -75,12 +96,46 @@ const server = createServer(async (request, response) => {
     };
     await store.put(key, record);
 
+    record.state = "verifying";
+    record.workType = job.workType;
+    record.updatedAt = new Date().toISOString();
+    await store.put(key, record);
+
+    let verificationResult: VerificationResult;
+    try {
+      verificationResult = await verifyWork(job);
+    } catch (error) {
+      record.state = "failed";
+      record.failureReason = error instanceof Error ? error.message : String(error);
+      record.verificationFlags = ["verification_error"];
+      record.verificationScore = 0;
+      record.updatedAt = new Date().toISOString();
+      await store.put(key, record);
+      return json(response, 422, record);
+    }
+
+    record.verificationScore = verificationResult.score;
+    record.evidenceHash = verificationResult.evidenceHash;
+    record.verificationSummary = verificationResult.summary;
+    record.verificationFlags = verificationResult.flags;
+    record.updatedAt = new Date().toISOString();
+    await store.put(key, record);
+
+    if (!verificationResult.approved && job.workType === "code") {
+      record.state = "failed";
+      record.failureReason = `Verification failed: ${verificationResult.flags.join(", ")}`;
+      record.updatedAt = new Date().toISOString();
+      await store.put(key, record);
+      return json(response, 422, record);
+    }
+
+    const forceOwnerApproval = job.workType === "creative";
     try {
       record.state = "submitting";
       record.attempts += 1;
       record.updatedAt = new Date().toISOString();
       await store.put(key, record);
-      Object.assign(record, await submitJob(mandateAddress, agentSecret, job));
+      Object.assign(record, await submitJob(mandateAddress, agentSecret, job, forceOwnerApproval));
     } catch (error) {
       record.state = "failed";
       record.failureReason = error instanceof Error ? error.message : String(error);

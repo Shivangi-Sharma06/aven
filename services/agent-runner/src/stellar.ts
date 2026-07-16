@@ -61,7 +61,12 @@ export function jobParams(job: StreamJob): StreamParams {
   };
 }
 
-export async function submitJob(contractId: string, agentSecret: string, job: StreamJob) {
+export async function submitJob(
+  contractId: string,
+  agentSecret: string,
+  job: StreamJob,
+  forceOwnerApproval = false,
+) {
   const { client, address } = createMandateClient(contractId, agentSecret);
   const configTx = await client.get_config();
   const ledger = await fetch(SOROBAN_RPC_URL, {
@@ -80,7 +85,8 @@ export async function submitJob(contractId: string, agentSecret: string, job: St
   const alreadyUsed = await client.is_request_used({ request_id: Buffer.from(id) });
   if (alreadyUsed.result) return { state: "already_processed" as const };
 
-  const requiresOwner = needsOwnerApproval(configTx.result, params.total_deposited);
+  const requiresOwner =
+    forceOwnerApproval || needsOwnerApproval(configTx.result, params.total_deposited);
   let lastError: unknown;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     try {

@@ -1,0 +1,12 @@
+{
+  "name": "@aven/agent-runner",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:binding": "npm --prefix ../../contracts/bindings/agent_mandate run build",
+    "prestart": "npm run build:binding",
+    "start": "node src/index.ts",
+    "pretypecheck": "npm run build:binding",
+    "typecheck": "tsc --noEmit"
+  }
+}

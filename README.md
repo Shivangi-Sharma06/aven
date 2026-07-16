@@ -4,7 +4,7 @@
 
 Aven turns economic activity into verifiable work history. Payments stream as work happens; completed streams create attestations; those attestations become a portable reputation record owned by the worker.
 
-The repository contains the Aven web app, its editorial GSAP-powered landing page, three Soroban smart contracts, and generated TypeScript contract bindings.
+The repository contains the Aven web app, its editorial GSAP-powered landing page, four Soroban smart contracts, generated TypeScript bindings, and a small automation runner for delegated agent payments.
 
 ## How it works
 
@@ -17,6 +17,7 @@ flowchart LR
 - **Stream** — creates, pauses, resumes, cancels, and settles time-based USDC or XLM payments.
 - **Attestation** — mints a permanent work record from a completed stream.
 - **Reputation** — calculates a score and category breakdown from verified attestations.
+- **Agent Mandate** — holds a deliberately limited budget and lets a registered agent create policy-compliant streams without holding the owner's key.
 
 ## Product surfaces
 
@@ -26,7 +27,7 @@ flowchart LR
 - `/stream/[id]` — inspect and manage a stream
 - `/profile/[address]` — public work history and reputation
 - `/verify` — verify an attestation or reputation claim
-- `/agents` — agent-oriented protocol surface
+- `/agents` — owner automation console and agent reputation lookup
 
 ## Tech stack
 
@@ -71,6 +72,17 @@ cd contracts
 cargo test
 ```
 
+The Agent Mandate runner is a separate process. It signs only as the registered agent and never receives the owner's secret:
+
+```bash
+cp services/agent-runner/.env.example services/agent-runner/.env
+cd services/agent-runner
+set -a && source .env && set +a
+npm start
+```
+
+Jobs are accepted at `POST /jobs` and must include an `x-aven-signature: sha256=<hex>` HMAC over the exact request body. Amounts in runner jobs use Stellar's raw seven-decimal contract units to avoid floating-point ambiguity. The checked-in file journal is crash-safe and appropriate for a single testnet process; replace it with a transactional database and a unique `(mandate_address, request_id)` constraint before production.
+
 To build the contract WASM artifacts:
 
 ```bash
@@ -90,9 +102,12 @@ contracts/              Soroban Rust workspace
   contracts/stream_contract/
   contracts/attestation_contract/
   contracts/reputation_contract/
+  contracts/agent_mandate_contract/
   contracts/shared/
 lib/contracts.ts        Testnet config and contract client factories
 lib/stellar.ts          Wallet and on-chain application operations
+lib/agent-automation.ts Typed mandate operations and readable errors
+services/agent-runner/  HMAC-authenticated, idempotent agent job runner
 ```
 
 ## Testnet deployment
@@ -104,6 +119,7 @@ The frontend is currently wired to Stellar testnet:
 | Stream | `CCPHFGDKV2SOL5SUFN3WPM7DVNMYAJODH63YIA2VCS5UFRW57Z7FNKJ4` |
 | Attestation | `CDZMWG7BEGRIGKDXZE32NNQB37LRQQJ6657JOJOPNSOLSXHSKDSFMVL7` |
 | Reputation | `CBAJXRTE37SREIBIL5FP3J6BJV2VTMCHHQJJIS5W4IQK4BZ6UANKGSVL` |
+| Agent Mandate | Deployed per owner-agent pair; entered in the `/agents` console at runtime |
 
 Amounts use Stellar's seven-decimal fixed-point representation. The frontend converts human-readable values at the client boundary in `lib/contracts.ts`.
 
@@ -112,7 +128,9 @@ Amounts use Stellar's seven-decimal fixed-point representation. The frontend con
 - The landing-page loop is desktop-only. Mobile renders the same content as a normal stacked document flow.
 - The duplicate final panel is an internal loop bridge and is excluded from pin and snap calculations.
 - Freighter signs transactions in the browser; secret keys are never stored by the app.
+- Agent secrets belong only in a runner secret manager or KMS. Never expose them through `NEXT_PUBLIC_` variables.
 - Contract bindings must be regenerated or updated after deploying a new contract version or changing a contract interface.
+- The first mandate release is testnet-only. The factory remains intentionally deferred until one manually deployed mandate is rehearsed end to end.
 
 ## Status
 

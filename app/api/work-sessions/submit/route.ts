@@ -9,7 +9,7 @@ import {
   authenticateCliRequest,
   calculateSessionPaymentUnits,
   formatAmountUnits,
-  getEarnedUnits,
+  getAvailableUnits,
   getOnchainStream,
   ratePerSecondUnits,
   validateWorkSessionReport,
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     if (report.paymentRequest.asset !== stream.asset) {
       return apiError("The report asset does not match the stream asset.");
     }
-    const earnedUnits = await getEarnedUnits(stream.id);
+    const earnedUnits = await getAvailableUnits(stream.id);
     const calculatedUnits = calculateSessionPaymentUnits(
       stream,
       report.session.activeSeconds,

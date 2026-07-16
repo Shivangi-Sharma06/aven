@@ -33,9 +33,6 @@ export type StreamCategory =
   | "Subscription";
 export type StreamAsset = "USDC" | "XLM";
 
-export const STRICT_REVIEWED_WITHDRAWALS =
-  process.env.NEXT_PUBLIC_STRICT_REVIEWED_WITHDRAWALS === "true";
-
 export type StreamObject = {
   id: string;
   sender: string;
@@ -91,17 +88,13 @@ export type CreateStreamInput = {
   approvalTimeoutLedgers?: number;
 };
 
-const DEFAULT_CHECKPOINT_COUNT = 4;
-const DEFAULT_WITHDRAWABLE_CAP_PERCENT = 60;
 const DEFAULT_APPROVAL_TIMEOUT_LEDGERS = 50;
 
 function checkpointCountFor(durationLedgers: number, requested?: number): number {
   if (requested !== undefined) return requested;
-
-  for (let count = DEFAULT_CHECKPOINT_COUNT; count > 1; count -= 1) {
+  for (let count = 4; count > 1; count -= 1) {
     if (durationLedgers % count === 0) return count;
   }
-
   return 1;
 }
 
@@ -132,12 +125,6 @@ function categoryFromTag(tag: string): StreamCategory {
 function toBigInt(v: unknown): bigint {
   if (typeof v === "bigint") return v;
   return BigInt(String(v));
-}
-
-function decimalAmountToContract(value: string): bigint {
-  const match = /^(0|[1-9]\d*)(?:\.(\d{1,7}))?$/.exec(value);
-  if (!match) throw new Error("Invalid Stellar amount.");
-  return BigInt(match[1]) * 10_000_000n + BigInt((match[2] ?? "").padEnd(7, "0"));
 }
 
 function transactionHash(sent: any): string {
@@ -206,8 +193,7 @@ export async function createStream(
     total_deposited: totalDeposited,
     duration_ledgers: data.durationLedgers,
     checkpoint_count: checkpointCountFor(data.durationLedgers, data.checkpointCount),
-    withdrawable_cap_percent:
-      data.withdrawableCapPercent ?? DEFAULT_WITHDRAWABLE_CAP_PERCENT,
+    withdrawable_cap_percent: data.withdrawableCapPercent ?? 60,
     approval_timeout_ledgers:
       data.approvalTimeoutLedgers ?? DEFAULT_APPROVAL_TIMEOUT_LEDGERS,
     category: { tag: data.category, values: undefined as any },
@@ -237,42 +223,18 @@ export async function cancelStream(streamId: string, callerAddress: string): Pro
   await tx.signAndSend();
 }
 
-export async function withdrawEarned(
-  streamId: string,
-  callerAddress: string
-): Promise<{ amount: number; txHash: string }> {
-  const client = getStreamClient(callerAddress);
-  const tx = await client.withdraw({ stream_id: BigInt(streamId), caller: callerAddress });
-  const sent = await tx.signAndSend();
-  const raw = (sent as any).result?.unwrap?.() ?? 0n;
-  return {
-    amount: fromContractAmount(toBigInt(raw)),
-    txHash: transactionHash(sent),
-  };
-}
-
-export async function requestReviewedWithdrawal(
-  streamId: string,
-  recipientAddress: string,
-  requestId: string,
-  amount: string,
-): Promise<void> {
-  const client = getStreamClient(recipientAddress);
-  const tx = await client.request_withdrawal({
-    stream_id: BigInt(streamId),
-    recipient: recipientAddress,
-    request_id: requestId,
-    amount: decimalAmountToContract(amount),
-  });
-  await tx.signAndSend();
-}
-
 export async function approveReviewedWithdrawal(
   streamId: string,
   senderAddress: string,
   requestId: string,
 ): Promise<void> {
   const client = getStreamClient(senderAddress);
+  const existing = await client.get_withdrawal({
+    stream_id: BigInt(streamId),
+    request_id: requestId,
+  });
+  const claim = (existing.result as any)?.unwrap?.() ?? existing.result;
+  if (claim?.status?.tag === "Approved") return;
   const tx = await client.approve_withdrawal({
     stream_id: BigInt(streamId),
     sender: senderAddress,
@@ -287,6 +249,12 @@ export async function disputeReviewedWithdrawal(
   requestId: string,
 ): Promise<void> {
   const client = getStreamClient(senderAddress);
+  const existing = await client.get_withdrawal({
+    stream_id: BigInt(streamId),
+    request_id: requestId,
+  });
+  const claim = (existing.result as any)?.unwrap?.() ?? existing.result;
+  if (claim?.status?.tag === "Disputed") return;
   const tx = await client.dispute_withdrawal({
     stream_id: BigInt(streamId),
     sender: senderAddress,
@@ -327,11 +295,11 @@ export async function getStream(streamId: string, callerAddress?: string): Promi
   }
 }
 
-export async function computeEarned(streamId: string, callerAddress?: string): Promise<number> {
+export async function computeAvailable(streamId: string, callerAddress?: string): Promise<number> {
   const addr = callerAddress ?? ANON_ADDR;
   const client = getStreamClient(addr);
   try {
-    const tx = await client.compute_earned({ stream_id: BigInt(streamId) });
+    const tx = await client.compute_available({ stream_id: BigInt(streamId) });
     const raw = (tx.result as any)?.unwrap?.() ?? tx.result ?? 0n;
     return fromContractAmount(toBigInt(raw));
   } catch {
@@ -377,8 +345,7 @@ function mapStreamRecord(r: any): StreamObject {
     status: statusFromTag(r.status?.tag ?? "Active"),
     category: categoryFromTag(r.category?.tag ?? "Freelance"),
     title: r.title,
-    hasAttestation: Boolean(r.has_attestation),
-    attestationId: r.has_attestation ? String(r.attestation_id) : undefined,
+    hasAttestation: false,
     pausedAtLedger: r.paused_at_ledger ? Number(r.paused_at_ledger) : undefined,
   };
 }

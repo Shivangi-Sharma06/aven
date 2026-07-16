@@ -8,16 +8,13 @@ import { ConfirmModal } from "@/components/ConfirmModal";
 import type { WorkSession } from "@/lib/work-session";
 import {
   getStream,
-  computeEarned,
+  computeAvailable,
   pauseStream,
   resumeStream,
   cancelStream,
-  withdrawEarned,
-  requestReviewedWithdrawal,
   approveReviewedWithdrawal,
   disputeReviewedWithdrawal,
   withdrawReviewed,
-  STRICT_REVIEWED_WITHDRAWALS,
   StreamObject,
 } from "@/lib/stellar";
 import styles from "./page.module.css";
@@ -76,7 +73,7 @@ export default function StreamDetailPage() {
       const s = await getStream(id, address ?? undefined);
       setStream(s);
       if (s?.status === "active" || s?.status === "paused") {
-        const e = await computeEarned(id, address ?? undefined);
+        const e = await computeAvailable(id, address ?? undefined);
         setEarned(e);
       }
     } catch (e: any) {
@@ -134,7 +131,7 @@ export default function StreamDetailPage() {
     // Poll earned every 6 seconds when active
     pollRef.current = setInterval(async () => {
       if (stream?.status === "active") {
-        const e = await computeEarned(id, address ?? undefined);
+        const e = await computeAvailable(id, address ?? undefined);
         setEarned(e);
       }
     }, 6000);
@@ -174,12 +171,7 @@ export default function StreamDetailPage() {
     setError(null);
     try {
       const session = sessions.find((candidate) => candidate.id === sessionId);
-      if (STRICT_REVIEWED_WITHDRAWALS && address && session) {
-        if (action === "request-withdrawal") {
-          const amount = session.requestedAmount ?? session.report?.paymentRequest.requestedAmount;
-          if (!amount) throw new Error("This work session has no calculated payment amount.");
-          await requestReviewedWithdrawal(id, address, session.id, amount);
-        }
+      if (address && session) {
         if (action === "approve") await approveReviewedWithdrawal(id, address, session.id);
         if (action === "dispute") await disputeReviewedWithdrawal(id, address, session.id);
       }
@@ -217,9 +209,7 @@ export default function StreamDetailPage() {
       });
       const preparedData = await prepared.json();
       if (!prepared.ok) throw new Error(preparedData.error ?? "The release could not be prepared.");
-      const result = STRICT_REVIEWED_WITHDRAWALS
-        ? await withdrawReviewed(id, address, session.id)
-        : await withdrawEarned(id, address);
+      const result = await withdrawReviewed(id, address, session.id);
       transactionSucceeded = true;
       const path = `/api/work-sessions/${encodeURIComponent(session.id)}/release`;
       const response = await fetch(path, {
@@ -260,10 +250,6 @@ export default function StreamDetailPage() {
       if (action === "pause") await pauseStream(id, address);
       if (action === "resume") await resumeStream(id, address);
       if (action === "cancel") await cancelStream(id, address);
-      if (action === "withdraw") {
-        const res = await withdrawEarned(id, address);
-        setTxResult(`Withdrew ${res.amount.toFixed(4)} ${stream?.asset} · tx: ${res.txHash.slice(0, 10)}…`);
-      }
       await load();
     } catch (e: any) {
       setError(e?.message ?? "Transaction failed");
@@ -370,9 +356,9 @@ export default function StreamDetailPage() {
             <div className="stream-detail-item-value">#{stream.startLedger.toLocaleString()}</div>
           </div>
           <div className="stream-detail-item">
-            <div className="stream-detail-item-label">Attestation</div>
+            <div className="stream-detail-item-label">Work evidence</div>
             <div className="stream-detail-item-value">
-              {stream.hasAttestation ? `#${stream.attestationId}` : "Not minted yet"}
+              {sessions.length > 0 ? `${sessions.length} session record${sessions.length === 1 ? "" : "s"}` : "No sessions yet"}
             </div>
           </div>
         </div>
@@ -387,7 +373,7 @@ export default function StreamDetailPage() {
           </div>
 
           <div className={styles["work-session-summary"]}>
-            <div><span>Streamed</span><strong>{earned.toFixed(7)} {stream.asset}</strong></div>
+            <div><span>Available</span><strong>{earned.toFixed(7)} {stream.asset}</strong></div>
             <div><span>Pending review</span><strong>{pendingAmount.toFixed(7)} {stream.asset}</strong></div>
             <div><span>Release eligible</span><strong>{releasedAmount.toFixed(7)} {stream.asset}</strong></div>
             <div><span>Disputed</span><strong>{disputedAmount.toFixed(7)} {stream.asset}</strong></div>
@@ -451,6 +437,9 @@ export default function StreamDetailPage() {
                         <div className={styles["work-session-verification"]}>
                           <span>Verification</span>
                           <p>{session.verificationSummary ?? report.localVerification.summary}</p>
+                          {session.reportDigest && (
+                            <code title={session.reportDigest}>On-chain report {session.reportDigest.slice(0, 12)}…</code>
+                          )}
                           {(session.verificationFlags ?? report.localVerification.flags).length > 0 && (
                             <div>{(session.verificationFlags ?? report.localVerification.flags).map((flag) => <code key={flag}>{flag}</code>)}</div>
                           )}

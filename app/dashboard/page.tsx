@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useWallet } from "@/components/WalletProvider";
 import { getSenderStreams, getRecipientStreams, StreamObject, getWorkerAttestations } from "@/lib/stellar";
-import { pauseStream, resumeStream, cancelStream, withdrawEarned } from "@/lib/stellar";
+import { pauseStream, resumeStream, cancelStream } from "@/lib/stellar";
 
 type Tab = "sending" | "receiving";
 
@@ -72,7 +72,6 @@ export default function DashboardPage() {
       if (action === "pause") await pauseStream(stream.id, address);
       if (action === "resume") await resumeStream(stream.id, address);
       if (action === "cancel") await cancelStream(stream.id, address);
-      if (action === "withdraw") await withdrawEarned(stream.id, address);
       await load();
     } catch (e: any) {
       setError(e?.message ?? "Transaction failed");
@@ -257,19 +256,7 @@ function StreamCard({
               </button>
             )}
           </>
-        ) : (
-          <>
-            {(stream.status === "active" || stream.status === "paused") && (
-              <button
-                className="stream-action-btn stream-action-btn--primary"
-                onClick={() => onAction("withdraw", stream)}
-                disabled={isLoading("withdraw")}
-              >
-                {isLoading("withdraw") ? "…" : "Withdraw Earned"}
-              </button>
-            )}
-          </>
-        )}
+        ) : null}
         <button className="stream-view-btn" onClick={onView}>
           View →
         </button>

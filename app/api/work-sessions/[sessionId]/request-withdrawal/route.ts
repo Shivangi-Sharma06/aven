@@ -1,15 +1,19 @@
 import { NextResponse } from "next/server";
 import { apiError } from "@/lib/api-response";
-import { getSession, listSessionsForStream, putSession } from "@/lib/session-store";
+import { getSession, putSession } from "@/lib/session-store";
 import {
   addTimelineEvent,
   addressesEqual,
   authenticateCliRequest,
   authenticateWalletRequest,
-  getEarnedUnits,
+  getAvailableUnits,
   getOnchainStream,
   parseAmountUnits,
 } from "@/lib/work-session-server";
+import { recordVerifiedWork } from "@/lib/work-stream-verifier";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 const RESERVED_STATES = new Set([
   "WITHDRAWAL_REQUESTED",
@@ -46,16 +50,22 @@ export async function POST(
     const requestedAmount = session.report?.paymentRequest.requestedAmount;
     if (!requestedAmount) return apiError("The report has no payment request.");
     const requestedUnits = parseAmountUnits(requestedAmount);
-    const earnedUnits = await getEarnedUnits(session.streamId);
-    const otherSessions = await listSessionsForStream(session.streamId);
-    const reservedUnits = otherSessions
-      .filter((other) => other.id !== session.id && RESERVED_STATES.has(other.status))
-      .reduce((total, other) => total + parseAmountUnits(other.requestedAmount ?? "0"), 0n);
-    if (requestedUnits <= 0n || requestedUnits > earnedUnits - reservedUnits) {
+    const availableUnits = await getAvailableUnits(session.streamId);
+    if (requestedUnits <= 0n || requestedUnits > availableUnits) {
       return apiError("The requested amount exceeds the stream earnings not already reserved.", 409);
     }
+    if (!session.report) return apiError("The verified report is missing.", 409);
+    const onchain = await recordVerifiedWork({
+      streamId: session.streamId,
+      sessionId: session.id,
+      amountUnits: requestedUnits,
+      report: session.report,
+    });
     session.requestedAmount = requestedAmount;
-    addTimelineEvent(session, "WITHDRAWAL_REQUESTED", "worker", `Requested ${requestedAmount} ${stream.asset}.`);
+    session.verifierTxHash = onchain.transactionHash ?? session.verifierTxHash;
+    session.reportDigest = onchain.reportDigest;
+    session.reviewDeadlineLedger = onchain.reviewDeadlineLedger;
+    addTimelineEvent(session, "WITHDRAWAL_REQUESTED", "worker", `Reserved ${requestedAmount} ${stream.asset} against the verified session.`);
     session.reviewDeadlineAt = new Date(
       Date.now() + Math.max(stream.approvalTimeoutLedgers, 1) * 5_000,
     ).toISOString();

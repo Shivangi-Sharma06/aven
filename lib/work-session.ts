@@ -121,6 +121,9 @@ export type WorkSession = {
   verificationFlags?: string[];
   requestedAmount?: string;
   reviewDeadlineAt?: string;
+  reviewDeadlineLedger?: number;
+  verifierTxHash?: string;
+  reportDigest?: string;
   disputeReason?: string;
   workerResponse?: string;
   releasedTxHash?: string;

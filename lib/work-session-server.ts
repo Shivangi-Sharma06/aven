@@ -55,6 +55,12 @@ export async function getEarnedUnits(streamId: string): Promise<bigint> {
   return BigInt(String(unwrapResult<bigint>(transaction.result) ?? 0n));
 }
 
+export async function getAvailableUnits(streamId: string): Promise<bigint> {
+  const client = getStreamClient(ANONYMOUS_ADDRESS);
+  const transaction = await client.compute_available({ stream_id: BigInt(streamId) });
+  return BigInt(String(unwrapResult<bigint>(transaction.result) ?? 0n));
+}
+
 export function parseAmountUnits(value: string): bigint {
   const match = AMOUNT_PATTERN.exec(value);
   if (!match) throw new Error("Amount must be a non-negative decimal string with at most 7 decimal places.");

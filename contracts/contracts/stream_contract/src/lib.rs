@@ -21,6 +21,8 @@ enum DataKey {
     Checkpoint(u64, u32),
     Withdrawal(u64, String),
     ReservedWithdrawals(u64),
+    Verifier,
+    WorkEvidence(u64, String),
 }
 
 const MAX_WITHDRAWAL_REQUEST_ID_LEN: u32 = 64;
@@ -78,6 +80,9 @@ pub enum Error {
     WithdrawalNotApproved = 27,
     WithdrawalDisputed = 28,
     WithdrawalApprovalRequired = 29,
+    NotAdmin = 30,
+    VerifierNotConfigured = 31,
+    VerificationRequired = 32,
 }
 
 #[contractevent(topics = ["stream_created"])]
@@ -157,6 +162,18 @@ pub struct WithdrawalDisputed {
     pub request_id: String,
 }
 
+#[contractevent(topics = ["work_verified"])]
+pub struct WorkVerified {
+    #[topic]
+    pub stream_id: u64,
+    #[topic]
+    pub recipient: Address,
+    pub request_id: String,
+    pub amount: i128,
+    pub evidence_hash: BytesN<32>,
+    pub deadline_ledger: u32,
+}
+
 #[contractevent(topics = ["stream_paused"])]
 pub struct StreamPaused {
     #[topic]
@@ -197,6 +214,106 @@ impl StreamContract {
         Ok(())
     }
 
+    pub fn set_verifier(env: Env, admin: Address, verifier: Address) -> Result<(), Error> {
+        admin.require_auth();
+        let expected: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .ok_or(Error::NotInitialized)?;
+        if admin != expected {
+            return Err(Error::NotAdmin);
+        }
+        env.storage().instance().set(&DataKey::Verifier, &verifier);
+        bump_instance(&env);
+        Ok(())
+    }
+
+    pub fn verify_work(
+        env: Env,
+        stream_id: u64,
+        request_id: String,
+        amount: i128,
+        evidence_hash: BytesN<32>,
+    ) -> Result<(), Error> {
+        let verifier: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Verifier)
+            .ok_or(Error::VerifierNotConfigured)?;
+        verifier.require_auth();
+        bump_instance(&env);
+
+        let stream = load_stream(&env, stream_id)?;
+        require_withdrawable_status(&stream)?;
+        if request_id.is_empty() || request_id.len() > MAX_WITHDRAWAL_REQUEST_ID_LEN {
+            return Err(Error::InvalidRequestId);
+        }
+        if amount <= 0 {
+            return Err(Error::InvalidAmount);
+        }
+
+        let key = DataKey::Withdrawal(stream_id, request_id.clone());
+        if let Some(existing) = env.storage().persistent().get::<_, WithdrawalRecord>(&key) {
+            let evidence_key = DataKey::WorkEvidence(stream_id, request_id.clone());
+            let existing_hash: Option<BytesN<32>> = env.storage().persistent().get(&evidence_key);
+            if existing.amount == amount
+                && existing.status == WithdrawalStatus::Pending
+                && existing_hash == Some(evidence_hash)
+            {
+                return Ok(());
+            }
+            return Err(Error::WithdrawalAlreadyExists);
+        }
+
+        finalize_due_checkpoints(&env, &stream)?;
+        let available = compute_withdrawable(&env, &stream)?
+            .checked_sub(load_reserved(&env, stream_id))
+            .ok_or(Error::Overflow)?;
+        if amount > available {
+            return Err(Error::AmountExceedsWithdrawable);
+        }
+
+        let requested_at_ledger = env.ledger().sequence();
+        let deadline_ledger = requested_at_ledger
+            .checked_add(stream.approval_timeout_ledgers)
+            .ok_or(Error::Overflow)?;
+        let record = WithdrawalRecord {
+            stream_id,
+            request_id: request_id.clone(),
+            amount,
+            requested_at_ledger,
+            deadline_ledger,
+            status: WithdrawalStatus::Pending,
+        };
+        save_withdrawal(&env, &record);
+        save_reserved(
+            &env,
+            stream_id,
+            load_reserved(&env, stream_id)
+                .checked_add(amount)
+                .ok_or(Error::Overflow)?,
+        );
+        let evidence_key = DataKey::WorkEvidence(stream_id, request_id.clone());
+        env.storage()
+            .persistent()
+            .set(&evidence_key, &evidence_hash);
+        env.storage()
+            .persistent()
+            .extend_ttl(&evidence_key, LEDGER_BUMP, LEDGER_BUMP);
+
+        WorkVerified {
+            stream_id,
+            recipient: stream.recipient,
+            request_id,
+            amount,
+            evidence_hash,
+            deadline_ledger,
+        }
+        .publish(&env);
+        Ok(())
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn create_stream(
         env: Env,
@@ -231,7 +348,7 @@ impl StreamContract {
         if checkpoint_count == 0 || checkpoint_count > MAX_CHECKPOINTS {
             return Err(Error::InvalidCheckpointCount);
         }
-        if duration_ledgers % checkpoint_count != 0 {
+        if !duration_ledgers.is_multiple_of(checkpoint_count) {
             return Err(Error::DurationNotDivisible);
         }
         if withdrawable_cap_percent > 100 {
@@ -253,7 +370,7 @@ impl StreamContract {
         }
 
         let token_client = token::Client::new(&env, &asset);
-        token_client.transfer(&sender, &env.current_contract_address(), &total_deposited);
+        token_client.transfer(&sender, env.current_contract_address(), &total_deposited);
 
         let id: u64 = env
             .storage()
@@ -397,12 +514,16 @@ impl StreamContract {
         recipient.require_auth();
         bump_instance(&env);
 
+        if env.storage().instance().has(&DataKey::Verifier) {
+            return Err(Error::VerificationRequired);
+        }
+
         let stream = load_stream(&env, stream_id)?;
         if recipient != stream.recipient {
             return Err(Error::NotRecipient);
         }
         require_withdrawable_status(&stream)?;
-        if request_id.len() == 0 || request_id.len() > MAX_WITHDRAWAL_REQUEST_ID_LEN {
+        if request_id.is_empty() || request_id.len() > MAX_WITHDRAWAL_REQUEST_ID_LEN {
             return Err(Error::InvalidRequestId);
         }
         if amount <= 0 {
@@ -475,7 +596,12 @@ impl StreamContract {
             WithdrawalStatus::Withdrawn => return Err(Error::WithdrawalAlreadyExists),
         }
         save_withdrawal(&env, &record);
-        WithdrawalApproved { stream_id, sender, request_id }.publish(&env);
+        WithdrawalApproved {
+            stream_id,
+            sender,
+            request_id,
+        }
+        .publish(&env);
         Ok(())
     }
 
@@ -506,7 +632,12 @@ impl StreamContract {
             reserved.checked_sub(record.amount).ok_or(Error::Overflow)?,
         );
         save_withdrawal(&env, &record);
-        WithdrawalDisputed { stream_id, sender, request_id }.publish(&env);
+        WithdrawalDisputed {
+            stream_id,
+            sender,
+            request_id,
+        }
+        .publish(&env);
         Ok(())
     }
 
@@ -555,7 +686,12 @@ impl StreamContract {
             &recipient,
             &record.amount,
         );
-        StreamWithdrawn { stream_id, recipient, amount: record.amount }.publish(&env);
+        StreamWithdrawn {
+            stream_id,
+            recipient,
+            amount: record.amount,
+        }
+        .publish(&env);
         Ok(record.amount)
     }
 

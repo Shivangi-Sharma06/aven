@@ -1,4 +1,7 @@
 :root {
+  --font-inter: var(--font-sans);
+  --font-space: var(--font-serif);
+
   /* Backgrounds */
   --bg-black:      #000000;
   --bg-dark:       #0a0a0f;

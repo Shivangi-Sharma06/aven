@@ -1,145 +1,132 @@
 # Aven
 
-**A protocol for streaming payments, portable work attestations, and on-chain reputation on Stellar.**
+**A decentralized protocol for streaming payments, atomic work attestations, and portable on-chain reputation on Stellar.**
 
-Aven turns economic activity into verifiable work history. Payments stream as work happens; completed streams create attestations; those attestations become a portable reputation record owned by the worker.
+Aven turns real-time economic activity into verifiable work history. It bridges the trust gap between clients, workers (both human and AI), and verifiers by ensuring that payments and credit are aligned, transparent, and cryptographically proven.
 
-The repository contains the Aven web app, its editorial GSAP-powered landing page, the Aven protocol contracts, generated TypeScript bindings, and the `aven-stellar` work-session package. The enhanced stream build is ready for its first testnet deployment.
+---
 
-## How it works
+## 💡 What is Aven?
+
+Aven is a protocol that allows clients to stream payments to workers as progress is made, while automatically documenting that progress as verifiable proof of work (attestations) on the Stellar ledger. These attestations roll up into a single, portable on-chain reputation score that workers own and can present anywhere.
+
+### The Core Problem It Solves:
+* **For Clients:** Prevents paying upfront for undelivered work. Clients can stream payments per second, with the ability to pause or dispute active sessions.
+* **For Workers:** Guarantees payment for every active second of contribution. Eliminates payment delays and establishes a permanent, verifiable work history they own.
+* **For AI Agents:** Provides a machine-to-machine payment and identity layer, allowing autonomous agents to earn, verify their output, and build reputation scores automatically.
+
+---
+
+## 🔄 How it Works: The Lifecycle
 
 ```mermaid
-flowchart LR
-  A["Stream contract<br/>Moves payment over time"] --> B["Attestation contract<br/>Records completed work"]
-  B --> C["Reputation contract<br/>Computes a portable score"]
+flowchart TD
+    A[1. Client creates Stream] -->|USDC / XLM locked in contract| B[2. Worker runs local CLI]
+    B -->|Tracks Git activity & timing| C[3. Session submitted to Dashboard]
+    C -->|Verified by verifier key| D[4. Atomic Verification on Stellar]
+    D -->|SUCCESS| E[5. Worker gets Paid & Attestation is Minted]
+    D -->|FAIL| F[Transaction Reverted]
+    E -->|Reputation Contract| G[6. Reputation Score Bumps]
 ```
 
-- **Stream** — creates, pauses, resumes, cancels, and settles time-based USDC or XLM payments.
-- **Verified releases** — an optional stream extension that ties exact session payments to verifier records, client review, and timeout release.
-- **Attestation** — mints a permanent work record from a completed stream.
-- **Reputation** — calculates a score and category breakdown from verified attestations.
+### 1. Payment Streaming
+A client creates a payment stream on-chain (using USDC or XLM) with a specified total amount, duration, and rate per second. Funds are safely locked in the `stream_contract`.
 
-## Product surfaces
+### 2. Work Tracking (Privacy-First)
+The worker launches the lightweight `aven-stellar` CLI tool in their local Git repository. The CLI monitors active time and Git statistics (files modified, branch, commits, and diff sizes). **It never reads file contents, uploads proprietary source code, or collects keystrokes.**
 
-- `/` — monochrome editorial landing page with a GSAP layered-pinning scroll loop
-- `/dashboard` — sent and received payment streams
-- `/stream/create` — create a new stream
-- `/stream/[id]` — inspect and manage a stream
-- `/profile/[address]` — public work history and reputation
-- `/verify` — verify an attestation or reputation claim
-- `/agents` — on-chain reputation lookup for human and AI workers
-- `/cli/authorize` — wallet-signed authorization for the local work-session CLI
-- `/stream/[id]` — also contains the client/worker work-session review ledger
+### 3. Submission & Verification
+When the work period ends, the worker stops the session. The CLI generates a secure JSON report and uploads it to the Aven Dashboard. A verifier (automated or manual) validates the session's Git statistics against the requested payment.
 
-## Tech stack
+### 4. Atomic Execution (Non-Negotiable Rule)
+When the verified session is claimed:
+* The `stream_contract` performs the token transfer to the worker.
+* In the **same transaction**, the `attestation_contract` mints a permanent on-chain `AttestationRecord`.
+* **If the payment transfer fails, no attestation is minted. If the attestation mint fails, the transaction reverts and the worker receives no money.** They are unified atomically.
 
-- Next.js 15, React 19, and TypeScript
-- GSAP, ScrollTrigger, and `@gsap/react`
-- Stellar SDK and Freighter wallet
-- Soroban smart contracts written in Rust
-- Generated TypeScript clients for each contract
-- Mantine primitives and Lucide icons
+### 5. Reputation Aggregation
+The `reputation_contract` scans all minted attestations for the worker's address and computes a categorized reputation score (Freelance, Salary, Bounty, Grant, AgentTask, Subscription) based on actual volumes paid.
 
-## Run locally
+---
+
+## 🌟 Key Features
+
+* **Atomic Payments & Credit:** A worker is paid only when an attestation is created, and an attestation is created only when payment succeeds.
+* **USDC & XLM Native Support:** Fund streams using either Stellar USDC or native XLM.
+* **Privacy-First Git Verification:** Verifiable proof of contribution without exposing intellectual property or source code.
+* **Category-Based Reputation:** Track expertise across different payment structures (e.g. high freelance score vs. high bounty score).
+* **AI Agent Ready:** Built with machine-to-machine APIs to support fully autonomous agent workers.
+* **High-Fidelity Editorial UI:** Desktop landing page using custom GSAP pinning transitions, styling, and animations.
+
+---
+
+## 💻 Tech Stack
+
+* **Frontend:** Next.js 15 (App Router), React 19, TypeScript
+* **Animations & Style:** GSAP (GreenSock), ScrollTrigger, `@gsap/react`, Vanilla CSS with Mantine primitives
+* **Smart Contracts:** Soroban (Rust) smart contracts deployed on Stellar Testnet
+* **SDK & Wallets:** Stellar SDK (`@stellar/stellar-sdk`), Freighter Wallet integration
+* **CLI Tool:** Node.js 20+ CLI package (`aven-stellar`)
+
+---
+
+## 🚀 Running Locally
 
 ### Prerequisites
+* **Node.js:** v20.x or newer
+* **Stellar Freighter Wallet:** Installed in browser and configured for **Testnet** with a funded account.
+* **Stellar CLI:** Only if building/deploying smart contracts.
 
-- Node.js 20 or newer
-- npm
-- [Freighter](https://www.freighter.app/) configured for Stellar testnet to use wallet features
-- Rust and the `wasm32v1-none` target only if you plan to build or test the contracts
-
-### Start the web app
-
+### 1. Start the Web App
+Install all dependencies and run the Next.js dev server:
 ```bash
 npm install
 npm run dev
 ```
-
 Open [http://localhost:3000](http://localhost:3000).
 
-The current testnet RPC endpoint, network passphrase, and asset contract IDs are defined in `lib/contracts.ts`. Deployed contract IDs are stored in the generated clients under `contracts/bindings/*/src/index.ts`; no `.env` file is required for the checked-in testnet deployment.
-
-## Validation
-
+### 2. Connect Your CLI
+Inside any active Git repository where you want to perform work:
 ```bash
-npm run typecheck
-npm run build
-```
+# Start a work session (will prompt you to authorize your wallet in the browser)
+npx aven-stellar start --stream <your-stream-id>
 
-Contract tests run from the Rust workspace:
+# ... Work normally, commit code ...
 
-```bash
-cd contracts
-cargo test
-```
-
-## Work sessions
-
-[`aven-stellar`](https://www.npmjs.com/package/aven-stellar) is the published CLI that connects Git activity to an existing Aven stream without executing project code or collecting full file contents. It requires Node.js 20 or newer and must be run inside a Git repository:
-
-```bash
-npx aven-stellar start
-
-# After working in the connected repository:
+# Stop the work session and submit the report to the dashboard
 npx aven-stellar stop
 ```
 
-For a global installation, run `npm install --global aven-stellar` and use `aven start` / `aven stop`. Both `aven` and `aven-stellar` are installed as command aliases.
+---
 
-On first use, `start` asks for the Aven dashboard URL and stream ID, opens `/cli/authorize`, and asks the stream recipient to sign a short-lived device authorization with Freighter. For local development, use `http://localhost:3000` as the dashboard URL. The resulting token can read that worker's streams, submit sessions, and request review; it cannot create streams or approve the worker's own request.
-
-The CLI creates `.avenignore` with private-file defaults, records relative paths and Git statistics, and stores recoverable local state under `.aven/`. `stop` calculates the session report and previews it before submission. Submitted sessions appear in the `WORK SESSIONS` section on `/stream/[id]`, where the worker can request review and the stream sender can approve or dispute the request.
-
-The report contains session timing, branch and commit metadata, file-level change statistics, and the worker's statement. Its payment amount is calculated automatically from tracked active seconds and the stream's on-chain rate, capped by currently earned funds; workers do not enter their own amount. The report does not contain complete source files, keystrokes, screenshots, environment files, wallet secret keys, or excluded paths. The CLI never executes the tracked project or installs its dependencies.
-
-The next stream deployment keeps the original Aven interface and adds verified work releases to it. Existing stream creation, checkpoints, attestations, reputation inputs, indexes, pause/resume/cancel, and client methods remain available. The optional verifier records an exact session amount and evidence on the same stream before the existing approval/dispute/timeout withdrawal flow begins. The dashboard uses `NEXT_PUBLIC_STREAM_CONTRACT_ID`, while the server signs verification with `AVEN_VERIFIER_SECRET`.
-
-To build the contract WASM artifacts:
-
-```bash
-rustup target add wasm32v1-none
-cd contracts
-stellar contract build --package stream_contract
-```
-
-## Repository structure
+## 📁 Repository Structure
 
 ```text
-app/                    Next.js routes and global styles
-components/             Wallet, navigation, app shell, and landing sections
-components/sections/    Aven protocol panels and infinite layered loop
-contracts/              Soroban Rust workspace
-  bindings/             Generated TypeScript clients for deployed contracts
-  contracts/stream_contract/
-  contracts/attestation_contract/
-  contracts/reputation_contract/
-  contracts/shared/
-lib/contracts.ts        Testnet config and contract client factories
-lib/stellar.ts          Wallet and on-chain application operations
-packages/aven-work-session/ Source for the published `aven-stellar` CLI
+app/                     # Next.js routes and layout configurations
+components/              # UI components, wallet providers, and layout shells
+components/sections/     # GSAP-powered protocol showcases & infinite landing loop
+contracts/               # Soroban Rust contracts & TypeScript bindings
+  contracts/shared/      # Common types shared between contracts
+  contracts/stream_contract/      # Stream payment and release logic
+  contracts/attestation_contract/ # Attestation minting logic
+  contracts/reputation_contract/  # Reputation score calculation
+lib/                     # Client factories, Stellar wrappers, and utils
+packages/                # Source code for the published CLI npm package
 ```
 
-## Testnet deployment
+---
 
-The frontend is currently wired to Stellar testnet:
+## 🌍 Testnet Deployment
+
+The protocol contracts are currently live on **Stellar Testnet**:
 
 | Contract | Address |
 | --- | --- |
-| Stream | `CCPHFGDKV2SOL5SUFN3WPM7DVNMYAJODH63YIA2VCS5UFRW57Z7FNKJ4` |
-| Attestation | `CDZMWG7BEGRIGKDXZE32NNQB37LRQQJ6657JOJOPNSOLSXHSKDSFMVL7` |
-| Reputation | `CBAJXRTE37SREIBIL5FP3J6BJV2VTMCHHQJJIS5W4IQK4BZ6UANKGSVL` |
+| **Stream Contract** | `CAZSE5UHSWNF62K26OZKOL7BSFB2647CXRPOICHUDCUJ5EKS4NCOA6ZA` |
+| **Attestation Contract** | `CD22NZLAI53Y2LZB2GNLVITQXZWGZ3AQ6QKVKNUDKWABIIQIDEFSPQCG` |
+| **Reputation Contract** | `CANK4E7GOFZT4D3U57RNT7QLQTNFGY7QNL6TQTWWKYBNHX7J6U54HO7E` |
 
-Amounts use Stellar's seven-decimal fixed-point representation. The frontend converts human-readable values at the client boundary in `lib/contracts.ts`.
+---
 
-## Development notes
-
-- The landing-page loop is desktop-only. Mobile renders the same content as a normal stacked document flow.
-- The duplicate final panel is an internal loop bridge and is excluded from pin and snap calculations.
-- Freighter signs transactions in the browser; secret keys are never stored by the app.
-- AI agents participate as workers: their wallet address is the recipient of an ordinary Aven payment stream.
-- Contract bindings must be regenerated or updated after deploying a new contract version or changing a contract interface.
-
-## Status
-
-Aven is under active development and currently targets Stellar testnet. Do not treat testnet balances, attestations, or reputation scores as production records.
+## 🔒 Security & Verification
+All work-session payouts are verified cryptographically. The Aven dashboard uses an automated verifier signature generated from the private `AVEN_VERIFIER_SECRET`. Any manual claim verifies this signature on-chain before executing the payout.

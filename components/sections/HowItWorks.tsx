@@ -1,3 +1,5 @@
+import React from 'react'
+
 const streamDetails = [
   ['ASSET', 'USDC'],
   ['DEPOSIT', '2,500.00'],
@@ -12,11 +14,11 @@ export default function HowItWorks() {
       <div className="section-layout">
         <div>
           <h2>
-            FROM AGREEMENT
+            From agreement
             <br />
-            TO PAYMENT.
+            to payment.
             <br />
-            TO PROOF.
+            To proof.
           </h2>
         </div>
         <div className="section-visual steps-grid">
@@ -24,8 +26,7 @@ export default function HowItWorks() {
             <span>STEP 01</span>
             <h3>FUND THE WORK</h3>
             <p>
-              The client locks the agreed budget in a Stellar smart contract, then sets
-              the schedule and checkpoints.
+              The client locks the agreed budget in a Stellar smart contract, then sets the schedule and checkpoints.
             </p>
             <dl className="data-list">
               {streamDetails.map(([label, value]) => (
@@ -38,10 +39,9 @@ export default function HowItWorks() {
           </article>
           <article className="step-panel">
             <span>STEP 02</span>
-            <h3>PROGRESS UNLOCKS PAYMENT</h3>
+            <h3>TRACK AS YOU CODE</h3>
             <p>
-              Earnings accrue as the work moves forward. Checkpoints keep both sides
-              aligned before more funds become available.
+              Earnings accrue as the work moves forward. Checkpoints keep both sides aligned before more funds become available.
             </p>
             <div className="stream-line" aria-hidden="true">
               <span>SENDER</span>
@@ -53,10 +53,9 @@ export default function HowItWorks() {
           </article>
           <article className="step-panel">
             <span>STEP 03</span>
-            <h3>APPROVE. RECORD. REPEAT.</h3>
+            <h3>APPROVE & MINT PROOF</h3>
             <p>
-              The worker submits a checkpoint. Once approved, Aven records who worked,
-              who paid, and what was completed as an on-chain attestation.
+              Once a milestone is reached or the project is complete, client approval triggers the payment and mints an attestation.
             </p>
             <div className="proof-stack" aria-label="Stream completion flow">
               <strong>WORK FUNDED</strong>

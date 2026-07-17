@@ -12,7 +12,6 @@ import WorkAttestations from '../components/sections/WorkAttestations';
 import Reputation from '../components/sections/Reputation';
 import Protocol from '../components/sections/Protocol';
 import Developers from '../components/sections/Developers';
-import AIAgents from '../components/sections/AIAgents';
 import FinalCTA from '../components/sections/FinalCTA';
 import AvenFooter from '../components/sections/AvenFooter';
 import InfinitePageLoop from '../components/sections/InfinitePageLoop';
@@ -77,7 +76,6 @@ export default function LandingPage() {
             { id: 'reputation', content: <Reputation />, dense: true },
             { id: 'protocol', content: <Protocol />, dense: true },
             { id: 'developers', content: <Developers />, dense: true },
-            { id: 'agents', content: <AIAgents /> },
             {
               id: 'cta',
               content: (

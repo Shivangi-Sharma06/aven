@@ -1,9 +1,11 @@
+import React from 'react'
+
 const reputationRows = [
-  ['IDENTITY', 'KARTIKEY.AVEN'],
-  ['COMPLETED', '20 STREAMS'],
-  ['PAID', '18,420 USDC'],
-  ['TIME', '1,284 HOURS'],
-  ['CATEGORIES', 'SMART CONTRACTS / FRONTEND / SECURITY / OPEN SOURCE'],
+  ['IDENTITY', 'kartik.aven'],
+  ['STREAMS COMPLETED', '14 Active Streams'],
+  ['TOTAL VOLUME', '12,450 USDC'],
+  ['VERIFIED TIME', '342 Active Hours'],
+  ['EXPERTISE FOCUS', 'Rust Smart Contracts / React Web Apps / Security Auditing'],
 ]
 
 export default function Reputation() {
@@ -13,13 +15,15 @@ export default function Reputation() {
       <div className="section-layout section-layout--center">
         <div>
           <h2>
-            A CAREER YOU CAN
+            A career history you
             <br />
-            TAKE WITH YOU.
+            truly own.
           </h2>
           <p className="section-copy">
-            Your reputation comes from work people actually paid for and approved—not
-            reviews, endorsements, or a profile you lose when you leave a platform.
+            Traditional platforms lock your work history inside their database. Aven builds your 
+            reputation directly onto your Stellar wallet address. By aggregating every verified 
+            payout and attestation you earn, it creates a living, portable CV that follows you 
+            wherever you go.
           </p>
         </div>
         <div className="section-visual reputation-document-card">

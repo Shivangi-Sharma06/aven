@@ -35,7 +35,8 @@ export async function buildReport(
   config: AvenConfig,
   session: LocalSession,
   message: string,
-  payment: { earned: string; ratePerSecond: string },
+  payment: { earned: string; ratePerSecond: string; streamTotal: string },
+  ended?: boolean,
 ): Promise<WorkSessionReport> {
   const endedAt = new Date();
   const endingState = await captureGitState(repositoryRoot);
@@ -50,11 +51,13 @@ export async function buildReport(
   const unmeasured = Math.max(0, totalSeconds - measured);
   const activeSeconds = session.activeSeconds + Math.min(unmeasured, 600);
   const idleSeconds = Math.max(0, totalSeconds - activeSeconds);
-  const requestedAmount = calculateAutomaticPayment(
-    payment.ratePerSecond,
-    activeSeconds,
-    payment.earned,
-  );
+  const requestedAmount = ended
+    ? payment.streamTotal
+    : calculateAutomaticPayment(
+        payment.ratePerSecond,
+        activeSeconds,
+        payment.earned,
+      );
   const included = changes.changedFiles.filter((file) => file.includedInVerification);
   const substantive = included.filter((file) => file.category === "source" || file.category === "test");
   const flags: string[] = [];
@@ -76,6 +79,7 @@ export async function buildReport(
       activeSeconds,
       idleSeconds,
       packageVersion: "0.1.0",
+      ended: ended || false,
     },
     repository: {
       repositoryId,
@@ -109,9 +113,9 @@ export async function buildReport(
     paymentRequest: {
       requestedAmount,
       asset: config.asset,
-      calculation: "active_time_x_stream_rate",
+      calculation: ended ? "flat_rate" : "active_time_x_stream_rate",
       ratePerSecond: payment.ratePerSecond,
-      billableSeconds: activeSeconds,
+      billableSeconds: ended ? 0 : activeSeconds,
     },
     privacy: {
       profile: "standard",

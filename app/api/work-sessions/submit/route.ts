@@ -53,22 +53,43 @@ export async function POST(request: Request) {
     if (report.paymentRequest.asset !== stream.asset) {
       return apiError("The report asset does not match the stream asset.");
     }
-    const earnedUnits = await getAvailableUnits(stream.id);
-    const calculatedUnits = calculateSessionPaymentUnits(
-      stream,
-      report.session.activeSeconds,
-      earnedUnits,
-    );
-    if (calculatedUnits <= 0n) {
-      return apiError("No payment has accrued for this session's tracked active time.", 409);
+    const isEnded = Boolean(report.session.ended || report.paymentRequest.calculation === "flat_rate");
+    let calculatedUnits = 0n;
+
+    if (isEnded) {
+      calculatedUnits = parseAmountUnits(report.paymentRequest.requestedAmount);
+      const remainingUnits = stream.totalDepositedUnits - stream.totalWithdrawnUnits;
+      if (calculatedUnits > remainingUnits) {
+        return apiError("The requested amount exceeds the remaining stream balance.", 409);
+      }
+      if (calculatedUnits <= 0n) {
+        return apiError("The requested amount must be greater than zero.", 409);
+      }
+      report.paymentRequest = {
+        requestedAmount: formatAmountUnits(calculatedUnits),
+        asset: stream.asset,
+        calculation: "flat_rate",
+        ratePerSecond: formatAmountUnits(ratePerSecondUnits(stream)),
+        billableSeconds: 0,
+      };
+    } else {
+      const earnedUnits = await getAvailableUnits(stream.id);
+      calculatedUnits = calculateSessionPaymentUnits(
+        stream,
+        report.session.activeSeconds,
+        earnedUnits,
+      );
+      if (calculatedUnits <= 0n) {
+        return apiError("No payment has accrued for this session's tracked active time.", 409);
+      }
+      report.paymentRequest = {
+        requestedAmount: formatAmountUnits(calculatedUnits),
+        asset: stream.asset,
+        calculation: "active_time_x_stream_rate",
+        ratePerSecond: formatAmountUnits(ratePerSecondUnits(stream)),
+        billableSeconds: report.session.activeSeconds,
+      };
     }
-    report.paymentRequest = {
-      requestedAmount: formatAmountUnits(calculatedUnits),
-      asset: stream.asset,
-      calculation: "active_time_x_stream_rate",
-      ratePerSecond: formatAmountUnits(ratePerSecondUnits(stream)),
-      billableSeconds: report.session.activeSeconds,
-    };
     // Excluded paths are useful in the worker's private local report, but the
     // dashboard only needs the aggregate privacy counts. Do not persist their
     // names server-side.

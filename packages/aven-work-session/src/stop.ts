@@ -10,6 +10,7 @@ import { deleteSession, readSession, writeSession } from "./session.js";
 export type StopOptions = {
   message?: string;
   submit?: boolean;
+  ended?: boolean;
 };
 
 const delay = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -58,12 +59,19 @@ export async function stopCommand(options: StopOptions) {
   const report = await buildReport(repositoryRoot, config, session, message, {
     earned: stream.earned,
     ratePerSecond: stream.ratePerSecond,
-  });
+    streamTotal: stream.streamTotal,
+  }, options.ended);
   await saveLocalReport(repositoryRoot, report);
   printReport(report);
-  process.stdout.write(
-    `Payment was calculated from ${report.session.activeSeconds}s of tracked active time at the stream rate.\n`,
-  );
+  if (options.ended) {
+    process.stdout.write(
+      `Project marked as completed! Requesting the full remaining stream balance.\n`,
+    );
+  } else {
+    process.stdout.write(
+      `Payment was calculated from ${report.session.activeSeconds}s of tracked active time at the stream rate.\n`,
+    );
+  }
 
   let shouldSubmit = options.submit === true;
   if (!options.submit) {

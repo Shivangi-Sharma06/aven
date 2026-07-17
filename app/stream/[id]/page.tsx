@@ -410,6 +410,11 @@ export default function StreamDetailPage() {
                       <div>
                         <span>Session #{sessions.length - index}</span>
                         <strong>{report ? new Date(report.session.endedAt).toLocaleDateString() : "REPORT PENDING"}</strong>
+                        {report?.session?.ended && (
+                          <span style={{ marginLeft: "8px", background: "#ef4444", color: "#fff", fontSize: "10px", padding: "2px 6px", borderRadius: "4px", fontWeight: "bold", textTransform: "uppercase" }}>
+                            Project Complete
+                          </span>
+                        )}
                       </div>
                       <div>
                         <span>{session.status.replaceAll("_", " ")}</span>
@@ -433,6 +438,11 @@ export default function StreamDetailPage() {
                         <div className={styles["work-session-statement"]}>
                           <span>Worker statement</span>
                           <p>{report.workerStatement?.message ?? "No worker statement was provided."}</p>
+                          {report.session?.ended && (
+                            <div style={{ marginTop: "12px", padding: "10px", background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.3)", borderRadius: "6px", fontSize: "13px", color: "#f87171" }}>
+                              <strong>Final Release Requested:</strong> The worker has marked this project as complete and is requesting a full release of the remaining stream balance. If approved, the funds will be reserved on-chain.
+                            </div>
+                          )}
                         </div>
                         <div className={styles["work-session-verification"]}>
                           <span>Verification</span>
@@ -485,13 +495,20 @@ export default function StreamDetailPage() {
                         </button>
                       )}
                       {isRecipient && session.status === "RELEASE_ELIGIBLE" && (
-                        <button
-                          type="button"
-                          disabled={actionBusy}
-                          onClick={() => releaseSession(session)}
-                        >
-                          {actionBusy ? "Releasing…" : `Withdraw ${session.requestedAmount ?? report?.paymentRequest.requestedAmount ?? "0.0000000"} ${stream.asset}`}
-                        </button>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
+                          <button
+                            type="button"
+                            disabled={actionBusy}
+                            onClick={() => releaseSession(session)}
+                          >
+                            {actionBusy ? "Releasing…" : `Withdraw ${session.requestedAmount ?? report?.paymentRequest.requestedAmount ?? "0.0000000"} ${stream.asset}`}
+                          </button>
+                          {report?.session?.ended && (
+                            <span style={{ fontSize: "11px", color: "var(--text-secondary)", textAlign: "right" }}>
+                              Note: This is a full release. If the stream timeline hasn't fully elapsed, funds withdraw as they vest on-chain.
+                            </span>
+                          )}
+                        </div>
                       )}
                       {isSender && session.status === "PENDING_CLIENT_REVIEW" && (
                         <>

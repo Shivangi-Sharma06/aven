@@ -32,6 +32,7 @@ export async function inspectStream(
     workerAddress: response.headers.get("x-aven-worker-address") ?? "",
     earned: response.headers.get("x-aven-earned") ?? "0.0000000",
     ratePerSecond: response.headers.get("x-aven-rate-per-second") ?? "",
+    streamTotal: response.headers.get("x-aven-stream-total") ?? "0.0000000",
   };
 }
 

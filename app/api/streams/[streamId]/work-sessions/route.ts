@@ -29,6 +29,7 @@ export async function GET(
   return NextResponse.json(await listSessionsForStream(streamId), {
     headers: {
       "x-aven-stream-asset": stream.asset,
+      "x-aven-stream-total": formatAmountUnits(stream.totalDepositedUnits),
       "x-aven-stream-status": stream.status,
       "x-aven-worker-address": stream.recipient,
       "x-aven-client-address": stream.sender,

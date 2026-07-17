@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans, Lora, JetBrains_Mono } from "next/font/google";
+import { Plus_Jakarta_Sans, Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import "@mantine/core/styles.css";
 import "@mantine/notifications/styles.css";
@@ -10,7 +10,7 @@ import { WalletProvider } from "@/components/WalletProvider";
 import { ToastProvider } from "@/components/ToastProvider";
 
 const plusJakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-sans" });
-const lora = Lora({ subsets: ["latin"], variable: "--font-serif", style: ["normal", "italic"] });
+const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-serif" });
 const jetbrains = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
 export const metadata: Metadata = {
@@ -28,7 +28,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
       </head>
-      <body className={`${plusJakarta.variable} ${lora.variable} ${jetbrains.variable}`}>
+      <body className={`${plusJakarta.variable} ${spaceGrotesk.variable} ${jetbrains.variable}`}>
         <MantineProvider defaultColorScheme="light">
           <ModalsProvider>
             <Notifications />

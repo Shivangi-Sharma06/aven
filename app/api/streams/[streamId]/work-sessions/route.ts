@@ -22,11 +22,23 @@ export async function GET(
   if (!stream) return apiError("Stream was not found.", 404);
   const token = await authenticateCliRequest(request, "read_streams");
   const wallet = token?.walletAddress ?? new URL(request.url).searchParams.get("wallet") ?? "";
-  if (!wallet || roleForWallet(stream, wallet) === "unrelated") {
-    return apiError("This wallet cannot view work sessions for the stream.", 403);
+  let sessions = await listSessionsForStream(streamId);
+  if (wallet) {
+    const walletLower = wallet.toLowerCase();
+    const senderLower = stream.sender.toLowerCase();
+    const recipientLower = stream.recipient.toLowerCase();
+    if (walletLower === recipientLower) {
+      // Recipient sees only their own sessions, or sessions with no workerAddress
+      sessions = sessions.filter(
+        (s) => !s.workerAddress || s.workerAddress.toLowerCase() === walletLower
+      );
+    }
+    // Sender sees ALL sessions for the stream — no filter needed
+    // Unrecognized wallet also sees all sessions (public stream data)
   }
+
   const earnedUnits = await getEarnedUnits(streamId);
-  return NextResponse.json(await listSessionsForStream(streamId), {
+  return NextResponse.json(sessions, {
     headers: {
       "x-aven-stream-asset": stream.asset,
       "x-aven-stream-total": formatAmountUnits(stream.totalDepositedUnits),

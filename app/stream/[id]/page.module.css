@@ -158,16 +158,16 @@
 }
 
 .work-session-section {
-  --text-primary: #000;
-  --text-secondary: rgba(0, 0, 0, 0.56);
-  --text-mono: rgba(0, 0, 0, 0.52);
-  --border: rgba(0, 0, 0, 0.18);
-  --surface: #fff;
-  --surface-high: #f6f6f3;
-  --bg-dark: #fff;
-  --stream-paused: #7a5200;
+  --text-primary: #e4e4f0;
+  --text-secondary: rgba(228, 228, 240, 0.56);
+  --text-mono: rgba(161, 188, 152, 0.7);
+  --border: rgba(255, 255, 255, 0.08);
+  --surface: rgba(255, 255, 255, 0.03);
+  --surface-high: rgba(255, 255, 255, 0.06);
+  --bg-dark: rgba(0, 0, 0, 0.3);
+  --stream-paused: #f59e0b;
   margin-top: 34px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
   color: var(--text-primary);
 }
 

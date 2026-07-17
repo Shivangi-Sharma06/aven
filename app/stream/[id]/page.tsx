@@ -80,6 +80,7 @@ export default function StreamDetailPage() {
   const [checkpointsLoading, setCheckpointsLoading] = useState(false);
   const [currentLedger, setCurrentLedger] = useState<number>(0);
   const [tickerSecs, setTickerSecs] = useState<number>(0);
+  const [showCheckpointAlert, setShowCheckpointAlert] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   async function loadCheckpoints(s: StreamObject) {
@@ -118,13 +119,9 @@ export default function StreamDetailPage() {
   }
 
   async function loadSessions() {
-    if (!address) {
-      setSessions([]);
-      return;
-    }
     setSessionsLoading(true);
     try {
-      const response = await fetch(`/api/streams/${encodeURIComponent(id)}/work-sessions?wallet=${encodeURIComponent(address)}`, {
+      const response = await fetch(`/api/streams/${encodeURIComponent(id)}/work-sessions${address ? `?wallet=${encodeURIComponent(address)}` : ''}`, {
         cache: "no-store",
       });
       const data = await response.json();
@@ -144,7 +141,7 @@ export default function StreamDetailPage() {
             }),
           ),
         );
-        const refreshed = await fetch(`/api/streams/${encodeURIComponent(id)}/work-sessions?wallet=${encodeURIComponent(address)}`, {
+        const refreshed = await fetch(`/api/streams/${encodeURIComponent(id)}/work-sessions${address ? `?wallet=${encodeURIComponent(address)}` : ''}`, {
           cache: "no-store",
         });
         const refreshedData = await refreshed.json();
@@ -189,6 +186,15 @@ export default function StreamDetailPage() {
   useEffect(() => {
     setTickerSecs(0);
   }, [stream, checkpoints, currentLedger]);
+
+  useEffect(() => {
+    if (!stream || !address || checkpoints.length === 0) return;
+    const isS = stream.sender.toLowerCase() === address.toLowerCase();
+    if (isS) {
+      const hasPending = checkpoints.some(cp => cp.submitted && !cp.approved && !cp.autoApproved);
+      if (hasPending) setShowCheckpointAlert(true);
+    }
+  }, [address, stream, checkpoints]);
 
   async function walletHeaders(path: string) {
     if (!address) throw new Error("Connect your wallet first.");
@@ -611,22 +617,7 @@ export default function StreamDetailPage() {
               </div>
             )}
 
-            {/* Settle elapsed checkpoints (auto-approve) — any connected party */}
-            {connected && (isSender || isRecipient) && (
-              <div className="checkpoint-settle-row">
-                <button
-                  className="checkpoint-btn checkpoint-btn--settle"
-                  type="button"
-                  disabled={actionLoading === "checkpoint:settle"}
-                  onClick={() => void doCheckpointAction("settle")}
-                >
-                  {actionLoading === "checkpoint:settle" ? "Settling…" : "Settle Elapsed Checkpoints"}
-                </button>
-                <span className="checkpoint-settle-hint">
-                  Auto-approves any checkpoint whose deadline has passed without client approval.
-                </span>
-              </div>
-            )}
+
           </section>
         )}
 
@@ -856,6 +847,38 @@ export default function StreamDetailPage() {
           View Stream Contract on Stellar Expert ↗
         </a>
       </div>
+
+      {/* Pending checkpoint alert for client/sender */}
+      {showCheckpointAlert && (
+        <div className="checkpoint-alert-overlay" onClick={() => setShowCheckpointAlert(false)}>
+          <div className="checkpoint-alert-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="checkpoint-alert-icon">⚠️</div>
+            <h3 className="checkpoint-alert-title">Work Checkpoints Need Your Review</h3>
+            <p className="checkpoint-alert-body">
+              The recipient has submitted checkpoint evidence awaiting your approval. If you do not
+              approve or dispute before the deadline, the <strong>full remaining stream balance will
+              be automatically released to the recipient</strong>.
+            </p>
+            <div className="checkpoint-alert-actions">
+              <button
+                className="checkpoint-alert-btn checkpoint-alert-btn--review"
+                onClick={() => {
+                  setShowCheckpointAlert(false);
+                  document.querySelector('.checkpoint-section')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+              >
+                Review Checkpoints Below ↓
+              </button>
+              <button
+                className="checkpoint-alert-btn checkpoint-alert-btn--dismiss"
+                onClick={() => setShowCheckpointAlert(false)}
+              >
+                Dismiss for Now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ConfirmModal
         open={Boolean(approveSession)}

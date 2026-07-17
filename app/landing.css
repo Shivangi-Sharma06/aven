@@ -27,13 +27,12 @@ html {
 body {
   min-height: 100%;
   margin: 0;
-  background: var(--bg);
-  color: var(--fg);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
 }
+
 
 #root {
   min-height: 100vh;
@@ -369,6 +368,8 @@ a {
   border-top: 1px solid rgba(0, 0, 0, 0.16);
   background: #fff;
   color: #000;
+  /* Smooth layering via will-change hint */
+  will-change: transform;
 }
 
 .aven-layered-panel[data-theme="light"] {
@@ -582,9 +583,26 @@ a {
   margin-top: clamp(24px, 4vh, 38px);
 }
 
-.aven-layered-panel--duplicate {
-  pointer-events: none;
+/* Footer always rendered inline in the final panel */
+.aven-layered-panel--final .aven-footer {
+  position: relative;
+  z-index: 2;
 }
+
+
+/* Final panel — allow natural scrolling through the footer */
+.aven-layered-panel--final {
+  height: auto;
+  min-height: 100vh;
+  overflow: visible;
+}
+
+.aven-layered-panel--final > .aven-section,
+.aven-layered-panel--final > .stage {
+  height: auto;
+  min-height: auto;
+}
+
 
 .aven-layered-hero-copy {
   min-height: 100%;

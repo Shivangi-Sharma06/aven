@@ -15,8 +15,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const truncate = (addr: string) => addr.slice(0, 4) + "…" + addr.slice(-4);
 
+  const isStreamDetail = pathname?.startsWith("/stream/") && pathname !== "/stream/create";
+
   return (
-    <div className="app-layout">
+    <div className={`app-layout${isStreamDetail ? " app-layout--stream" : ""}`}>
       <main className="main-content">{children}</main>
 
       <nav className="bottom-nav">

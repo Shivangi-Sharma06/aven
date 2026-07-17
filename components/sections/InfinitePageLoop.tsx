@@ -23,67 +23,87 @@ export default function InfinitePageLoop({ panels }: InfinitePageLoopProps) {
       const media = gsap.matchMedia();
 
       media.add("(min-width: 769px)", () => {
-        const renderedPanels = gsap.utils.toArray<HTMLElement>("[data-aven-layered-panel]", root);
-        const panelElements = renderedPanels.filter((panel) => !panel.hasAttribute("data-duplicate"));
+        const panelElements = gsap.utils.toArray<HTMLElement>(
+          "[data-aven-layered-panel]",
+          root
+        );
         if (panelElements.length < 2) return;
 
         const triggers: ScrollTrigger[] = [];
 
-        panelElements.forEach((panel) => {
-          triggers.push(
-          ScrollTrigger.create({
-            trigger: panel,
-            start: "top top",
-            pin: true,
-            pinSpacing: false,
-          })
+        // Pin each panel so they stack on top of each other while scrolling
+        // Skip the final panel — it flows naturally into the footer
+        panelElements.forEach((panel, i) => {
+          const isFinal = i === panelElements.length - 1;
+
+          if (!isFinal) {
+            triggers.push(
+              ScrollTrigger.create({
+                trigger: panel,
+                start: "top top",
+                pin: true,
+                pinSpacing: false,
+                anticipatePin: 1,
+              })
+            );
+          }
+
+          // Slide panels in from below with a scale + fade effect (except first)
+          if (i > 0) {
+            gsap.fromTo(
+              panel,
+              { opacity: 0, y: 60, scale: 0.97 },
+              {
+                opacity: 1,
+                y: 0,
+                scale: 1,
+                ease: "power3.out",
+                scrollTrigger: {
+                  trigger: panel,
+                  start: "top 95%",
+                  end: "top 30%",
+                  scrub: 0.6,
+                },
+              }
+            );
+          }
+
+          // Animate content cards/elements inside each panel with a stagger
+          const cards = gsap.utils.toArray<HTMLElement>(
+            ".step-panel, .attestation-card, .reputation-document-card, .protocol-stack article, .agent-rails > div, .developer-grid",
+            panel
           );
+          if (cards.length > 0) {
+            gsap.fromTo(
+              cards,
+              { opacity: 0, y: 32 },
+              {
+                opacity: 1,
+                y: 0,
+                duration: 0.65,
+                stagger: 0.1,
+                ease: "power2.out",
+                scrollTrigger: {
+                  trigger: panel,
+                  start: "top 70%",
+                  once: true,
+                },
+              }
+            );
+          }
         });
-
-        let maxScroll = 0;
-
-        const pageScrollTrigger = ScrollTrigger.create({
-          snap(value) {
-            const snappedValue = gsap.utils.snap(1 / panelElements.length, value);
-
-            if (maxScroll <= 0) return snappedValue;
-            if (snappedValue <= 0) return 1.05 / maxScroll;
-            if (snappedValue >= 1) return maxScroll / (maxScroll + 1.05);
-            return snappedValue;
-          },
-        });
-
-        triggers.push(pageScrollTrigger);
 
         const onResize = () => {
-          maxScroll = ScrollTrigger.maxScroll(window) - 1;
-        };
-
-        const onScroll = (event: Event) => {
-          const scroll = pageScrollTrigger.scroll();
-
-          if (scroll > maxScroll) {
-            pageScrollTrigger.scroll(1);
-            if (event.cancelable) event.preventDefault();
-          } else if (scroll < 1) {
-            pageScrollTrigger.scroll(maxScroll - 1);
-            if (event.cancelable) event.preventDefault();
-          }
-        };
-
-        onResize();
-        window.addEventListener("resize", onResize);
-        window.addEventListener("scroll", onScroll, { passive: false });
-        const refreshFrame = requestAnimationFrame(() => {
-          onResize();
           ScrollTrigger.refresh();
-        });
+        };
+
+        window.addEventListener("resize", onResize);
+        const frame = requestAnimationFrame(() => ScrollTrigger.refresh());
 
         return () => {
-          cancelAnimationFrame(refreshFrame);
+          cancelAnimationFrame(frame);
           window.removeEventListener("resize", onResize);
-          window.removeEventListener("scroll", onScroll);
-          triggers.forEach((trigger) => trigger.kill());
+          triggers.forEach((t) => t.kill());
         };
       });
 
@@ -96,7 +116,14 @@ export default function InfinitePageLoop({ panels }: InfinitePageLoopProps) {
     <main ref={rootRef} className="aven-layered-loop">
       {panels.map((panel, index) => (
         <section
-          className={`aven-layered-panel aven-layered-panel--${panel.id}${panel.dense ? " aven-layered-panel--dense" : ""}${index === panels.length - 1 ? " aven-layered-panel--final" : ""}`}
+          className={[
+            "aven-layered-panel",
+            `aven-layered-panel--${panel.id}`,
+            panel.dense ? "aven-layered-panel--dense" : "",
+            index === panels.length - 1 ? "aven-layered-panel--final" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
           data-aven-layered-panel
           data-panel-id={panel.id}
           data-theme={index % 2 === 0 ? "light" : "dark"}
@@ -106,20 +133,6 @@ export default function InfinitePageLoop({ panels }: InfinitePageLoopProps) {
           {panel.content}
         </section>
       ))}
-
-      <section
-        className="aven-layered-panel aven-layered-panel--hero aven-layered-panel--duplicate"
-        data-aven-layered-panel
-        data-duplicate="true"
-        data-theme="light"
-        aria-hidden="true"
-      >
-        <div className="aven-layered-hero-copy">
-          <span>PAY FOR PROGRESS · KEEP THE PROOF</span>
-          <strong>AVEN</strong>
-          <p>PAYMENT, PROOF, AND REPUTATION FOR REAL WORK.</p>
-        </div>
-      </section>
     </main>
   );
 }

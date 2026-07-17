@@ -873,6 +873,122 @@ h1, h2, h3, h4, h5, h6, .display-text {
 
 .form-success-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
 
+/* Dashboard pending review alert */
+.dash-pending-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #1e1e1e;
+  border-left: 4px solid #fbbf24; /* amber */
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  border-radius: 4px;
+  color: var(--text-primary);
+}
+.dash-pending-alert-icon {font-size: 20px; line-height: 1;}
+.dash-pending-alert-body strong {color: #fbbf24;}
+
+/* Pending review badge on stream cards */
+.dash-pending-badge {
+  display: inline-block;
+  background: #fbbf24;
+  color: #111;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 8px;
+}
+
+/* Checkpoint section */
+.checkpoint-section {
+  background: #111;
+  padding: 16px;
+  margin-top: 24px;
+  border-radius: 6px;
+}
+.checkpoint-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.checkpoint-eyebrow {font-size: 12px; color: var(--text-secondary); text-transform: uppercase;}
+.checkpoint-count {font-weight: 600; font-size: 14px;}
+
+.checkpoint-list {display: grid; gap: 12px;}
+.checkpoint-card {
+  border: 1px solid #222;
+  border-radius: 4px;
+  padding: 8px 12px;
+  background: #0d0d0d;
+}
+.checkpoint-card--approved {border-color: #10b981;}
+.checkpoint-card--pending {border-color: #fbbf24;}
+.checkpoint-card-header {display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;}
+.checkpoint-num {font-weight: 600;}
+.checkpoint-status {font-size: 13px;}
+.checkpoint-due {font-size: 12px; color: var(--text-secondary);}
+.checkpoint-overdue {color: #f87171; margin-left: 4px;}
+
+.checkpoint-form {display: flex; gap: 8px; align-items: center; margin-top: 4px;}
+.checkpoint-btn {font-size: 13px; padding: 4px 8px; border-radius: 4px; border: none; cursor: pointer;}
+.checkpoint-btn--submit {background: #3b82f6; color: #fff;}
+.checkpoint-btn--approve {background: #10b981; color: #fff;}
+.checkpoint-btn--settle {background: #f59e0b; color: #111;}
+
+/* Stream ticker */
+.stream-ticker-wrap {display: flex; gap: 16px; margin-top: 12px; flex-wrap: wrap;}
+.stream-ticker-item {background: #111; padding: 8px 12px; border-radius: 4px; min-width: 120px;}
+.stream-ticker-label {font-size: 12px; color: var(--text-secondary);}
+.stream-ticker-value {font-size: 14px; font-weight: 600; margin-top: 2px;}
+.stream-ticker-asset {font-weight: normal; color: var(--text-secondary); margin-left: 2px;}
+.stream-ticker-item--green {border-left: 4px solid #10b981;}
+.stream-ticker-item--amber {border-left: 4px solid #fbbf24;}
+.stream-ticker-cap {font-weight: 400; color: var(--text-secondary); font-size: 11px;}
+
+/* Checkpoint loading + settle row */
+.checkpoint-loading {display: flex; align-items: center; gap: 8px; padding: 12px 0; color: var(--text-secondary); font-size: 13px;}
+.checkpoint-evidence {font-size: 12px; color: var(--text-secondary); margin-top: 4px;}
+.checkpoint-settle-row {display: flex; align-items: center; gap: 12px; margin-top: 16px; padding-top: 12px; border-top: 1px solid #222;}
+.checkpoint-settle-hint {font-size: 12px; color: var(--text-secondary);}
+
+/* Wallet badge select dropdown (multiple known addresses) */
+.wallet-badge-select {
+  background: var(--surface-high, #1e1e1e);
+  border: 1px solid #333;
+  border-left: 2px solid var(--violet, #6c47ff);
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  color: var(--text-primary, #fff);
+  padding: 5px 20px 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  padding-right: 22px;
+}
+.wallet-badge-select:focus {border-color: var(--violet, #6c47ff);}
+.wallet-badge-select option {background: #1e1e1e; color: #fff;}
+
+/* Wallet modal field (label+select inside modal) */
+.wallet-modal-field {display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; font-size: 13px; color: var(--text-secondary);}
+.wallet-modal-field select {
+  background: var(--surface-high, #1e1e1e);
+  border: 1px solid #333;
+  color: var(--text-primary, #fff);
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: var(--font-mono, monospace);
+  outline: none;
+}
+.wallet-modal-field select:focus {border-color: var(--violet, #6c47ff);}
+
 /* ─── Stream Detail ───────────────────────────────────────────────────────── */
 .stream-detail-wrap { padding: 16px 0 40px; }
 
@@ -1334,6 +1450,18 @@ h1, h2, h3, h4, h5, h6, .display-text {
   border-left-width: 1px;
   font-family: var(--font-mono), monospace;
 }
+
+.app-layout .wallet-badge-select {
+  background: #050505;
+  border: 1px solid rgba(255, 255, 255, 0.52);
+  border-left: 2px solid rgba(255, 255, 255, 0.52);
+  color: #fff;
+  border-radius: 0;
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+}
+.app-layout .wallet-badge-select:focus { border-color: #fff; }
+.app-layout .wallet-badge-select option { background: #050505; }
 
 .app-layout .wallet-btn:hover,
 .app-layout .wallet-badge:hover {

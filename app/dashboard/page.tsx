@@ -35,6 +35,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pendingReviews, setPendingReviews] = useState<{ id: string; streamId: string; reviewDeadlineAt?: string }[]>([]);
 
   const load = useCallback(async () => {
     if (!address) return;
@@ -49,6 +50,13 @@ export default function DashboardPage() {
       setSendingStreams(sent);
       setReceivingStreams(received);
       setAttestationCount(attestations.length);
+      // Fetch pending work sessions that the client needs to review
+      try {
+        const res = await fetch(`/api/work-sessions/pending?wallet=${encodeURIComponent(address)}`, { cache: "no-store" });
+        if (res.ok) setPendingReviews(await res.json());
+      } catch {
+        // Non-critical: don't block dashboard on this failure
+      }
     } catch (e: any) {
       setError(e?.message ?? "Failed to load streams");
     } finally {
@@ -143,6 +151,32 @@ export default function DashboardPage() {
 
       {error && <div className="dash-error">{error}</div>}
 
+      {/* Pending review alert for clients */}
+      {tab === "sending" && pendingReviews.length > 0 && (
+        <div className="dash-pending-alert">
+          <span className="dash-pending-alert-icon">⚠️</span>
+          <div className="dash-pending-alert-body">
+            <strong>{pendingReviews.length} work session{pendingReviews.length === 1 ? "" : "s"} pending your review.</strong>
+            <p>
+              If you don&apos;t approve or dispute within the review window,
+              the worker&apos;s withdrawal request will be auto-approved.
+              {(() => {
+                const earliest = pendingReviews
+                  .filter(s => s.reviewDeadlineAt)
+                  .sort((a, b) => a.reviewDeadlineAt!.localeCompare(b.reviewDeadlineAt!));
+                if (earliest.length === 0) return null;
+                const remaining = Math.max(0, Date.parse(earliest[0].reviewDeadlineAt!) - Date.now());
+                const hrs = Math.floor(remaining / 3_600_000);
+                const mins = Math.floor((remaining % 3_600_000) / 60_000);
+                return remaining === 0
+                  ? " One window has already expired."
+                  : ` Earliest deadline: ${hrs}h ${mins}m.`;
+              })()}
+            </p>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div className="dash-loading">
           <div className="dash-spinner" />
@@ -159,17 +193,21 @@ export default function DashboardPage() {
         </div>
       ) : (
         <div className="stream-list">
-          {streams.map((stream) => (
-            <StreamCard
-              key={stream.id}
-              stream={stream}
-              isSender={tab === "sending"}
-              address={address!}
-              actionLoading={actionLoading}
-              onAction={handleAction}
-              onView={() => router.push(`/stream/${stream.id}`)}
-            />
-          ))}
+          {streams.map((stream) => {
+            const hasPending = pendingReviews.some(s => s.streamId === stream.id);
+            return (
+              <StreamCard
+                key={stream.id}
+                stream={stream}
+                isSender={tab === "sending"}
+                address={address!}
+                actionLoading={actionLoading}
+                onAction={handleAction}
+                onView={() => router.push(`/stream/${stream.id}`)}
+                hasPendingReview={hasPending}
+              />
+            );
+          })}
         </div>
       )}
     </div>
@@ -183,6 +221,7 @@ function StreamCard({
   actionLoading,
   onAction,
   onView,
+  hasPendingReview,
 }: {
   stream: StreamObject;
   isSender: boolean;
@@ -190,6 +229,7 @@ function StreamCard({
   actionLoading: string | null;
   onAction: (action: string, stream: StreamObject) => void;
   onView: () => void;
+  hasPendingReview?: boolean;
 }) {
   const isLoading = (action: string) => actionLoading === `${action}-${stream.id}`;
   const pct = stream.totalDeposited > 0
@@ -213,6 +253,11 @@ function StreamCard({
           style={{ background: STATUS_COLOR[stream.status] }}
           title={stream.status}
         />
+        {hasPendingReview && (
+          <span className="dash-pending-badge" title="Work session pending your review">
+            ⚠️ Review
+          </span>
+        )}
       </div>
 
       <div className="stream-card-amounts">

@@ -1,15 +1,25 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { checkFreighterInstalled, connectWallet as connectFreighter, disconnectWallet as disconnectFreighter } from "@/lib/stellar";
+import {
+  checkFreighterInstalled,
+  connectWallet as connectFreighter,
+  disconnectWallet as disconnectFreighter,
+  getConnectedWallet,
+  watchWalletChanges,
+} from "@/lib/stellar";
+import { NETWORK_PASSPHRASE } from "@/lib/contracts";
 
 export type WalletContextValue = {
   address: string | null;
   connected: boolean;
   connecting: boolean;
   hasFreighter: boolean | null; // null = not yet checked
+  restoring: boolean;
+  knownAddresses: string[];
   connect: () => Promise<void>;
   disconnect: () => void;
+  selectAddress: (address: string) => void;
   openConnectModal: () => void;
 };
 
@@ -25,15 +35,74 @@ export function useWallet() {
 let _openModalFn: (() => void) | null = null;
 export function _registerOpenModal(fn: () => void) { _openModalFn = fn; }
 
+const LAST_WALLET_KEY = "aven:last-wallet-address";
+const KNOWN_WALLETS_KEY = "aven:known-wallet-addresses";
+
+function readKnownAddresses() {
+  if (typeof window === "undefined") return [];
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(KNOWN_WALLETS_KEY) ?? "[]");
+    return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function rememberAddress(address: string) {
+  if (typeof window === "undefined") return [];
+  const known = [address, ...readKnownAddresses().filter((item) => item.toLowerCase() !== address.toLowerCase())].slice(0, 8);
+  window.localStorage.setItem(LAST_WALLET_KEY, address);
+  window.localStorage.setItem(KNOWN_WALLETS_KEY, JSON.stringify(known));
+  return known;
+}
+
 export function WalletProvider({ children }: { children: React.ReactNode }) {
-  const [address, setAddress] = useState<string | null>(null);
+  const [address, setAddress] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      return window.localStorage.getItem(LAST_WALLET_KEY);
+    }
+    return null;
+  });
   const [connecting, setConnecting] = useState(false);
+  const [restoring, setRestoring] = useState(true);
   const [hasFreighter, setHasFreighter] = useState<boolean | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [walletError, setWalletError] = useState<string | null>(null);
+  const [knownAddresses, setKnownAddresses] = useState<string[]>([]);
 
   useEffect(() => {
-    checkFreighterInstalled().then(setHasFreighter);
+    let mounted = true;
+    setKnownAddresses(readKnownAddresses());
+    checkFreighterInstalled().then((installed) => {
+      if (mounted) setHasFreighter(installed);
+    });
+    getConnectedWallet()
+      .then((wallet) => {
+        if (!mounted) return;
+        if (wallet) {
+          setAddress(wallet.address);
+          setHasFreighter(true);
+          setKnownAddresses(rememberAddress(wallet.address));
+        }
+      })
+      .finally(() => {
+        if (mounted) setRestoring(false);
+      });
+    const stopWatching = watchWalletChanges((next) => {
+      if (!mounted) return;
+      if (next.networkPassphrase !== NETWORK_PASSPHRASE) {
+        setAddress(null);
+        setWalletError("Switch Freighter to Stellar Testnet, then try connecting again.");
+        return;
+      }
+      setWalletError(null);
+      setAddress(next.address);
+      setKnownAddresses(rememberAddress(next.address));
+    });
+    return () => {
+      mounted = false;
+      stopWatching();
+    };
   }, []);
 
   const connect = useCallback(async () => {
@@ -42,6 +111,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     try {
       const { address: addr } = await connectFreighter();
       setAddress(addr);
+      setKnownAddresses(rememberAddress(addr));
       setHasFreighter(true);
       setShowModal(false);
     } catch (error) {
@@ -60,7 +130,13 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   const disconnect = useCallback(() => {
     disconnectFreighter();
+    if (typeof window !== "undefined") window.localStorage.removeItem(LAST_WALLET_KEY);
     setAddress(null);
+  }, []);
+
+  const selectAddress = useCallback((nextAddress: string) => {
+    setAddress(nextAddress);
+    setKnownAddresses(rememberAddress(nextAddress));
   }, []);
 
   const openConnectModal = useCallback(() => setShowModal(true), []);
@@ -70,8 +146,19 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo<WalletContextValue>(
-    () => ({ address, connected: Boolean(address), connecting, hasFreighter, connect, disconnect, openConnectModal }),
-    [address, connecting, hasFreighter, connect, disconnect, openConnectModal]
+    () => ({
+      address,
+      connected: Boolean(address),
+      connecting,
+      hasFreighter,
+      restoring,
+      knownAddresses,
+      connect,
+      disconnect,
+      selectAddress,
+      openConnectModal,
+    }),
+    [address, connecting, hasFreighter, restoring, knownAddresses, connect, disconnect, selectAddress, openConnectModal]
   );
 
   return (
@@ -83,8 +170,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           connecting={connecting}
           connected={Boolean(address)}
           address={address}
+          knownAddresses={knownAddresses}
           error={walletError}
           onConnect={connect}
+          onSelectAddress={selectAddress}
           onRetryDetection={retryFreighterDetection}
           onDisconnect={() => { disconnect(); setShowModal(false); }}
           onClose={() => setShowModal(false)}
@@ -101,8 +190,10 @@ function ConnectWalletModal({
   connecting,
   connected,
   address,
+  knownAddresses,
   error,
   onConnect,
+  onSelectAddress,
   onRetryDetection,
   onDisconnect,
   onClose,
@@ -111,8 +202,10 @@ function ConnectWalletModal({
   connecting: boolean;
   connected: boolean;
   address: string | null;
+  knownAddresses: string[];
   error: string | null;
   onConnect: () => Promise<void>;
+  onSelectAddress: (address: string) => void;
   onRetryDetection: () => Promise<void>;
   onDisconnect: () => void;
   onClose: () => void;
@@ -139,6 +232,18 @@ function ConnectWalletModal({
         {connected && address ? (
           <>
             <div className="wallet-modal-address">{truncate(address)}</div>
+            {knownAddresses.length > 1 && (
+              <label className="wallet-modal-field">
+                <span>Use address</span>
+                <select value={address} onChange={(event) => onSelectAddress(event.target.value)}>
+                  {knownAddresses.map((knownAddress) => (
+                    <option key={knownAddress} value={knownAddress}>
+                      {truncate(knownAddress)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <p className="wallet-modal-sub">Your Stellar wallet is connected to Aven.</p>
             <button className="wallet-modal-btn-secondary" onClick={onDisconnect}>
               Disconnect

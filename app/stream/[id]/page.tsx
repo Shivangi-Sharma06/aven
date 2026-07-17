@@ -15,8 +15,17 @@ import {
   approveReviewedWithdrawal,
   disputeReviewedWithdrawal,
   withdrawReviewed,
+  hashEvidence,
+  submitCheckpoint,
+  approveCheckpoint,
+  settleCheckpoints,
+  streamContractExplorerUrl,
   StreamObject,
+  CheckpointObject,
+  getCheckpoint,
+  getLatestLedger,
 } from "@/lib/stellar";
+import { STREAM_CONTRACT_ID } from "@/lib/contracts";
 import styles from "./page.module.css";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -65,16 +74,41 @@ export default function StreamDetailPage() {
   const [approveSession, setApproveSession] = useState<WorkSession | null>(null);
   const [disputeSession, setDisputeSession] = useState<string | null>(null);
   const [disputeReason, setDisputeReason] = useState("");
+  const [checkpointIndex, setCheckpointIndex] = useState("0");
+  const [checkpointEvidence, setCheckpointEvidence] = useState("");
+  const [checkpoints, setCheckpoints] = useState<CheckpointObject[]>([]);
+  const [checkpointsLoading, setCheckpointsLoading] = useState(false);
+  const [currentLedger, setCurrentLedger] = useState<number>(0);
+  const [tickerSecs, setTickerSecs] = useState<number>(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  async function loadCheckpoints(s: StreamObject) {
+    if (!s || s.checkpointCount === 0) return;
+    setCheckpointsLoading(true);
+    try {
+      const promises = Array.from({ length: s.checkpointCount }, (_, i) =>
+        getCheckpoint(s.id, i, address ?? undefined)
+      );
+      const list = await Promise.all(promises);
+      setCheckpoints(list.filter(Boolean) as CheckpointObject[]);
+    } catch (e) {
+      console.error("Failed to load checkpoints", e);
+    } finally {
+      setCheckpointsLoading(false);
+    }
+  }
 
   async function load() {
     setLoading(true);
     try {
       const s = await getStream(id, address ?? undefined);
       setStream(s);
-      if (s?.status === "active" || s?.status === "paused") {
-        const e = await computeAvailable(id, address ?? undefined);
-        setEarned(e);
+      if (s) {
+        await Promise.all([
+          computeAvailable(id, address ?? undefined).then(setEarned),
+          getLatestLedger().then(setCurrentLedger),
+          loadCheckpoints(s),
+        ]);
       }
     } catch (e: any) {
       setError(e?.message ?? "Failed to load stream");
@@ -130,10 +164,10 @@ export default function StreamDetailPage() {
     load();
     // Poll earned every 6 seconds when active
     pollRef.current = setInterval(async () => {
-      if (stream?.status === "active") {
-        const e = await computeAvailable(id, address ?? undefined);
-        setEarned(e);
-      }
+      const e = await computeAvailable(id, address ?? undefined);
+      setEarned(e);
+      const l = await getLatestLedger();
+      if (l > 0) setCurrentLedger(l);
     }, 6000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -143,6 +177,18 @@ export default function StreamDetailPage() {
     loadSessions();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, address]);
+
+  useEffect(() => {
+    if (!stream || stream.status !== "active") return;
+    const interval = setInterval(() => {
+      setTickerSecs((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [stream]);
+
+  useEffect(() => {
+    setTickerSecs(0);
+  }, [stream, checkpoints, currentLedger]);
 
   async function walletHeaders(path: string) {
     if (!address) throw new Error("Connect your wallet first.");
@@ -258,6 +304,43 @@ export default function StreamDetailPage() {
     }
   }
 
+  async function doCheckpointAction(action: "submit" | "approve" | "settle") {
+    if (!address || !stream) return;
+    const index = Number.parseInt(checkpointIndex, 10);
+    if ((action === "submit" || action === "approve") && (!Number.isInteger(index) || index < 0 || index >= stream.checkpointCount)) {
+      setError(`Checkpoint index must be between 0 and ${Math.max(stream.checkpointCount - 1, 0)}.`);
+      return;
+    }
+    setActionLoading(`checkpoint:${action}`);
+    setError(null);
+    setTxResult(null);
+    try {
+      if (action === "submit") {
+        if (!checkpointEvidence.trim()) throw new Error("Add a short work note or a 32-byte evidence hash.");
+        const rawEvidence = checkpointEvidence.trim().replace(/^0x/, "");
+        const evidenceHash = /^[a-fA-F0-9]{64}$/.test(rawEvidence)
+          ? rawEvidence
+          : await hashEvidence(checkpointEvidence.trim());
+        await submitCheckpoint(id, address, index, evidenceHash);
+        setTxResult(`Checkpoint #${index} submitted with evidence ${evidenceHash.slice(0, 12)}…`);
+        setCheckpointEvidence("");
+      }
+      if (action === "approve") {
+        await approveCheckpoint(id, address, index);
+        setTxResult(`Checkpoint #${index} approved.`);
+      }
+      if (action === "settle") {
+        const settled = await settleCheckpoints(id, address);
+        setTxResult(`${settled} checkpoint${settled === 1 ? "" : "s"} settled.`);
+      }
+      await Promise.all([load(), loadSessions()]);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
   if (loading) {
     return (
       <div className="stream-detail-loading">
@@ -319,12 +402,78 @@ export default function StreamDetailPage() {
           </div>
         </div>
 
-        {/* Live earned */}
-        {(stream.status === "active" || stream.status === "paused") && (
-          <div className="stream-detail-earned-wrap">
-            <div className="stream-detail-earned-label">Withdrawable now</div>
-            <div className="stream-detail-earned-value">
-              {earned.toFixed(6)} <span className="stream-detail-earned-asset">{stream.asset}</span>
+        {/* Live earnings ticker — active streams */}
+        {stream.status === "active" && (() => {
+          // Estimate elapsed ledgers client-side using tickerSecs (1 ledger ≈ 5s)
+          const estimatedExtraLedgers = tickerSecs / 5;
+          const elapsedLedgers = Math.min(
+            stream.durationLedgers,
+            Math.max(
+              0,
+              currentLedger + estimatedExtraLedgers
+                - stream.startLedger
+                - (stream.pausedDurationLedgers ?? 0)
+            )
+          );
+          const totalVested = elapsedLedgers * stream.ratePerLedger;
+          const capPct = (stream.withdrawableCapPercent ?? 65) / 100;
+
+          // Compute how much of vested is covered by approved checkpoints
+          let approvedVested = 0;
+          let unapprovedVested = totalVested;
+          if (stream.checkpointCount > 0 && stream.checkpointSpanLedgers > 0) {
+            const cpLedgers = stream.checkpointSpanLedgers;
+            checkpoints.forEach((cp, i) => {
+              const cpStart = stream.startLedger + i * cpLedgers;
+              const cpEnd = cpStart + cpLedgers;
+              const cpElapsed = Math.min(cpLedgers, Math.max(0, (currentLedger + estimatedExtraLedgers) - cpStart));
+              const cpVested = cpElapsed * stream.ratePerLedger;
+              if (cp.approved || cp.autoApproved) {
+                approvedVested += cpVested;
+                unapprovedVested -= cpVested;
+              }
+            });
+          }
+          const withdrawableNow = Math.min(
+            approvedVested + unapprovedVested * capPct,
+            totalVested
+          );
+          const pendingApproval = totalVested - withdrawableNow;
+
+          return (
+            <div className="stream-ticker-wrap">
+              <div className="stream-ticker-item">
+                <div className="stream-ticker-label">Total Vested</div>
+                <div className="stream-ticker-value mono">
+                  {totalVested.toFixed(6)}
+                  <span className="stream-ticker-asset"> {stream.asset}</span>
+                </div>
+              </div>
+              <div className="stream-ticker-item stream-ticker-item--green">
+                <div className="stream-ticker-label">Withdrawable Now <span className="stream-ticker-cap">({stream.withdrawableCapPercent ?? 65}% cap)</span></div>
+                <div className="stream-ticker-value mono">
+                  {withdrawableNow.toFixed(6)}
+                  <span className="stream-ticker-asset"> {stream.asset}</span>
+                </div>
+              </div>
+              <div className="stream-ticker-item stream-ticker-item--amber">
+                <div className="stream-ticker-label">Pending Client Approval</div>
+                <div className="stream-ticker-value mono">
+                  {pendingApproval.toFixed(6)}
+                  <span className="stream-ticker-asset"> {stream.asset}</span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+        {stream.status === "paused" && (
+          <div className="stream-ticker-wrap">
+            <div className="stream-ticker-item">
+              <div className="stream-ticker-label">Withdrawable (on-chain)</div>
+              <div className="stream-ticker-value mono">
+                {earned.toFixed(6)}
+                <span className="stream-ticker-asset"> {stream.asset}</span>
+              </div>
             </div>
           </div>
         )}
@@ -362,6 +511,124 @@ export default function StreamDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* ── Checkpoints Panel ── */}
+        {stream.checkpointCount > 0 && (
+          <section className="checkpoint-section">
+            <div className="checkpoint-section-header">
+              <div>
+                <span className="checkpoint-eyebrow">STREAM / MILESTONES</span>
+                <h2>Checkpoints</h2>
+              </div>
+              <span className="checkpoint-count">{stream.checkpointCount}</span>
+            </div>
+
+            {checkpointsLoading ? (
+              <div className="checkpoint-loading"><div className="dash-spinner" /> Loading checkpoints…</div>
+            ) : (
+              <div className="checkpoint-list">
+                {Array.from({ length: stream.checkpointCount }, (_, i) => {
+                  const cp = checkpoints[i];
+                  const dueLedger = stream.startLedger + (i + 1) * stream.checkpointSpanLedgers;
+                  const elapsed = currentLedger > 0 && currentLedger >= dueLedger;
+                  const statusLabel = !cp
+                    ? "Not Submitted"
+                    : cp.approved
+                    ? "✅ Approved"
+                    : cp.autoApproved
+                    ? "✅ Auto-Approved"
+                    : cp.submitted
+                    ? "⏳ Pending Approval"
+                    : "📝 Not Submitted";
+
+                  return (
+                    <div
+                      key={i}
+                      className={`checkpoint-card${cp?.approved || cp?.autoApproved ? " checkpoint-card--approved" : cp?.submitted ? " checkpoint-card--pending" : ""}`}
+                    >
+                      <div className="checkpoint-card-header">
+                        <span className="checkpoint-num">#{i + 1}</span>
+                        <span className="checkpoint-status">{statusLabel}</span>
+                        <span className="checkpoint-due" title={elapsed ? "Deadline passed" : "Future deadline"}>
+                          Due ledger #{dueLedger.toLocaleString()}
+                          {elapsed && <span className="checkpoint-overdue"> · ELAPSED</span>}
+                        </span>
+                      </div>
+                      {cp?.submitted && cp.evidenceHash && (
+                        <div className="checkpoint-evidence">
+                          Evidence: <code title={cp.evidenceHash}>{cp.evidenceHash.slice(0, 16)}…</code>
+                        </div>
+                      )}
+
+                      {/* Recipient: submit evidence for this checkpoint */}
+                      {isRecipient && !cp?.submitted && (
+                        <div className="checkpoint-form">
+                          <input
+                            id={`checkpoint-evidence-${i}`}
+                            type="text"
+                            className="form-input"
+                            placeholder="Work note or 32-byte hex evidence hash"
+                            value={Number(checkpointIndex) === i ? checkpointEvidence : ""}
+                            onFocus={() => setCheckpointIndex(String(i))}
+                            onChange={(e) => {
+                              setCheckpointIndex(String(i));
+                              setCheckpointEvidence(e.target.value);
+                            }}
+                          />
+                          <button
+                            className="checkpoint-btn checkpoint-btn--submit"
+                            type="button"
+                            disabled={actionLoading === `checkpoint:submit` && Number(checkpointIndex) === i}
+                            onClick={() => {
+                              setCheckpointIndex(String(i));
+                              void doCheckpointAction("submit");
+                            }}
+                          >
+                            {actionLoading === `checkpoint:submit` && Number(checkpointIndex) === i ? "Submitting…" : "Submit Checkpoint"}
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Client: approve a submitted but unapproved checkpoint */}
+                      {isSender && cp?.submitted && !cp.approved && !cp.autoApproved && (
+                        <div className="checkpoint-form">
+                          <button
+                            className="checkpoint-btn checkpoint-btn--approve"
+                            type="button"
+                            disabled={actionLoading === `checkpoint:approve` && Number(checkpointIndex) === i}
+                            onClick={() => {
+                              setCheckpointIndex(String(i));
+                              void doCheckpointAction("approve");
+                            }}
+                          >
+                            {actionLoading === `checkpoint:approve` && Number(checkpointIndex) === i ? "Approving…" : "Approve Checkpoint"}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Settle elapsed checkpoints (auto-approve) — any connected party */}
+            {connected && (isSender || isRecipient) && (
+              <div className="checkpoint-settle-row">
+                <button
+                  className="checkpoint-btn checkpoint-btn--settle"
+                  type="button"
+                  disabled={actionLoading === "checkpoint:settle"}
+                  onClick={() => void doCheckpointAction("settle")}
+                >
+                  {actionLoading === "checkpoint:settle" ? "Settling…" : "Settle Elapsed Checkpoints"}
+                </button>
+                <span className="checkpoint-settle-hint">
+                  Auto-approves any checkpoint whose deadline has passed without client approval.
+                </span>
+              </div>
+            )}
+          </section>
+        )}
 
         <section className={styles["work-session-section"]}>
           <div className={styles["work-session-heading"]}>
@@ -579,14 +846,14 @@ export default function StreamDetailPage() {
           </div>
         )}
 
-        {/* Explorer link */}
+        {/* Explorer link — points to the stream contract, not a user address */}
         <a
           className="stream-explorer-link"
-          href={`https://stellar.expert/explorer/testnet/contract/${stream.sender}`}
+          href={`https://stellar.expert/explorer/testnet/contract/${STREAM_CONTRACT_ID}`}
           target="_blank"
           rel="noopener noreferrer"
         >
-          View on Stellar Expert ↗
+          View Stream Contract on Stellar Expert ↗
         </a>
       </div>
 

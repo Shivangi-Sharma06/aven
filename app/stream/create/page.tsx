@@ -22,7 +22,6 @@ export default function CreateStreamPage() {
   const [recipient, setRecipient] = useState("");
   const [totalAmount, setTotalAmount] = useState("");
   const [durationDays, setDurationDays] = useState("7");
-  const [ratePerSecond, setRatePerSecond] = useState("");
   const [category, setCategory] = useState<Category>("Freelance");
   const [asset, setAsset] = useState<Asset>("USDC");
   const [title, setTitle] = useState("");
@@ -59,7 +58,7 @@ export default function CreateStreamPage() {
 
     const total = parseFloat(totalAmount);
     const days = parseFloat(durationDays);
-    const rate = parseFloat(ratePerSecond || computedRate);
+    const rate = parseFloat(computedRate);
 
     if (!recipient.startsWith("G") || recipient.length < 56) {
       setError("Recipient must be a valid Stellar address starting with G");
@@ -68,6 +67,10 @@ export default function CreateStreamPage() {
     if (!title.trim()) { setError("Title is required"); return; }
     if (!total || total <= 0) { setError("Total amount must be > 0"); return; }
     if (!days || days <= 0) { setError("Duration must be > 0"); return; }
+    if (!rate || rate <= 0) {
+      setError("The calculated rate must be greater than 0. Increase the amount or adjust the duration.");
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -227,8 +230,8 @@ export default function CreateStreamPage() {
               type="number"
               placeholder={computedRate || "0.00000116"}
               step="any"
-              value={ratePerSecond}
-              onChange={(e) => setRatePerSecond(e.target.value)}
+              value={computedRate}
+              readOnly
               id="stream-rate"
             />
           </div>
@@ -252,8 +255,8 @@ export default function CreateStreamPage() {
         </div>
 
         {computedRate && (
-          <div className="form-rate-preview">
-            <span>≈ {computedRate} {asset}/sec · {(parseFloat(computedRate) * 3600).toFixed(6)} {asset}/hr</span>
+        <div className="form-rate-preview">
+            <span>≈ {computedRate} {asset}/sec · {(parseFloat(computedRate) * 3600).toFixed(6)} {asset}/hr · 65% worker-withdrawable until approval</span>
           </div>
         )}
 

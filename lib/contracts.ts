@@ -36,10 +36,19 @@ export const freighterSignTx = async (
 ): Promise<{ signedTxXdr: string; signerAddress?: string }> => {
   const res = await signTransaction(xdr, {
     networkPassphrase: opts?.networkPassphrase ?? NETWORK_PASSPHRASE,
+    address: opts?.address,
   });
   // freighter-api v4.x returns either string or { signedTxXdr }
   if (typeof res === "string") return { signedTxXdr: res };
-  return res as { signedTxXdr: string; signerAddress?: string };
+  const signed = res as { signedTxXdr: string; signerAddress?: string };
+  if (
+    opts?.address &&
+    signed.signerAddress &&
+    signed.signerAddress.toUpperCase() !== opts.address.toUpperCase()
+  ) {
+    throw new Error("Freighter signed with a different account. Switch wallets and try again.");
+  }
+  return signed;
 };
 
 function baseOptions(publicKey: string) {

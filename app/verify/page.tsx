@@ -3,6 +3,7 @@
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { getAttestation, verifyAttestation, AttestationObject } from "@/lib/stellar";
+import { ATTESTATION_CONTRACT_ID } from "@/lib/contracts";
 
 const CATEGORY_COLORS: Record<string, string> = {
   Freelance: "#8b5cf6",
@@ -134,11 +135,11 @@ function VerifyContent() {
 
               <a
                 className="stream-explorer-link"
-                href={`https://stellar.expert/explorer/testnet/contract/${result.record.recipient}`}
+                href={`https://stellar.expert/explorer/testnet/contract/${ATTESTATION_CONTRACT_ID}`}
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                View on Stellar Expert ↗
+                View Attestation Contract on Stellar Expert ↗
               </a>
             </div>
           )}

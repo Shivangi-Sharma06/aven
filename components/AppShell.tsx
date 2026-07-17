@@ -7,7 +7,7 @@ import { useWallet } from "./WalletProvider";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { connected, address, openConnectModal, disconnect } = useWallet();
+  const { connected, address, openConnectModal, disconnect, knownAddresses, selectAddress } = useWallet();
 
   if (pathname === "/") {
     return <>{children}</>;
@@ -52,9 +52,35 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </button>
           ) : (
             <div className="wallet-badge-group">
-              <Link href={`/profile/${address}`} className="wallet-badge">
-                {truncate(address || "")}
-              </Link>
+              {knownAddresses.length > 1 ? (
+                <select
+                  value={address || ""}
+                  onChange={(e) => selectAddress(e.target.value)}
+                  className="wallet-badge-select"
+                  style={{
+                    background: "var(--surface-high)",
+                    border: "none",
+                    borderLeft: "2px solid var(--violet)",
+                    fontFamily: "var(--font-mono), monospace",
+                    fontSize: "11px",
+                    color: "var(--text-primary)",
+                    padding: "6px 20px 6px 12px",
+                    borderRadius: "4px",
+                    cursor: "pointer",
+                    outline: "none",
+                  }}
+                >
+                  {knownAddresses.map((knownAddr) => (
+                    <option key={knownAddr} value={knownAddr}>
+                      {truncate(knownAddr)}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <Link href={`/profile/${address}`} className="wallet-badge">
+                  {truncate(address || "")}
+                </Link>
+              )}
               <button className="wallet-disconnect-btn" onClick={disconnect} title="Disconnect">
                 <LogOut size={12} />
               </button>

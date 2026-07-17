@@ -7,7 +7,9 @@ import {
   getAddress,
   getNetwork,
   isConnected as freighterIsConnected,
+  isAllowed as freighterIsAllowed,
   requestAccess,
+  WatchWalletChanges,
 } from "@stellar/freighter-api";
 
 import {
@@ -20,6 +22,7 @@ import {
   XLM_ASSET_ID,
   NETWORK_PASSPHRASE,
   ATTESTATION_CONTRACT_ID,
+  STREAM_CONTRACT_ID,
 } from "./contracts";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -50,6 +53,22 @@ export type StreamObject = {
   hasAttestation: boolean;
   attestationId?: string;
   pausedAtLedger?: number;
+  pausedDurationLedgers: number;
+  checkpointCount: number;
+  checkpointSpanLedgers: number;
+  withdrawableCapPercent: number;
+  approvalTimeoutLedgers: number;
+};
+
+export type CheckpointObject = {
+  streamId: string;
+  index: number;
+  dueLedger: number;
+  submitted: boolean;
+  evidenceHash: string;
+  approved: boolean;
+  autoApproved: boolean;
+  attestationId: string;
 };
 
 export type AttestationObject = {
@@ -94,6 +113,7 @@ export type CreateStreamInput = {
 };
 
 const DEFAULT_APPROVAL_TIMEOUT_LEDGERS = 50;
+const DEFAULT_WITHDRAWABLE_CAP_PERCENT = 65;
 
 function checkpointCountFor(durationLedgers: number, requested?: number): number {
   if (requested !== undefined) return requested;
@@ -176,6 +196,35 @@ export async function connectWallet(): Promise<{ address: string; connected: boo
   return { address, connected: true };
 }
 
+export async function getConnectedWallet(): Promise<{ address: string; connected: boolean } | null> {
+  if (typeof window === "undefined") return null;
+  const installed = await checkFreighterInstalled();
+  if (!installed) return null;
+
+  const allowed = await freighterIsAllowed();
+  if (allowed.error || !allowed.isAllowed) return null;
+
+  const addressResult = await getAddress();
+  if (addressResult.error || !addressResult.address) return null;
+
+  const network = await getNetwork();
+  if (network.error || network.networkPassphrase !== NETWORK_PASSPHRASE) return null;
+  return { address: addressResult.address, connected: true };
+}
+
+export function watchWalletChanges(
+  onChange: (next: { address: string; networkPassphrase: string }) => void,
+) {
+  const watcher = new WatchWalletChanges(1500);
+  const result = watcher.watch((params) => {
+    if (!params.error && params.address) {
+      onChange({ address: params.address, networkPassphrase: params.networkPassphrase });
+    }
+  });
+  if (result.error) return () => undefined;
+  return () => watcher.stop();
+}
+
 export async function disconnectWallet(): Promise<void> {
   // Freighter doesn't expose revoke; caller clears local state
 }
@@ -198,7 +247,7 @@ export async function createStream(
     total_deposited: totalDeposited,
     duration_ledgers: data.durationLedgers,
     checkpoint_count: checkpointCountFor(data.durationLedgers, data.checkpointCount),
-    withdrawable_cap_percent: data.withdrawableCapPercent ?? 60,
+    withdrawable_cap_percent: data.withdrawableCapPercent ?? DEFAULT_WITHDRAWABLE_CAP_PERCENT,
     approval_timeout_ledgers:
       data.approvalTimeoutLedgers ?? DEFAULT_APPROVAL_TIMEOUT_LEDGERS,
     category: { tag: data.category, values: undefined as any },
@@ -287,6 +336,58 @@ export async function withdrawReviewed(
   };
 }
 
+function hexToBytes32(value: string): Uint8Array {
+  const normalized = value.trim().toLowerCase().replace(/^0x/, "");
+  if (!/^[a-f0-9]{64}$/.test(normalized)) {
+    throw new Error("Evidence hash must be a 32-byte hex string.");
+  }
+  return Uint8Array.from(normalized.match(/.{2}/g)!.map((byte) => Number.parseInt(byte, 16)));
+}
+
+export async function hashEvidence(value: string): Promise<string> {
+  const bytes = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+export async function submitCheckpoint(
+  streamId: string,
+  workerAddress: string,
+  index: number,
+  evidenceHashHex: string,
+): Promise<void> {
+  const client = getStreamClient(workerAddress);
+  const tx = await client.submit_checkpoint({
+    stream_id: BigInt(streamId),
+    worker: workerAddress,
+    index,
+    evidence_hash: hexToBytes32(evidenceHashHex) as any,
+  });
+  await tx.signAndSend();
+}
+
+export async function approveCheckpoint(
+  streamId: string,
+  senderAddress: string,
+  index: number,
+): Promise<void> {
+  const client = getStreamClient(senderAddress);
+  const tx = await client.approve_checkpoint({
+    stream_id: BigInt(streamId),
+    sender: senderAddress,
+    index,
+  });
+  await tx.signAndSend();
+}
+
+export async function settleCheckpoints(streamId: string, callerAddress: string): Promise<number> {
+  const client = getStreamClient(callerAddress);
+  const tx = await client.settle_checkpoints({ stream_id: BigInt(streamId) });
+  const sent = await tx.signAndSend();
+  const raw = (sent as any).result?.unwrap?.() ?? (sent as any).result ?? 0n;
+  return Number(toBigInt(raw));
+}
+
 export async function getStream(streamId: string, callerAddress?: string): Promise<StreamObject | null> {
   const addr = callerAddress ?? ANON_ADDR;
   const client = getStreamClient(addr);
@@ -352,7 +453,17 @@ function mapStreamRecord(r: any): StreamObject {
     title: r.title,
     hasAttestation: false,
     pausedAtLedger: r.paused_at_ledger ? Number(r.paused_at_ledger) : undefined,
+    pausedDurationLedgers: Number(r.paused_duration_ledgers ?? 0),
+    checkpointCount: Number(r.checkpoint_count ?? 1),
+    checkpointSpanLedgers: Number(r.checkpoint_span_ledgers ?? r.duration_ledgers ?? 0),
+    withdrawableCapPercent: Number(r.withdrawable_cap_percent ?? DEFAULT_WITHDRAWABLE_CAP_PERCENT),
+    approvalTimeoutLedgers: Number(r.approval_timeout_ledgers ?? DEFAULT_APPROVAL_TIMEOUT_LEDGERS),
   };
+}
+
+export function streamContractExplorerUrl() {
+  if (!STREAM_CONTRACT_ID) return "https://stellar.expert/explorer/testnet";
+  return `https://stellar.expert/explorer/testnet/contract/${STREAM_CONTRACT_ID}`;
 }
 
 // ─── Attestation contract ─────────────────────────────────────────────────────
@@ -448,5 +559,54 @@ export async function verifyClaim(address: string, minimumScore: number): Promis
     return Boolean(tx.result);
   } catch {
     return false;
+  }
+}
+
+export async function getCheckpoint(
+  streamId: string,
+  index: number,
+  callerAddress?: string
+): Promise<CheckpointObject | null> {
+  const addr = callerAddress ?? ANON_ADDR;
+  const client = getStreamClient(addr);
+  try {
+    const tx = await client.get_checkpoint({
+      stream_id: BigInt(streamId),
+      index,
+    });
+    const r = (tx.result as any)?.unwrap?.() ?? tx.result;
+    if (!r) return null;
+    return {
+      streamId: String(r.stream_id),
+      index: Number(r.index),
+      dueLedger: Number(r.due_ledger),
+      submitted: Boolean(r.submitted),
+      evidenceHash: r.evidence_hash
+        ? Array.from(new Uint8Array(r.evidence_hash), (byte) => byte.toString(16).padStart(2, "0")).join("")
+        : "",
+      approved: Boolean(r.approved),
+      autoApproved: Boolean(r.auto_approved),
+      attestationId: String(r.attestation_id),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function getLatestLedger(): Promise<number> {
+  try {
+    const response = await fetch("https://soroban-testnet.stellar.org", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "getLatestLedger",
+      }),
+    });
+    const data = await response.json();
+    return Number(data.result.sequence);
+  } catch {
+    return 0;
   }
 }

@@ -8,11 +8,7 @@ import AvenNavigation from '../components/navigation/AvenNavigation';
 import AvenHero from '../components/hero/AvenHero';
 import HowItWorks from '../components/sections/HowItWorks';
 import LiveStreamDemo from '../components/sections/LiveStreamDemo';
-import WorkAttestations from '../components/sections/WorkAttestations';
 import Reputation from '../components/sections/Reputation';
-import Protocol from '../components/sections/Protocol';
-import Developers from '../components/sections/Developers';
-import AIAgents from '../components/sections/AIAgents';
 import FinalCTA from '../components/sections/FinalCTA';
 import AvenFooter from '../components/sections/AvenFooter';
 import InfinitePageLoop from '../components/sections/InfinitePageLoop';
@@ -70,22 +66,33 @@ export default function LandingPage() {
       <AvenNavigation />
         <InfinitePageLoop
           panels={[
-            { id: 'hero', content: <AvenHero /> },
-            { id: 'how', content: <HowItWorks />, dense: true },
-            { id: 'stream', content: <LiveStreamDemo /> },
-            { id: 'attestations', content: <WorkAttestations />, dense: true },
-            { id: 'reputation', content: <Reputation />, dense: true },
-            { id: 'protocol', content: <Protocol />, dense: true },
-            { id: 'developers', content: <Developers />, dense: true },
-            { id: 'agents', content: <AIAgents /> },
             {
-              id: 'cta',
+              // Panel 1 — Hero
+              id: 'hero',
+              content: <AvenHero />,
+            },
+            {
+              // Panel 2 — How It Works + Live Payment Demo
+              id: 'how',
               content: (
                 <>
+                  <HowItWorks />
+                  <LiveStreamDemo />
+                </>
+              ),
+              dense: true,
+            },
+            {
+              // Panel 3 — Reputation, CTA, and Footer
+              id: 'reputation',
+              content: (
+                <>
+                  <Reputation />
                   <FinalCTA />
                   <AvenFooter />
                 </>
               ),
+              dense: true,
             },
           ]}
         />

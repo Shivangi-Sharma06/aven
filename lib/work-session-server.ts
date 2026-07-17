@@ -44,7 +44,8 @@ export async function getOnchainStream(streamId: string): Promise<OnchainStream 
       totalDepositedUnits: BigInt(String(record.total_deposited)),
       totalWithdrawnUnits: BigInt(String(record.total_withdrawn)),
     };
-  } catch {
+  } catch (err: any) {
+    console.error("Error fetching stream:", err);
     return null;
   }
 }

@@ -59,6 +59,9 @@ export async function startCommand(options: StartOptions) {
   }
 
   let config = await readConfig(repositoryRoot);
+  if (config && options.stream && config.streamId !== options.stream) {
+    config = null;
+  }
   if (!config) config = await firstTimeSetup(repositoryRoot, options);
   try {
     const stream = await inspectStream(config.dashboardUrl, config.streamId, config.token);

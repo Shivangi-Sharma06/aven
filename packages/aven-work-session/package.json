@@ -1,6 +1,6 @@
 {
   "name": "aven-stellar",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Privacy-conscious Git work sessions for Aven payment streams on Stellar.",
   "type": "module",
   "bin": {

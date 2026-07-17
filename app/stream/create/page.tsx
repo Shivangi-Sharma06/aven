@@ -37,6 +37,22 @@ export default function CreateStreamPage() {
       ? (Math.floor((parseFloat(totalAmount) * 10000000) / (durationLedgers * SECONDS_PER_LEDGER)) / 10000000).toFixed(7)
       : "";
 
+  function friendlyError(raw: string): string {
+    if (raw.includes("trustline entry is missing")) {
+      const acct = raw.match(/GDW[A-Z0-9]{53}|G[A-Z0-9]{54}/)?.[0] ?? "your account";
+      return `USDC trustline missing on ${acct.slice(0, 8)}…${acct.slice(-6)}. ` +
+        `Add a USDC trustline in Stellar Laboratory or Freighter before creating a USDC stream. ` +
+        `(Or switch the asset to XLM — XLM needs no trustline.)`;
+    }
+    if (raw.includes("insufficient funds") || raw.includes("balance would go below")) {
+      return "Insufficient balance. Make sure you have enough funds to cover the stream amount plus transaction fees.";
+    }
+    if (raw.includes("User declined") || raw.includes("user rejected")) {
+      return "Transaction was cancelled in Freighter.";
+    }
+    return raw;
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!connected || !address) return openConnectModal();
@@ -44,7 +60,6 @@ export default function CreateStreamPage() {
     const total = parseFloat(totalAmount);
     const days = parseFloat(durationDays);
     const rate = parseFloat(ratePerSecond || computedRate);
-
 
     if (!recipient.startsWith("G") || recipient.length < 56) {
       setError("Recipient must be a valid Stellar address starting with G");
@@ -69,7 +84,7 @@ export default function CreateStreamPage() {
       const result = await createStream(input, address);
       setSuccess(result);
     } catch (e: any) {
-      setError(e?.message ?? "Transaction failed. Check Freighter for details.");
+      setError(friendlyError(e?.message ?? "Transaction failed. Check Freighter for details."));
     } finally {
       setLoading(false);
     }

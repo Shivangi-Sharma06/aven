@@ -87,7 +87,7 @@ npx aven-stellar stop \
 
 ## Current enforcement boundary
 
-Work-session review is application-layer state in the current release. An approved session can become `RELEASE_ELIGIBLE` in the Aven dashboard, but the unchanged Stellar stream contract does not yet enforce that review record during withdrawal. The stream contract remains authoritative for on-chain funds.
+Work-session review is enforced on-chain in the current release. When the Aven dashboard verifies a session report, the stream contract's `verify_work` function is called atomically: funds are transferred to the worker and an attestation record is minted in a single transaction. If either step fails the entire transaction reverts — the worker receives no funds and no attestation. The stream contract and the attestation contract are authoritative for on-chain state.
 
 ## Package development
 

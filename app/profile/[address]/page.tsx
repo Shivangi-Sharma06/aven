@@ -183,6 +183,10 @@ export default function ProfilePage() {
 }
 
 function AttestationCard({ attestation, onView }: { attestation: AttestationObject; onView: () => void }) {
+  const kindLabel =
+    attestation.kind === "WorkSession" ? "Work Session"
+    : attestation.kind === "LegacyReviewed" ? "Legacy"
+    : "Checkpoint";
   return (
     <div className="attestation-card" onClick={onView}>
       <div className="attestation-card-header">
@@ -192,11 +196,17 @@ function AttestationCard({ attestation, onView }: { attestation: AttestationObje
         >
           {attestation.category}
         </span>
+        <span
+          className="stream-cat-badge"
+          style={{ background: attestation.clientConfirmed ? "#10b981" : "#64748b", fontSize: "0.7rem" }}
+        >
+          {kindLabel}{attestation.autoReleased ? " (auto)" : ""}
+        </span>
         <span className="attestation-id">#{attestation.id}</span>
       </div>
       <div className="attestation-title">{attestation.title}</div>
       <div className="attestation-meta">
-        <span>{attestation.totalPaid.toFixed(2)} {attestation.asset}</span>
+        <span>{attestation.amountPaid.toFixed(2)} {attestation.asset}</span>
         <span>·</span>
         <span>ledger {attestation.startLedger.toLocaleString()} → {attestation.endLedger.toLocaleString()}</span>
       </div>

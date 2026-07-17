@@ -12,6 +12,8 @@ export const NETWORK_PASSPHRASE = "Test SDF Network ; September 2015";
 export const STREAM_CONTRACT_ID = process.env.NEXT_PUBLIC_STREAM_CONTRACT_ID ?? "";
 export const ATTESTATION_CONTRACT_ID =
   process.env.NEXT_PUBLIC_ATTESTATION_CONTRACT_ID ?? attestNetworks.testnet.contractId;
+export const REPUTATION_CONTRACT_ID =
+  process.env.NEXT_PUBLIC_REPUTATION_CONTRACT_ID ?? reputationNetworks.testnet.contractId;
 
 /** USDC on Stellar testnet */
 export const USDC_ASSET_ID = "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA";
@@ -69,6 +71,6 @@ export function getAttestationClient(publicKey: string) {
 export function getReputationClient(publicKey: string) {
   return new ReputationClient({
     ...baseOptions(publicKey),
-    contractId: reputationNetworks.testnet.contractId,
+    contractId: REPUTATION_CONTRACT_ID,
   });
 }

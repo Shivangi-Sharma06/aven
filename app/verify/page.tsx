@@ -96,7 +96,7 @@ function VerifyContent() {
                 <div className="verify-record-item">
                   <div className="verify-record-label">Total Paid</div>
                   <div className="verify-record-value">
-                    {result.record.totalPaid.toFixed(4)} {result.record.asset}
+                    {result.record.amountPaid.toFixed(4)} {result.record.asset}
                   </div>
                 </div>
                 <div className="verify-record-item">

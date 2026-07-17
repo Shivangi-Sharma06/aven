@@ -19,6 +19,7 @@ import {
   USDC_ASSET_ID,
   XLM_ASSET_ID,
   NETWORK_PASSPHRASE,
+  ATTESTATION_CONTRACT_ID,
 } from "./contracts";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -58,11 +59,15 @@ export type AttestationObject = {
   sender: string;
   category: StreamCategory;
   title: string;
-  totalPaid: number;
+  amountPaid: number;
   asset: StreamAsset;
   startLedger: number;
   endLedger: number;
   mintedAtLedger: number;
+  kind: string;
+  clientConfirmed: boolean;
+  autoReleased: boolean;
+  requestId: string;
 };
 
 export type ScoreBreakdown = {
@@ -396,11 +401,15 @@ function mapAttestationRecord(r: any): AttestationObject {
     sender: r.sender,
     category: categoryFromTag(r.category?.tag ?? "Freelance"),
     title: r.title,
-    totalPaid: fromContractAmount(toBigInt(r.total_paid)),
+    amountPaid: fromContractAmount(toBigInt(r.amount_paid)),
     asset: assetFromId(r.asset),
-    startLedger: Number(r.start_ledger),
-    endLedger: Number(r.end_ledger),
+    startLedger: Number(r.period_start_ledger),
+    endLedger: Number(r.period_end_ledger),
     mintedAtLedger: Number(r.minted_at_ledger),
+    kind: r.kind?.tag ?? "Checkpoint",
+    clientConfirmed: Boolean(r.client_confirmed),
+    autoReleased: Boolean(r.auto_released),
+    requestId: r.request_id ?? "",
   };
 }
 
@@ -408,21 +417,20 @@ function mapAttestationRecord(r: any): AttestationObject {
 
 export async function computeScore(address: string): Promise<ScoreBreakdown> {
   const client = getReputationClient(address);
-  const attestationContractId = getAttestationClient(address).options.contractId;
   try {
     const tx = await client.get_score_breakdown({
-      attestation_contract: attestationContractId,
+      attestation_contract: ATTESTATION_CONTRACT_ID,
       recipient: address,
     });
     const r: any = tx.result;
     return {
-      total: fromContractAmount(toBigInt(r?.total ?? 0n)),
-      freelance: fromContractAmount(toBigInt(r?.freelance ?? 0n)),
-      salary: fromContractAmount(toBigInt(r?.salary ?? 0n)),
-      bounty: fromContractAmount(toBigInt(r?.bounty ?? 0n)),
-      grant: fromContractAmount(toBigInt(r?.grant ?? 0n)),
-      agentTask: fromContractAmount(toBigInt(r?.agent_task ?? 0n)),
-      subscription: fromContractAmount(toBigInt(r?.subscription ?? 0n)),
+      total: Number(toBigInt(r?.total ?? 0n)),
+      freelance: Number(toBigInt(r?.freelance ?? 0n)),
+      salary: Number(toBigInt(r?.salary ?? 0n)),
+      bounty: Number(toBigInt(r?.bounty ?? 0n)),
+      grant: Number(toBigInt(r?.grant ?? 0n)),
+      agentTask: Number(toBigInt(r?.agent_task ?? 0n)),
+      subscription: Number(toBigInt(r?.subscription ?? 0n)),
     };
   } catch {
     return { total: 0, freelance: 0, salary: 0, bounty: 0, grant: 0, agentTask: 0, subscription: 0 };
@@ -431,12 +439,11 @@ export async function computeScore(address: string): Promise<ScoreBreakdown> {
 
 export async function verifyClaim(address: string, minimumScore: number): Promise<boolean> {
   const client = getReputationClient(address);
-  const attestationContractId = getAttestationClient(address).options.contractId;
   try {
     const tx = await client.verify_claim({
-      attestation_contract: attestationContractId,
+      attestation_contract: ATTESTATION_CONTRACT_ID,
       recipient: address,
-      minimum_score: toContractAmount(minimumScore),
+      minimum_score: BigInt(Math.round(minimumScore)),
     });
     return Boolean(tx.result);
   } catch {

@@ -12,29 +12,44 @@ export default function LiveStreamDemo() {
             that measured time at the agreed rate—never idle ledger time.
           </p>
         </div>
-        <div className="section-visual stream-terminal">
-          <div className="terminal-row terminal-row--title">
-            <span>FUNDED WORK</span>
-            <strong>FRONTEND DEVELOPMENT</strong>
+        <div className="section-visual stream-receipt">
+          <div className="stream-receipt__header">
+            <span>AVEN / LIVE PAYMENT RECEIPT</span>
+            <strong>● VERIFIED</strong>
           </div>
-          <div className="terminal-grid">
-            <span>FROM</span>
-            <strong>GBX...84A</strong>
-            <span>TO</span>
-            <strong>GDK...21F</strong>
+          <div className="stream-receipt__project">
+            <div>
+              <span>FUNDED WORK</span>
+              <strong>FRONTEND DEVELOPMENT</strong>
+            </div>
+            <div>
+              <span>ROUTE</span>
+              <strong>GBX...84A → GDK...21F</strong>
+            </div>
           </div>
-          <LiveStreamCounter compact />
-          <div className="wide-payment-line" aria-hidden="true">
+          <div className="stream-receipt__earnings">
+            <LiveStreamCounter compact />
+          </div>
+          <div className="stream-receipt__rail" aria-hidden="true">
             <span />
           </div>
-          <div className="terminal-grid terminal-grid--three">
-            <span>STATUS</span>
-            <strong>● SESSION VERIFIED</strong>
-            <span>ACTIVE TIME</span>
-            <strong>04 HOURS · 22 MINUTES</strong>
-            <span>APPROVED TO WITHDRAW</span>
-            <strong>$1,248.38</strong>
+          <div className="stream-receipt__metrics">
+            <div>
+              <span>ACTIVE TIME</span>
+              <strong>04H 22M</strong>
+            </div>
+            <div>
+              <span>RATE</span>
+              <strong>$0.002314/S</strong>
+            </div>
+            <div>
+              <span>APPROVED</span>
+              <strong>$1,248.38</strong>
+            </div>
           </div>
+          <p className="stream-receipt__note">
+            IDLE TIME EXCLUDED · ACTIVE WORK VERIFIED · RELEASE READY
+          </p>
         </div>
       </div>
     </section>

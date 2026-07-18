@@ -32,7 +32,6 @@ createStream({
   recipient,
   asset: "USDC",
   ratePerSecond,
-  checkpointCount: 4,
   category
 });`}</pre>
             <pre>{`// conceptual query

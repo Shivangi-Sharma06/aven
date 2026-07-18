@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { signMessage } from "@stellar/freighter-api";
 import { useWallet } from "@/components/WalletProvider";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import type { WorkSession } from "@/lib/work-session";
+import { STREAM_CONTRACT_ID } from "@/lib/contracts";
 import {
   getStream,
   computeAvailable,
@@ -53,7 +54,7 @@ export default function StreamDetailPage() {
   const { address, connected } = useWallet();
 
   const [stream, setStream] = useState<StreamObject | null>(null);
-  const [earned, setEarned] = useState(0);
+  const [availableEscrow, setAvailableEscrow] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -65,16 +66,14 @@ export default function StreamDetailPage() {
   const [approveSession, setApproveSession] = useState<WorkSession | null>(null);
   const [disputeSession, setDisputeSession] = useState<string | null>(null);
   const [disputeReason, setDisputeReason] = useState("");
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
   async function load() {
     setLoading(true);
     try {
       const s = await getStream(id, address ?? undefined);
       setStream(s);
-      if (s?.status === "active" || s?.status === "paused") {
+      if (s) {
         const e = await computeAvailable(id, address ?? undefined);
-        setEarned(e);
+        setAvailableEscrow(e);
       }
     } catch (e: any) {
       setError(e?.message ?? "Failed to load stream");
@@ -90,8 +89,10 @@ export default function StreamDetailPage() {
     }
     setSessionsLoading(true);
     try {
-      const response = await fetch(`/api/streams/${encodeURIComponent(id)}/work-sessions?wallet=${encodeURIComponent(address)}`, {
+      const sessionsPath = `/api/streams/${encodeURIComponent(id)}/work-sessions`;
+      const response = await fetch(sessionsPath, {
         cache: "no-store",
+        headers: await walletHeaders(),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Failed to load work sessions.");
@@ -110,8 +111,9 @@ export default function StreamDetailPage() {
             }),
           ),
         );
-        const refreshed = await fetch(`/api/streams/${encodeURIComponent(id)}/work-sessions?wallet=${encodeURIComponent(address)}`, {
+        const refreshed = await fetch(sessionsPath, {
           cache: "no-store",
+          headers: await walletHeaders(),
         });
         const refreshedData = await refreshed.json();
         if (refreshed.ok) setSessions(refreshedData as WorkSession[]);
@@ -128,14 +130,6 @@ export default function StreamDetailPage() {
 
   useEffect(() => {
     load();
-    // Poll earned every 6 seconds when active
-    pollRef.current = setInterval(async () => {
-      if (stream?.status === "active") {
-        const e = await computeAvailable(id, address ?? undefined);
-        setEarned(e);
-      }
-    }, 6000);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, address]);
 
@@ -144,9 +138,32 @@ export default function StreamDetailPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, address]);
 
-  async function walletHeaders(path: string) {
+  async function walletHeaders() {
     if (!address) throw new Error("Connect your wallet first.");
-    const message = `POST ${path}`;
+    const storageKey = `aven:dashboard-auth:${address.toUpperCase()}`;
+    const cached = window.sessionStorage.getItem(storageKey);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached) as {
+          message: string;
+          signature: string;
+          expiresAt: number;
+        };
+        if (parsed.expiresAt > Date.now() + 10_000) {
+          return {
+            "content-type": "application/json",
+            "x-aven-wallet": address,
+            "x-aven-message": parsed.message,
+            "x-aven-signature": parsed.signature,
+          };
+        }
+      } catch {
+        window.sessionStorage.removeItem(storageKey);
+      }
+    }
+    const issuedAt = Date.now();
+    const expiresAt = issuedAt + 15 * 60_000;
+    const message = `Aven dashboard access\n${address}\n${issuedAt}\n${expiresAt}`;
     const signed = await signMessage(message, { address });
     if (signed.error || !signed.signedMessage) {
       throw new Error(signed.error?.message ?? "The wallet did not return a signature.");
@@ -157,12 +174,17 @@ export default function StreamDetailPage() {
     const signature = typeof signed.signedMessage === "string"
       ? signed.signedMessage
       : window.btoa(Array.from(signed.signedMessage, (byte) => String.fromCharCode(byte)).join(""));
-    return {
+    const headers = {
       "content-type": "application/json",
       "x-aven-wallet": address,
       "x-aven-message": message,
       "x-aven-signature": signature,
     };
+    window.sessionStorage.setItem(
+      storageKey,
+      JSON.stringify({ message, signature, expiresAt }),
+    );
+    return headers;
   }
 
   async function mutateSession(sessionId: string, action: "request-withdrawal" | "approve" | "dispute" | "release", body?: object) {
@@ -177,7 +199,7 @@ export default function StreamDetailPage() {
       }
       const response = await fetch(path, {
         method: "POST",
-        headers: await walletHeaders(path),
+        headers: await walletHeaders(),
         body: JSON.stringify(body ?? {}),
       });
       const data = await response.json();
@@ -204,7 +226,7 @@ export default function StreamDetailPage() {
     try {
       const prepared = await fetch(preparePath, {
         method: "POST",
-        headers: await walletHeaders(preparePath),
+        headers: await walletHeaders(),
         body: "{}",
       });
       const preparedData = await prepared.json();
@@ -214,7 +236,7 @@ export default function StreamDetailPage() {
       const path = `/api/work-sessions/${encodeURIComponent(session.id)}/release`;
       const response = await fetch(path, {
         method: "POST",
-        headers: await walletHeaders(path),
+        headers: await walletHeaders(),
         body: JSON.stringify({ txHash: result.txHash }),
       });
       const data = await response.json();
@@ -228,7 +250,7 @@ export default function StreamDetailPage() {
         try {
           await fetch(cancelPath, {
             method: "POST",
-            headers: await walletHeaders(cancelPath),
+            headers: await walletHeaders(),
             body: "{}",
           });
         } catch {
@@ -319,13 +341,15 @@ export default function StreamDetailPage() {
           </div>
         </div>
 
-        {/* Live earned */}
         {(stream.status === "active" || stream.status === "paused") && (
           <div className="stream-detail-earned-wrap">
-            <div className="stream-detail-earned-label">Withdrawable now</div>
+            <div className="stream-detail-earned-label">Unreserved escrow</div>
             <div className="stream-detail-earned-value">
-              {earned.toFixed(6)} <span className="stream-detail-earned-asset">{stream.asset}</span>
+              {availableEscrow.toFixed(6)} <span className="stream-detail-earned-asset">{stream.asset}</span>
             </div>
+            <p className="stream-detail-earned-label">
+              This changes only when an npm-tracked work session reserves or releases payment.
+            </p>
           </div>
         )}
 
@@ -344,8 +368,8 @@ export default function StreamDetailPage() {
         {/* Info grid */}
         <div className="stream-detail-grid">
           <div className="stream-detail-item">
-            <div className="stream-detail-item-label">Rate / ledger</div>
-            <div className="stream-detail-item-value">{stream.ratePerLedger.toFixed(7)} {stream.asset}</div>
+            <div className="stream-detail-item-label">Rate / active second</div>
+            <div className="stream-detail-item-value">{(stream.ratePerLedger / 5).toFixed(7)} {stream.asset}</div>
           </div>
           <div className="stream-detail-item">
             <div className="stream-detail-item-label">Duration (ledgers)</div>
@@ -358,7 +382,11 @@ export default function StreamDetailPage() {
           <div className="stream-detail-item">
             <div className="stream-detail-item-label">Work evidence</div>
             <div className="stream-detail-item-value">
-              {sessions.length > 0 ? `${sessions.length} session record${sessions.length === 1 ? "" : "s"}` : "No sessions yet"}
+              {!address
+                ? "Connect wallet to view"
+                : sessions.length > 0
+                  ? `${sessions.length} session record${sessions.length === 1 ? "" : "s"}`
+                  : "No sessions yet"}
             </div>
           </div>
         </div>
@@ -373,7 +401,7 @@ export default function StreamDetailPage() {
           </div>
 
           <div className={styles["work-session-summary"]}>
-            <div><span>Available</span><strong>{earned.toFixed(7)} {stream.asset}</strong></div>
+            <div><span>Unreserved escrow</span><strong>{availableEscrow.toFixed(7)} {stream.asset}</strong></div>
             <div><span>Pending review</span><strong>{pendingAmount.toFixed(7)} {stream.asset}</strong></div>
             <div><span>Release eligible</span><strong>{releasedAmount.toFixed(7)} {stream.asset}</strong></div>
             <div><span>Disputed</span><strong>{disputedAmount.toFixed(7)} {stream.asset}</strong></div>
@@ -388,7 +416,11 @@ export default function StreamDetailPage() {
             </div>
           )}
 
-          {sessionsLoading ? (
+          {!address ? (
+            <div className={styles["work-session-empty"]}>
+              Connect the sender or recipient wallet to view private work-session metadata.
+            </div>
+          ) : sessionsLoading ? (
             <div className={styles["work-session-empty"]}>Loading work sessions…</div>
           ) : sessions.length === 0 ? (
             <div className={styles["work-session-empty"]}>
@@ -565,7 +597,7 @@ export default function StreamDetailPage() {
         {/* Explorer link */}
         <a
           className="stream-explorer-link"
-          href={`https://stellar.expert/explorer/testnet/contract/${stream.sender}`}
+          href={`https://stellar.expert/explorer/testnet/contract/${STREAM_CONTRACT_ID}`}
           target="_blank"
           rel="noopener noreferrer"
         >

@@ -3,6 +3,7 @@
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { getAttestation, verifyAttestation, AttestationObject } from "@/lib/stellar";
+import { ATTESTATION_CONTRACT_ID } from "@/lib/contracts";
 
 const CATEGORY_COLORS: Record<string, string> = {
   Freelance: "#8b5cf6",
@@ -134,7 +135,7 @@ function VerifyContent() {
 
               <a
                 className="stream-explorer-link"
-                href={`https://stellar.expert/explorer/testnet/contract/${result.record.recipient}`}
+                href={`https://stellar.expert/explorer/testnet/contract/${ATTESTATION_CONTRACT_ID}`}
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -151,7 +152,7 @@ function VerifyContent() {
         <div className="verify-howto-steps">
           <div className="verify-step">
             <span className="verify-step-num">1</span>
-            <div>A stream completes on-chain. The Aven Stream contract calls the Attestation contract to mint a permanent record.</div>
+            <div>A verified npm work session is released on-chain. The Stream contract calls the Attestation contract to mint its permanent record.</div>
           </div>
           <div className="verify-step">
             <span className="verify-step-num">2</span>

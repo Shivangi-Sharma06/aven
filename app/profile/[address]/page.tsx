@@ -37,7 +37,10 @@ export default function ProfilePage() {
     if (!address) return;
     setLoading(true);
     Promise.all([computeScore(address), getWorkerAttestations(address)])
-      .then(([s, a]) => { setScore(s); setAttestations(a); })
+      .then(([s, a]) => {
+        setScore(s);
+        setAttestations(a.filter((record) => record.kind !== "StreamCompletion"));
+      })
       .catch((e) => setError(e?.message ?? "Failed to load profile"))
       .finally(() => setLoading(false));
   }, [address]);
@@ -186,6 +189,7 @@ function AttestationCard({ attestation, onView }: { attestation: AttestationObje
   const kindLabel =
     attestation.kind === "WorkSession" ? "Work Session"
     : attestation.kind === "LegacyReviewed" ? "Legacy"
+    : attestation.kind === "StreamCompletion" ? "Project Completion"
     : "Checkpoint";
   return (
     <div className="attestation-card" onClick={onView}>

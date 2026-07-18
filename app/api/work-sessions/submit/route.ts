@@ -3,6 +3,7 @@ import { apiError } from "@/lib/api-response";
 import { getSession, putSession } from "@/lib/session-store";
 import { verifyReport } from "@/lib/work-verifier";
 import type { WorkSessionReport } from "@/lib/work-session";
+import { STREAM_CONTRACT_ID } from "@/lib/contracts";
 import {
   addTimelineEvent,
   addressesEqual,
@@ -53,14 +54,14 @@ export async function POST(request: Request) {
     if (report.paymentRequest.asset !== stream.asset) {
       return apiError("The report asset does not match the stream asset.");
     }
-    const earnedUnits = await getAvailableUnits(stream.id);
+    const availableUnits = await getAvailableUnits(stream.id);
     const calculatedUnits = calculateSessionPaymentUnits(
       stream,
       report.session.activeSeconds,
-      earnedUnits,
+      availableUnits,
     );
     if (calculatedUnits <= 0n) {
-      return apiError("No payment has accrued for this session's tracked active time.", 409);
+      return apiError("No escrow remains for this session's tracked active time.", 409);
     }
     report.paymentRequest = {
       requestedAmount: formatAmountUnits(calculatedUnits),
@@ -80,6 +81,7 @@ export async function POST(request: Request) {
     const session = addTimelineEvent(
       {
         id: report.session.sessionId,
+        contractId: STREAM_CONTRACT_ID,
         streamId: stream.id,
         workerAddress: stream.recipient,
         clientAddress: stream.sender,

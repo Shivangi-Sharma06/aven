@@ -1,8 +1,8 @@
 # Aven
 
-**A protocol for streaming payments, portable work attestations, and on-chain reputation on Stellar.**
+**A protocol for verified work payments, portable attestations, and on-chain reputation on Stellar.**
 
-Aven turns economic activity into verifiable work history. Payments stream as work happens; completed streams create attestations; those attestations become a portable reputation record owned by the worker.
+Aven turns measured work into verifiable work history. Clients fund escrow, the `aven-stellar` npm package measures active work time, and the contract releases only the amount justified by that session.
 
 The repository contains the Aven web app, its editorial GSAP-powered landing page, the Aven protocol contracts, generated TypeScript bindings, and the `aven-stellar` work-session package. The enhanced stream build is ready for its first testnet deployment.
 
@@ -10,14 +10,15 @@ The repository contains the Aven web app, its editorial GSAP-powered landing pag
 
 ```mermaid
 flowchart LR
-  A["Stream contract<br/>Moves payment over time"] --> B["Attestation contract<br/>Records completed work"]
-  B --> C["Reputation contract<br/>Computes a portable score"]
+  A["npm work session<br/>Measures active seconds"] --> B["Stream contract<br/>Reserves exact payment"]
+  B --> C["Attestation contract<br/>Records released work"]
+  C --> D["Reputation contract<br/>Scores completed projects once"]
 ```
 
-- **Stream** — creates, pauses, resumes, cancels, and settles time-based USDC or XLM payments.
-- **Verified releases** — an optional stream extension that ties exact session payments to verifier records, client review, and timeout release.
-- **Attestation** — mints a permanent work record from a completed stream.
-- **Reputation** — calculates a score and category breakdown from verified attestations.
+- **Stream** — escrows USDC or XLM and validates `active seconds × rate` for each npm session.
+- **Verified releases** — ties exact session payments to verifier records, client review, and timeout release.
+- **Attestation** — mints permanent records for released work sessions and final project completion.
+- **Reputation** — calculates one stable score from each completed project; ledger time cannot change it.
 
 ## Product surfaces
 
@@ -38,6 +39,7 @@ flowchart LR
 - Stellar SDK and Freighter wallet
 - Soroban smart contracts written in Rust
 - Generated TypeScript clients for each contract
+- Upstash Redis for shared production work-session and CLI authorization state
 - Mantine primitives and Lucide icons
 
 ## Run locally
@@ -58,7 +60,9 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-The current testnet RPC endpoint, network passphrase, and asset contract IDs are defined in `lib/contracts.ts`. Deployed contract IDs are stored in the generated clients under `contracts/bindings/*/src/index.ts`; no `.env` file is required for the checked-in testnet deployment.
+The testnet RPC endpoint, network passphrase, and asset contract IDs are defined in `lib/contracts.ts`. Contract deployment IDs come from `NEXT_PUBLIC_STREAM_CONTRACT_ID`, `NEXT_PUBLIC_ATTESTATION_CONTRACT_ID`, and `NEXT_PUBLIC_REPUTATION_CONTRACT_ID`.
+
+Local development can use file-backed session state. Production requires `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` so sessions and CLI authorizations are shared across devices and serverless instances.
 
 ## Validation
 
@@ -91,9 +95,9 @@ On first use, `start` asks for the Aven dashboard URL and stream ID, opens `/cli
 
 The CLI creates `.avenignore` with private-file defaults, records relative paths and Git statistics, and stores recoverable local state under `.aven/`. `stop` calculates the session report and previews it before submission. Submitted sessions appear in the `WORK SESSIONS` section on `/stream/[id]`, where the worker can request review and the stream sender can approve or dispute the request.
 
-The report contains session timing, branch and commit metadata, file-level change statistics, and the worker's statement. Its payment amount is calculated automatically from tracked active seconds and the stream's on-chain rate, capped by currently earned funds; workers do not enter their own amount. The report does not contain complete source files, keystrokes, screenshots, environment files, wallet secret keys, or excluded paths. The CLI never executes the tracked project or installs its dependencies.
+The report contains session timing, branch and commit metadata, file-level change statistics, and the worker's statement. Its payment amount is calculated automatically from tracked active seconds and the stream's on-chain rate, capped by unreserved escrow; workers do not enter their own amount. The contract independently checks the same calculation before reserving funds. The report does not contain complete source files, keystrokes, screenshots, environment files, wallet secret keys, or excluded paths. The CLI never executes the tracked project or installs its dependencies.
 
-The next stream deployment keeps the original Aven interface and adds verified work releases to it. Existing stream creation, checkpoints, attestations, reputation inputs, indexes, pause/resume/cancel, and client methods remain available. The optional verifier records an exact session amount and evidence on the same stream before the existing approval/dispute/timeout withdrawal flow begins. The dashboard uses `NEXT_PUBLIC_STREAM_CONTRACT_ID`, while the server signs verification with `AVEN_VERIFIER_SECRET`.
+Checkpoint and ledger-time unlocking are intentionally disabled. The configured verifier records the npm session's exact amount and report hash before the approval/dispute/timeout flow begins. The dashboard uses `NEXT_PUBLIC_STREAM_CONTRACT_ID`, while the server signs verification with `AVEN_VERIFIER_SECRET`.
 
 To build the contract WASM artifacts:
 
@@ -126,9 +130,9 @@ The frontend is currently wired to Stellar testnet:
 
 | Contract | Address |
 | --- | --- |
-| Stream | `CCPHFGDKV2SOL5SUFN3WPM7DVNMYAJODH63YIA2VCS5UFRW57Z7FNKJ4` |
-| Attestation | `CDZMWG7BEGRIGKDXZE32NNQB37LRQQJ6657JOJOPNSOLSXHSKDSFMVL7` |
-| Reputation | `CBAJXRTE37SREIBIL5FP3J6BJV2VTMCHHQJJIS5W4IQK4BZ6UANKGSVL` |
+| Stream | `CAZ53PKMFJOJCK2GC6MZI3TID35UL6B4X5OJ5HV4U5VQ2MLIJUK34NXD` |
+| Attestation | `CC34BWDMECEJ3XI5ZY7KRYYLIEC5Y2HKOKRCG4GGEKG7LAPH6AN7VLV4` |
+| Reputation | `CAUU3K3JMUQZCPEQAM34X5UX3OVV6RVKOQLAC4BG4MTBMXMSYLBLZHJ2` |
 
 Amounts use Stellar's seven-decimal fixed-point representation. The frontend converts human-readable values at the client boundary in `lib/contracts.ts`.
 

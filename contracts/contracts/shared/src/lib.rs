@@ -46,9 +46,10 @@ pub enum Category {
 #[contracttype]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AttestationKind {
-    Checkpoint,      // finalized checkpoint payment
-    WorkSession,     // verified work-session payment (verifier-backed)
-    LegacyReviewed,  // request_withdrawal path (no verifier)
+    Checkpoint,       // legacy finalized checkpoint payment
+    WorkSession,      // verified npm work-session payment (verifier-backed)
+    LegacyReviewed,   // legacy request_withdrawal path (no verifier)
+    StreamCompletion, // one final record used for reputation scoring
 }
 
 #[contracttype]

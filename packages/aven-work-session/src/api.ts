@@ -28,9 +28,10 @@ export async function inspectStream(
   await responseJson(response);
   return {
     asset: response.headers.get("x-aven-stream-asset") as "USDC" | "XLM",
+    contractId: response.headers.get("x-aven-stream-contract") ?? "",
     status: response.headers.get("x-aven-stream-status") ?? "",
     workerAddress: response.headers.get("x-aven-worker-address") ?? "",
-    earned: response.headers.get("x-aven-earned") ?? "0.0000000",
+    available: response.headers.get("x-aven-available") ?? "0.0000000",
     ratePerSecond: response.headers.get("x-aven-rate-per-second") ?? "",
   };
 }

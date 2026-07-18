@@ -98,7 +98,7 @@ export default function DashboardPage() {
       <header className="app-page-header">
         <span className="app-page-kicker">AVEN / STREAMS</span>
         <h1>Payment Streams</h1>
-        <p>Manage continuous payments, withdrawals, and on-chain work records.</p>
+        <p>Manage funded work, verified session payments, and on-chain records.</p>
       </header>
       {/* Stats bar */}
       <div className="dash-stats">

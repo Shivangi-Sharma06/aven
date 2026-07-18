@@ -31,12 +31,12 @@ if (typeof window !== "undefined") {
 }
 
 
-export const networks = {
-  testnet: {
-    networkPassphrase: "Test SDF Network ; September 2015",
-    contractId: "CANK4E7GOFZT4D3U57RNT7QLQTNFGY7QNL6TQTWWKYBNHX7J6U54HO7E",
-  }
-} as const
+
+
+export const Errors = {
+  1: {message:"AlreadyInitialized"},
+  2: {message:"NotInitialized"}
+}
 
 
 export interface ScoreBreakdown {
@@ -75,7 +75,7 @@ export interface StreamRecord {
 
 export type StreamStatus = {tag: "Active", values: void} | {tag: "Paused", values: void} | {tag: "Completed", values: void} | {tag: "Cancelled", values: void};
 
-export type AttestationKind = {tag: "Checkpoint", values: void} | {tag: "WorkSession", values: void} | {tag: "LegacyReviewed", values: void};
+export type AttestationKind = {tag: "Checkpoint", values: void} | {tag: "WorkSession", values: void} | {tag: "LegacyReviewed", values: void} | {tag: "StreamCompletion", values: void};
 
 
 export interface CheckpointRecord {
@@ -114,19 +114,24 @@ export interface AttestationRecord {
 
 export interface Client {
   /**
+   * Construct and simulate a init transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+   */
+  init: ({attestation_contract}: {attestation_contract: string}, options?: MethodOptions) => Promise<AssembledTransaction<Result<void>>>
+
+  /**
    * Construct and simulate a verify_claim transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
    */
-  verify_claim: ({attestation_contract, recipient, minimum_score}: {attestation_contract: string, recipient: string, minimum_score: i128}, options?: MethodOptions) => Promise<AssembledTransaction<boolean>>
+  verify_claim: ({recipient, minimum_score}: {recipient: string, minimum_score: i128}, options?: MethodOptions) => Promise<AssembledTransaction<Result<boolean>>>
 
   /**
    * Construct and simulate a compute_score transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
    */
-  compute_score: ({attestation_contract, recipient}: {attestation_contract: string, recipient: string}, options?: MethodOptions) => Promise<AssembledTransaction<i128>>
+  compute_score: ({recipient}: {recipient: string}, options?: MethodOptions) => Promise<AssembledTransaction<Result<i128>>>
 
   /**
    * Construct and simulate a get_score_breakdown transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
    */
-  get_score_breakdown: ({attestation_contract, recipient}: {attestation_contract: string, recipient: string}, options?: MethodOptions) => Promise<AssembledTransaction<ScoreBreakdown>>
+  get_score_breakdown: ({recipient}: {recipient: string}, options?: MethodOptions) => Promise<AssembledTransaction<Result<ScoreBreakdown>>>
 
 }
 export class Client extends ContractClient {
@@ -146,22 +151,25 @@ export class Client extends ContractClient {
   }
   constructor(public readonly options: ContractClientOptions) {
     super(
-      new ContractSpec([ "AAAAAQAAAAAAAAAAAAAADlNjb3JlQnJlYWtkb3duAAAAAAAHAAAAAAAAAAphZ2VudF90YXNrAAAAAAALAAAAAAAAAAZib3VudHkAAAAAAAsAAAAAAAAACWZyZWVsYW5jZQAAAAAAAAsAAAAAAAAABWdyYW50AAAAAAAACwAAAAAAAAAGc2FsYXJ5AAAAAAALAAAAAAAAAAxzdWJzY3JpcHRpb24AAAALAAAAAAAAAAV0b3RhbAAAAAAAAAs=",
-        "AAAAAAAAAAAAAAAMdmVyaWZ5X2NsYWltAAAAAwAAAAAAAAAUYXR0ZXN0YXRpb25fY29udHJhY3QAAAATAAAAAAAAAAlyZWNpcGllbnQAAAAAAAATAAAAAAAAAA1taW5pbXVtX3Njb3JlAAAAAAAACwAAAAEAAAAB",
-        "AAAAAAAAAAAAAAANY29tcHV0ZV9zY29yZQAAAAAAAAIAAAAAAAAAFGF0dGVzdGF0aW9uX2NvbnRyYWN0AAAAEwAAAAAAAAAJcmVjaXBpZW50AAAAAAAAEwAAAAEAAAAL",
-        "AAAAAAAAAAAAAAATZ2V0X3Njb3JlX2JyZWFrZG93bgAAAAACAAAAAAAAABRhdHRlc3RhdGlvbl9jb250cmFjdAAAABMAAAAAAAAACXJlY2lwaWVudAAAAAAAABMAAAABAAAH0AAAAA5TY29yZUJyZWFrZG93bgAA",
+      new ContractSpec([ "AAAABAAAAAAAAAAAAAAABUVycm9yAAAAAAAAAgAAAAAAAAASQWxyZWFkeUluaXRpYWxpemVkAAAAAAABAAAAAAAAAA5Ob3RJbml0aWFsaXplZAAAAAAAAg==",
+        "AAAAAQAAAAAAAAAAAAAADlNjb3JlQnJlYWtkb3duAAAAAAAHAAAAAAAAAAphZ2VudF90YXNrAAAAAAALAAAAAAAAAAZib3VudHkAAAAAAAsAAAAAAAAACWZyZWVsYW5jZQAAAAAAAAsAAAAAAAAABWdyYW50AAAAAAAACwAAAAAAAAAGc2FsYXJ5AAAAAAALAAAAAAAAAAxzdWJzY3JpcHRpb24AAAALAAAAAAAAAAV0b3RhbAAAAAAAAAs=",
+        "AAAAAAAAAAAAAAAEaW5pdAAAAAEAAAAAAAAAFGF0dGVzdGF0aW9uX2NvbnRyYWN0AAAAEwAAAAEAAAPpAAAAAgAAAAM=",
+        "AAAAAAAAAAAAAAAMdmVyaWZ5X2NsYWltAAAAAgAAAAAAAAAJcmVjaXBpZW50AAAAAAAAEwAAAAAAAAANbWluaW11bV9zY29yZQAAAAAAAAsAAAABAAAD6QAAAAEAAAAD",
+        "AAAAAAAAAAAAAAANY29tcHV0ZV9zY29yZQAAAAAAAAEAAAAAAAAACXJlY2lwaWVudAAAAAAAABMAAAABAAAD6QAAAAsAAAAD",
+        "AAAAAAAAAAAAAAATZ2V0X3Njb3JlX2JyZWFrZG93bgAAAAABAAAAAAAAAAlyZWNpcGllbnQAAAAAAAATAAAAAQAAA+kAAAfQAAAADlNjb3JlQnJlYWtkb3duAAAAAAAD",
         "AAAAAgAAAAAAAAAAAAAACENhdGVnb3J5AAAABgAAAAAAAAAAAAAACUZyZWVsYW5jZQAAAAAAAAAAAAAAAAAABlNhbGFyeQAAAAAAAAAAAAAAAAAGQm91bnR5AAAAAAAAAAAAAAAAAAVHcmFudAAAAAAAAAAAAAAAAAAACUFnZW50VGFzawAAAAAAAAAAAAAAAAAADFN1YnNjcmlwdGlvbg==",
         "AAAAAQAAAAAAAAAAAAAADFN0cmVhbVJlY29yZAAAABIAAAAAAAAAGGFwcHJvdmFsX3RpbWVvdXRfbGVkZ2VycwAAAAQAAAAAAAAABWFzc2V0AAAAAAAAEwAAAAAAAAAIY2F0ZWdvcnkAAAfQAAAACENhdGVnb3J5AAAAAAAAABBjaGVja3BvaW50X2NvdW50AAAABAAAAAAAAAAXY2hlY2twb2ludF9zcGFuX2xlZGdlcnMAAAAABAAAAAAAAAAQZHVyYXRpb25fbGVkZ2VycwAAAAQAAAAAAAAAAmlkAAAAAAAGAAAAAAAAABBwYXVzZWRfYXRfbGVkZ2VyAAAABAAAAAAAAAAXcGF1c2VkX2R1cmF0aW9uX2xlZGdlcnMAAAAABAAAAAAAAAAPcmF0ZV9wZXJfbGVkZ2VyAAAAAAsAAAAAAAAACXJlY2lwaWVudAAAAAAAABMAAAAAAAAABnNlbmRlcgAAAAAAEwAAAAAAAAAMc3RhcnRfbGVkZ2VyAAAABAAAAAAAAAAGc3RhdHVzAAAAAAfQAAAADFN0cmVhbVN0YXR1cwAAAAAAAAAFdGl0bGUAAAAAAAAQAAAAAAAAAA90b3RhbF9kZXBvc2l0ZWQAAAAACwAAAAAAAAAPdG90YWxfd2l0aGRyYXduAAAAAAsAAAAAAAAAGHdpdGhkcmF3YWJsZV9jYXBfcGVyY2VudAAAAAQ=",
         "AAAAAgAAAAAAAAAAAAAADFN0cmVhbVN0YXR1cwAAAAQAAAAAAAAAAAAAAAZBY3RpdmUAAAAAAAAAAAAAAAAABlBhdXNlZAAAAAAAAAAAAAAAAAAJQ29tcGxldGVkAAAAAAAAAAAAAAAAAAAJQ2FuY2VsbGVkAAAA",
-        "AAAAAgAAAAAAAAAAAAAAD0F0dGVzdGF0aW9uS2luZAAAAAADAAAAAAAAAAAAAAAKQ2hlY2twb2ludAAAAAAAAAAAAAAAAAALV29ya1Nlc3Npb24AAAAAAAAAAAAAAAAOTGVnYWN5UmV2aWV3ZWQAAA==",
+        "AAAAAgAAAAAAAAAAAAAAD0F0dGVzdGF0aW9uS2luZAAAAAAEAAAAAAAAAAAAAAAKQ2hlY2twb2ludAAAAAAAAAAAAAAAAAALV29ya1Nlc3Npb24AAAAAAAAAAAAAAAAOTGVnYWN5UmV2aWV3ZWQAAAAAAAAAAAAAAAAAEFN0cmVhbUNvbXBsZXRpb24=",
         "AAAAAQAAAAAAAAAAAAAAEENoZWNrcG9pbnRSZWNvcmQAAAAIAAAAAAAAAAhhcHByb3ZlZAAAAAEAAAAAAAAADmF0dGVzdGF0aW9uX2lkAAAAAAAGAAAAAAAAAA1hdXRvX2FwcHJvdmVkAAAAAAAAAQAAAAAAAAAKZHVlX2xlZGdlcgAAAAAABAAAAAAAAAANZXZpZGVuY2VfaGFzaAAAAAAAA+4AAAAgAAAAAAAAAAVpbmRleAAAAAAAAAQAAAAAAAAACXN0cmVhbV9pZAAAAAAAAAYAAAAAAAAACXN1Ym1pdHRlZAAAAAAAAAE=",
         "AAAAAQAAAAAAAAAAAAAAEUF0dGVzdGF0aW9uUmVjb3JkAAAAAAAAEwAAAAAAAAAXYWN0aXZlX2R1cmF0aW9uX3NlY29uZHMAAAAABgAAAAAAAAALYW1vdW50X3BhaWQAAAAACwAAAAAAAAAFYXNzZXQAAAAAAAATAAAAAAAAAA1hdXRvX3JlbGVhc2VkAAAAAAAAAQAAAAAAAAAIY2F0ZWdvcnkAAAfQAAAACENhdGVnb3J5AAAAAAAAABBjaGVja3BvaW50X2luZGV4AAAABAAAAAAAAAAQY2xpZW50X2NvbmZpcm1lZAAAAAEAAAAAAAAAAmlkAAAAAAAGAAAAAAAAAARraW5kAAAH0AAAAA9BdHRlc3RhdGlvbktpbmQAAAAAAAAAABBtaW50ZWRfYXRfbGVkZ2VyAAAABAAAAAAAAAARcGVyaW9kX2VuZF9sZWRnZXIAAAAAAAAEAAAAAAAAABNwZXJpb2Rfc3RhcnRfbGVkZ2VyAAAAAAQAAAAAAAAACXJlY2lwaWVudAAAAAAAABMAAAAAAAAAC3JlcG9ydF9oYXNoAAAAA+gAAAPuAAAAIAAAAAAAAAAKcmVxdWVzdF9pZAAAAAAAEAAAAAAAAAAGc2VuZGVyAAAAAAATAAAAAAAAAAlzdHJlYW1faWQAAAAAAAAGAAAAAAAAAAV0aXRsZQAAAAAAABAAAAAAAAAACHZlcmlmaWVyAAAD6AAAABM=" ]),
       options
     )
   }
   public readonly fromJSON = {
-    verify_claim: this.txFromJSON<boolean>,
-        compute_score: this.txFromJSON<i128>,
-        get_score_breakdown: this.txFromJSON<ScoreBreakdown>
+    init: this.txFromJSON<Result<void>>,
+        verify_claim: this.txFromJSON<Result<boolean>>,
+        compute_score: this.txFromJSON<Result<i128>>,
+        get_score_breakdown: this.txFromJSON<Result<ScoreBreakdown>>
   }
 }

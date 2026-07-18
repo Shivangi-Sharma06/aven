@@ -14,22 +14,22 @@ export default function Protocol() {
           <article>
             <span>STREAM CONTRACT</span>
             <p>
-              Holds the budget, tracks earned value, and enforces checkpoint-based
-              withdrawal limits.
+              Holds the budget and verifies each npm work session against active time
+              and the agreed rate.
             </p>
-            <code>earned = (current_time - start_time) × rate_per_second</code>
+            <code>payment = npm_active_seconds × rate_per_second</code>
           </article>
           <article>
             <span>ATTESTATION CONTRACT</span>
             <p>
-              Turns each finalized checkpoint into a permanent record of paid,
-              client-confirmed work.
+              Turns every released work session—and one final project completion—into
+              permanent, verifiable records.
             </p>
             <code>client · worker · amount · period · category · confirmation</code>
           </article>
           <article>
             <span>REPUTATION CONTRACT</span>
-            <p>Reads verified work history and computes a transparent reputation score.</p>
+            <p>Computes one stable score when a funded project is fully completed.</p>
             <code>NO REVIEWS. NO HIDDEN RANKING. JUST VERIFIED HISTORY.</code>
           </article>
         </div>

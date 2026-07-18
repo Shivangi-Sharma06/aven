@@ -56,7 +56,7 @@ export async function stopCommand(options: StopOptions) {
   const stream = await inspectStream(config.dashboardUrl, config.streamId, config.token);
   const message = options.message ?? await question("What did you work on during this session?");
   const report = await buildReport(repositoryRoot, config, session, message, {
-    earned: stream.earned,
+    available: stream.available,
     ratePerSecond: stream.ratePerSecond,
   });
   await saveLocalReport(repositoryRoot, report);

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { Keypair } from "@stellar/stellar-sdk";
 import { getCliToken, type CliScope } from "./cli-auth-store";
-import { getStreamClient, USDC_ASSET_ID } from "./contracts";
+import { getStreamClient, STREAM_CONTRACT_ID, USDC_ASSET_ID } from "./contracts";
 import type { WorkSession, WorkSessionEvent, WorkSessionReport } from "./work-session";
 
 const ANONYMOUS_ADDRESS = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
@@ -81,13 +81,13 @@ export function ratePerSecondUnits(stream: OnchainStream) {
 export function calculateSessionPaymentUnits(
   stream: OnchainStream,
   activeSeconds: number,
-  earnedUnits: bigint,
+  availableUnits: bigint,
 ) {
   if (!Number.isSafeInteger(activeSeconds) || activeSeconds < 0) {
     throw new Error("Active session time must be a non-negative whole number of seconds.");
   }
   const sessionUnits = ratePerSecondUnits(stream) * BigInt(activeSeconds);
-  return sessionUnits < earnedUnits ? sessionUnits : earnedUnits;
+  return sessionUnits < availableUnits ? sessionUnits : availableUnits;
 }
 
 export function addressesEqual(left: string, right: string) {
@@ -98,6 +98,22 @@ export function roleForWallet(stream: OnchainStream, walletAddress: string) {
   if (addressesEqual(stream.sender, walletAddress)) return "client" as const;
   if (addressesEqual(stream.recipient, walletAddress)) return "worker" as const;
   return "unrelated" as const;
+}
+
+export function sessionMatchesOnchainStream(session: WorkSession, stream: OnchainStream) {
+  const contractMatches =
+    !session.contractId || addressesEqual(session.contractId, STREAM_CONTRACT_ID);
+  return (
+    contractMatches &&
+    session.streamId === stream.id &&
+    addressesEqual(session.workerAddress, stream.recipient) &&
+    addressesEqual(session.clientAddress, stream.sender)
+  );
+}
+
+export async function getSessionOnchainStream(session: WorkSession) {
+  const stream = await getOnchainStream(session.streamId);
+  return stream && sessionMatchesOnchainStream(session, stream) ? stream : null;
 }
 
 export function verifyWalletSignature(
@@ -131,8 +147,23 @@ export function authenticateWalletRequest(request: Request) {
   const walletAddress = request.headers.get("x-aven-wallet") ?? "";
   const message = request.headers.get("x-aven-message") ?? "";
   const signature = request.headers.get("x-aven-signature") ?? "";
-  const expected = `${request.method.toUpperCase()} ${new URL(request.url).pathname}`;
-  if (message !== expected || !verifyWalletSignature(walletAddress, message, signature)) return null;
+  const [purpose, signedAddress, issuedRaw, expiresRaw, ...extra] = message.split("\n");
+  const issuedAt = Number(issuedRaw);
+  const expiresAt = Number(expiresRaw);
+  const now = Date.now();
+  if (
+    purpose !== "Aven dashboard access" ||
+    extra.length > 0 ||
+    !addressesEqual(walletAddress, signedAddress ?? "") ||
+    !Number.isSafeInteger(issuedAt) ||
+    !Number.isSafeInteger(expiresAt) ||
+    issuedAt > now + 30_000 ||
+    expiresAt <= now ||
+    expiresAt - issuedAt > 60 * 60_000 ||
+    !verifyWalletSignature(walletAddress, message, signature)
+  ) {
+    return null;
+  }
   return walletAddress;
 }
 

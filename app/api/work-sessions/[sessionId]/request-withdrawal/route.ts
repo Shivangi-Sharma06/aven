@@ -7,7 +7,7 @@ import {
   authenticateCliRequest,
   authenticateWalletRequest,
   getAvailableUnits,
-  getOnchainStream,
+  getSessionOnchainStream,
   parseAmountUnits,
 } from "@/lib/work-session-server";
 import { recordVerifiedWork } from "@/lib/work-stream-verifier";
@@ -42,7 +42,7 @@ export async function POST(
   if (session.status !== "VERIFICATION_COMPLETE") {
     return apiError(`Cannot request withdrawal while the session is ${session.status}.`, 409);
   }
-  const stream = await getOnchainStream(session.streamId);
+  const stream = await getSessionOnchainStream(session);
   if (!stream || !addressesEqual(stream.recipient, wallet)) {
     return apiError("The stream recipient could not be verified.", 403);
   }

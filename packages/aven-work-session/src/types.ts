@@ -75,6 +75,7 @@ export type AvenConfig = {
   version: 1;
   dashboardUrl: string;
   projectId: string;
+  contractId: string;
   streamId: string;
   workerAddress: string;
   asset: "USDC" | "XLM";

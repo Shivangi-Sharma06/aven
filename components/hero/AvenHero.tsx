@@ -97,8 +97,8 @@ export default function AvenHero() {
           <span>PAYMENT SHOULD KEEP UP.</span>
         </h1>
         <p className="hero-copy__body" data-hero-reveal>
-          Aven lets clients fund work upfront, workers earn as they deliver, and every
-          approved checkpoint becomes verifiable history on Stellar.
+          Aven lets clients fund work upfront, workers get paid for npm-tracked active
+          time, and every released session becomes verifiable history on Stellar.
         </p>
         <div data-hero-reveal>
           <LiveStreamCounter />

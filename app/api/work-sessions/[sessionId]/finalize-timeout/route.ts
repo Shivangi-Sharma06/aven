@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
 import { apiError } from "@/lib/api-response";
 import { getSession, putSession } from "@/lib/session-store";
-import { addTimelineEvent } from "@/lib/work-session-server";
+import { addTimelineEvent, getSessionOnchainStream } from "@/lib/work-session-server";
 
 export async function POST(_request: Request, context: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await context.params;
   const session = await getSession(sessionId);
   if (!session) return apiError("Work session was not found.", 404);
+  if (!(await getSessionOnchainStream(session))) {
+    return apiError("The work session does not match the current on-chain stream.", 409);
+  }
   if (session.status === "RELEASE_ELIGIBLE" || session.status === "RELEASED") {
     return NextResponse.json(session);
   }

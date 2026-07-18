@@ -5,7 +5,7 @@ import {
   addTimelineEvent,
   addressesEqual,
   authenticateWalletRequest,
-  getOnchainStream,
+  getSessionOnchainStream,
 } from "@/lib/work-session-server";
 
 export async function POST(request: Request, context: { params: Promise<{ sessionId: string }> }) {
@@ -13,7 +13,7 @@ export async function POST(request: Request, context: { params: Promise<{ sessio
   const session = await getSession(sessionId);
   if (!session) return apiError("Work session was not found.", 404);
   const wallet = authenticateWalletRequest(request);
-  const stream = await getOnchainStream(session.streamId);
+  const stream = await getSessionOnchainStream(session);
   if (!wallet || !stream || !addressesEqual(wallet, stream.recipient)) {
     return apiError("Only the stream recipient can cancel this release attempt.", 403);
   }

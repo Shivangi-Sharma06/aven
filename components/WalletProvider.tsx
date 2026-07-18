@@ -1,7 +1,13 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { checkFreighterInstalled, connectWallet as connectFreighter, disconnectWallet as disconnectFreighter } from "@/lib/stellar";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import {
+  checkFreighterInstalled,
+  connectWallet as connectFreighter,
+  disconnectWallet as disconnectFreighter,
+  restoreWallet,
+  watchWallet,
+} from "@/lib/stellar";
 
 export type WalletContextValue = {
   address: string | null;
@@ -14,6 +20,7 @@ export type WalletContextValue = {
 };
 
 const WalletContext = createContext<WalletContextValue | null>(null);
+const MANUAL_DISCONNECT_KEY = "aven:wallet-manually-disconnected";
 
 export function useWallet() {
   const value = useContext(WalletContext);
@@ -31,9 +38,43 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [hasFreighter, setHasFreighter] = useState<boolean | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [walletError, setWalletError] = useState<string | null>(null);
+  const manuallyDisconnected = useRef(false);
 
   useEffect(() => {
-    checkFreighterInstalled().then(setHasFreighter);
+    let active = true;
+    manuallyDisconnected.current = window.localStorage.getItem(MANUAL_DISCONNECT_KEY) === "1";
+    async function restore() {
+      const installed = await checkFreighterInstalled();
+      if (!active) return;
+      setHasFreighter(installed);
+      if (!installed || manuallyDisconnected.current) return;
+      try {
+        const wallet = await restoreWallet();
+        if (!active || manuallyDisconnected.current) return;
+        setAddress(wallet?.address ?? null);
+        setWalletError(null);
+      } catch (error) {
+        if (!active) return;
+        setAddress(null);
+        setWalletError(error instanceof Error ? error.message : String(error));
+      }
+    }
+    void restore();
+    const stopWatching = watchWallet(({ address: nextAddress, error }) => {
+      if (!active || manuallyDisconnected.current) return;
+      if (error) {
+        setAddress(null);
+        setWalletError(error);
+        return;
+      }
+      setHasFreighter(true);
+      setAddress(nextAddress);
+      setWalletError(null);
+    });
+    return () => {
+      active = false;
+      stopWatching();
+    };
   }, []);
 
   const connect = useCallback(async () => {
@@ -41,6 +82,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     setWalletError(null);
     try {
       const { address: addr } = await connectFreighter();
+      manuallyDisconnected.current = false;
+      window.localStorage.removeItem(MANUAL_DISCONNECT_KEY);
       setAddress(addr);
       setHasFreighter(true);
       setShowModal(false);
@@ -59,7 +102,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const disconnect = useCallback(() => {
-    disconnectFreighter();
+    manuallyDisconnected.current = true;
+    window.localStorage.setItem(MANUAL_DISCONNECT_KEY, "1");
+    void disconnectFreighter();
     setAddress(null);
   }, []);
 

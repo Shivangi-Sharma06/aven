@@ -8,6 +8,7 @@ import {
   getNetwork,
   isConnected as freighterIsConnected,
   requestAccess,
+  WatchWalletChanges,
 } from "@stellar/freighter-api";
 
 import {
@@ -19,7 +20,6 @@ import {
   USDC_ASSET_ID,
   XLM_ASSET_ID,
   NETWORK_PASSPHRASE,
-  ATTESTATION_CONTRACT_ID,
 } from "./contracts";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -95,14 +95,6 @@ export type CreateStreamInput = {
 
 const DEFAULT_APPROVAL_TIMEOUT_LEDGERS = 50;
 
-function checkpointCountFor(durationLedgers: number, requested?: number): number {
-  if (requested !== undefined) return requested;
-  for (let count = 4; count > 1; count -= 1) {
-    if (durationLedgers % count === 0) return count;
-  }
-  return 1;
-}
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function assetIdFor(asset: StreamAsset): string {
@@ -176,6 +168,42 @@ export async function connectWallet(): Promise<{ address: string; connected: boo
   return { address, connected: true };
 }
 
+export async function restoreWallet(): Promise<{ address: string; connected: boolean } | null> {
+  const installed = await freighterIsConnected();
+  if (installed.error || !installed.isConnected) return null;
+
+  const addressResult = await getAddress();
+  if (addressResult.error || !addressResult.address) return null;
+  const network = await getNetwork();
+  if (network.error) throw new Error(network.error.message);
+  if (network.networkPassphrase !== NETWORK_PASSPHRASE) {
+    throw new Error("Switch Freighter to Stellar Testnet, then try connecting again.");
+  }
+  return { address: addressResult.address, connected: true };
+}
+
+export function watchWallet(
+  onChange: (change: { address: string | null; error?: string }) => void,
+) {
+  const watcher = new WatchWalletChanges(1_500);
+  const result = watcher.watch(({ address, networkPassphrase, error }) => {
+    if (error) {
+      onChange({ address: null, error: error.message });
+      return;
+    }
+    if (address && networkPassphrase !== NETWORK_PASSPHRASE) {
+      onChange({
+        address: null,
+        error: "Switch Freighter to Stellar Testnet, then try connecting again.",
+      });
+      return;
+    }
+    onChange({ address: address || null });
+  });
+  if (result.error) onChange({ address: null, error: result.error.message });
+  return () => watcher.stop();
+}
+
 export async function disconnectWallet(): Promise<void> {
   // Freighter doesn't expose revoke; caller clears local state
 }
@@ -197,8 +225,8 @@ export async function createStream(
     asset: assetIdFor(data.asset),
     total_deposited: totalDeposited,
     duration_ledgers: data.durationLedgers,
-    checkpoint_count: checkpointCountFor(data.durationLedgers, data.checkpointCount),
-    withdrawable_cap_percent: data.withdrawableCapPercent ?? 60,
+    checkpoint_count: 0,
+    withdrawable_cap_percent: 0,
     approval_timeout_ledgers:
       data.approvalTimeoutLedgers ?? DEFAULT_APPROVAL_TIMEOUT_LEDGERS,
     category: { tag: data.category, values: undefined as any },
@@ -290,14 +318,10 @@ export async function withdrawReviewed(
 export async function getStream(streamId: string, callerAddress?: string): Promise<StreamObject | null> {
   const addr = callerAddress ?? ANON_ADDR;
   const client = getStreamClient(addr);
-  try {
-    const tx = await client.get_stream({ stream_id: BigInt(streamId) });
-    const record = (tx.result as any)?.unwrap?.() ?? tx.result;
-    if (!record) return null;
-    return mapStreamRecord(record);
-  } catch {
-    return null;
-  }
+  const tx = await client.get_stream({ stream_id: BigInt(streamId) });
+  const record = (tx.result as any)?.unwrap?.() ?? tx.result;
+  if (!record) return null;
+  return mapStreamRecord(record);
 }
 
 export async function computeAvailable(streamId: string, callerAddress?: string): Promise<number> {
@@ -314,26 +338,18 @@ export async function computeAvailable(streamId: string, callerAddress?: string)
 
 export async function getSenderStreams(address: string): Promise<StreamObject[]> {
   const client = getStreamClient(address);
-  try {
-    const tx = await client.get_sender_streams({ sender: address });
-    const ids: bigint[] = (tx.result as any) ?? [];
-    const results = await Promise.all(ids.map((id) => getStream(String(id), address)));
-    return results.filter(Boolean) as StreamObject[];
-  } catch {
-    return [];
-  }
+  const tx = await client.get_sender_streams({ sender: address });
+  const ids: bigint[] = (tx.result as any) ?? [];
+  const results = await Promise.all(ids.map((id) => getStream(String(id), address)));
+  return results.filter(Boolean) as StreamObject[];
 }
 
 export async function getRecipientStreams(address: string): Promise<StreamObject[]> {
   const client = getStreamClient(address);
-  try {
-    const tx = await client.get_recipient_streams({ recipient: address });
-    const ids: bigint[] = (tx.result as any) ?? [];
-    const results = await Promise.all(ids.map((id) => getStream(String(id), address)));
-    return results.filter(Boolean) as StreamObject[];
-  } catch {
-    return [];
-  }
+  const tx = await client.get_recipient_streams({ recipient: address });
+  const ids: bigint[] = (tx.result as any) ?? [];
+  const results = await Promise.all(ids.map((id) => getStream(String(id), address)));
+  return results.filter(Boolean) as StreamObject[];
 }
 
 function mapStreamRecord(r: any): StreamObject {
@@ -419,7 +435,6 @@ export async function computeScore(address: string): Promise<ScoreBreakdown> {
   const client = getReputationClient(address);
   try {
     const tx = await client.get_score_breakdown({
-      attestation_contract: ATTESTATION_CONTRACT_ID,
       recipient: address,
     });
     const r: any = tx.result;
@@ -441,7 +456,6 @@ export async function verifyClaim(address: string, minimumScore: number): Promis
   const client = getReputationClient(address);
   try {
     const tx = await client.verify_claim({
-      attestation_contract: ATTESTATION_CONTRACT_ID,
       recipient: address,
       minimum_score: BigInt(Math.round(minimumScore)),
     });

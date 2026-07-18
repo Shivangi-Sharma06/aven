@@ -57,7 +57,7 @@ npx aven-stellar stop --message <summary>
 - `start --non-interactive` skips the collection confirmation.
 - `stop --submit` submits the previewed report without another prompt.
 - `--message` supplies the worker's summary of the session.
-- The payment amount is calculated automatically from tracked active seconds and the stream's on-chain rate, capped by currently earned funds.
+- The payment amount is calculated automatically from tracked active seconds and the stream's on-chain rate, capped by the unreserved escrow remaining.
 
 ## Privacy and safety
 

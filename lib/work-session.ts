@@ -112,6 +112,7 @@ export type WorkSessionEvent = {
 
 export type WorkSession = {
   id: string;
+  contractId?: string;
   streamId: string;
   workerAddress: string;
   clientAddress: string;

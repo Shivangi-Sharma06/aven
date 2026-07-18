@@ -65,6 +65,10 @@ export default function CreateStreamPage() {
       setError("Recipient must be a valid Stellar address starting with G");
       return;
     }
+    if (recipient.trim().toUpperCase() === address.trim().toUpperCase()) {
+      setError("Sender and recipient must be different Stellar wallets.");
+      return;
+    }
     if (!title.trim()) { setError("Title is required"); return; }
     if (!total || total <= 0) { setError("Total amount must be > 0"); return; }
     if (!days || days <= 0) { setError("Duration must be > 0"); return; }
@@ -136,7 +140,7 @@ export default function CreateStreamPage() {
       <div className="create-stream-header">
         <h1 className="create-stream-title">Create Payment Stream</h1>
         <p className="create-stream-sub">
-          Set up a continuous payment stream on Stellar. Funds unlock every ledger.
+          Fund a work agreement on Stellar. Payment unlocks only from npm-tracked active work sessions.
         </p>
       </div>
 
@@ -169,9 +173,13 @@ export default function CreateStreamPage() {
             placeholder="G…"
             value={recipient}
             onChange={(e) => setRecipient(e.target.value)}
+            aria-describedby="stream-recipient-help"
             required
             id="stream-recipient"
           />
+          <small id="stream-recipient-help" className="form-label-hint">
+            Must be different from the connected sender wallet.
+          </small>
         </div>
 
         <div className="form-row">

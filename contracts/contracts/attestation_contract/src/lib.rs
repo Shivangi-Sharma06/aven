@@ -18,6 +18,7 @@ enum DataKey {
     Attestation(u64),
     RecipientAttestations(Address),
     WorkSessionAttestation(u64, String), // (stream_id, request_id) → u64 attestation_id
+    StreamCompletionAttestation(u64),    // stream_id → final attestation_id
     SenderAttestations(Address),
 }
 
@@ -35,6 +36,8 @@ pub enum Error {
     InvalidLedgerRange = 8,
     TitleTooLong = 9,
     DuplicateAttestation = 10,
+    InvalidWorkSession = 11,
+    InvalidRequestId = 12,
 }
 
 #[contractevent(topics = ["attestation_minted"])]
@@ -58,6 +61,7 @@ pub struct AttestationContract;
 #[contractimpl]
 impl AttestationContract {
     pub fn init(env: Env, admin: Address, stream_contract: Address) -> Result<(), Error> {
+        admin.require_auth();
         if env.storage().instance().has(&DataKey::Admin) {
             return Err(Error::AlreadyInitialized);
         }
@@ -116,16 +120,34 @@ impl AttestationContract {
             return Err(Error::TitleTooLong);
         }
 
-        // Duplicate prevention for WorkSession and LegacyReviewed kinds
+        // Session records must prove they came through the configured verifier flow.
+        if kind == AttestationKind::WorkSession
+            && (request_id.is_empty()
+                || active_duration_seconds == 0
+                || verifier.is_none()
+                || report_hash.is_none())
+        {
+            return Err(Error::InvalidWorkSession);
+        }
+
+        // Duplicate prevention for WorkSession and LegacyReviewed kinds.
         if kind == AttestationKind::WorkSession || kind == AttestationKind::LegacyReviewed {
-            if request_id.len() > MAX_REQUEST_ID_LEN {
-                return Err(Error::TitleTooLong);
+            if request_id.is_empty() || request_id.len() > MAX_REQUEST_ID_LEN {
+                return Err(Error::InvalidRequestId);
             }
             let dup_key =
                 DataKey::WorkSessionAttestation(stream_id, request_id.clone());
             if env.storage().persistent().has(&dup_key) {
                 return Err(Error::DuplicateAttestation);
             }
+        }
+        if kind == AttestationKind::StreamCompletion
+            && env
+                .storage()
+                .persistent()
+                .has(&DataKey::StreamCompletionAttestation(stream_id))
+        {
+            return Err(Error::DuplicateAttestation);
         }
 
         env.storage()
@@ -178,6 +200,13 @@ impl AttestationContract {
             env.storage()
                 .persistent()
                 .extend_ttl(&dup_key, LEDGER_BUMP, LEDGER_BUMP);
+        }
+        if kind == AttestationKind::StreamCompletion {
+            let completion_key = DataKey::StreamCompletionAttestation(stream_id);
+            env.storage().persistent().set(&completion_key, &id);
+            env.storage()
+                .persistent()
+                .extend_ttl(&completion_key, LEDGER_BUMP, LEDGER_BUMP);
         }
 
         // Append to recipient attestation index
@@ -246,20 +275,28 @@ impl AttestationContract {
 
     pub fn get_recipient_attestations(env: Env, recipient: Address) -> Vec<u64> {
         let key = DataKey::RecipientAttestations(recipient);
-        let ids = env.storage().persistent().get(&key).unwrap_or(vec![&env]);
-        env.storage()
-            .persistent()
-            .extend_ttl(&key, LEDGER_BUMP, LEDGER_BUMP);
-        ids
+        match env.storage().persistent().get(&key) {
+            Some(ids) => {
+                env.storage()
+                    .persistent()
+                    .extend_ttl(&key, LEDGER_BUMP, LEDGER_BUMP);
+                ids
+            }
+            None => vec![&env],
+        }
     }
 
     pub fn get_sender_attestations(env: Env, sender: Address) -> Vec<u64> {
         let key = DataKey::SenderAttestations(sender);
-        let ids = env.storage().persistent().get(&key).unwrap_or(vec![&env]);
-        env.storage()
-            .persistent()
-            .extend_ttl(&key, LEDGER_BUMP, LEDGER_BUMP);
-        ids
+        match env.storage().persistent().get(&key) {
+            Some(ids) => {
+                env.storage()
+                    .persistent()
+                    .extend_ttl(&key, LEDGER_BUMP, LEDGER_BUMP);
+                ids
+            }
+            None => vec![&env],
+        }
     }
 
     pub fn verify_attestation(env: Env, attestation_id: u64) -> bool {

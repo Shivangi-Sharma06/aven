@@ -17,15 +17,15 @@ function formatAmountUnits(value: bigint) {
 export function calculateAutomaticPayment(
   ratePerSecond: string,
   activeSeconds: number,
-  earned: string,
+  available: string,
 ) {
   if (!ratePerSecond) throw new Error("The dashboard did not return the stream payment rate.");
   const rateUnits = amountUnits(ratePerSecond);
-  const earnedUnits = amountUnits(earned);
+  const availableUnits = amountUnits(available);
   const sessionUnits = rateUnits * BigInt(activeSeconds);
-  const paymentUnits = sessionUnits < earnedUnits ? sessionUnits : earnedUnits;
+  const paymentUnits = sessionUnits < availableUnits ? sessionUnits : availableUnits;
   if (paymentUnits <= 0n) {
-    throw new Error("No payment has accrued for the tracked active time yet.");
+    throw new Error("No escrow remains for the tracked active time.");
   }
   return formatAmountUnits(paymentUnits);
 }
@@ -35,7 +35,7 @@ export async function buildReport(
   config: AvenConfig,
   session: LocalSession,
   message: string,
-  payment: { earned: string; ratePerSecond: string },
+  payment: { available: string; ratePerSecond: string },
 ): Promise<WorkSessionReport> {
   const endedAt = new Date();
   const endingState = await captureGitState(repositoryRoot);
@@ -53,7 +53,7 @@ export async function buildReport(
   const requestedAmount = calculateAutomaticPayment(
     payment.ratePerSecond,
     activeSeconds,
-    payment.earned,
+    payment.available,
   );
   const included = changes.changedFiles.filter((file) => file.includedInVerification);
   const substantive = included.filter((file) => file.category === "source" || file.category === "test");

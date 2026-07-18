@@ -1,7 +1,7 @@
 const attestationRows = [
   ['STATUS', 'CLIENT CONFIRMED'],
   ['WORK', 'SMART CONTRACT DEVELOPMENT'],
-  ['CHECKPOINT', '03 / 04'],
+  ['WORK SESSION', 'SESSION 03'],
   ['AMOUNT PAID', '2,450 USDC'],
   ['SENDER', 'GBX7...81F'],
   ['RECIPIENT', 'GDQ4...92A'],
@@ -17,7 +17,7 @@ export default function WorkAttestations() {
         <div>
           <h2>A RECEIPT FOR REAL WORK.</h2>
           <p className="section-copy">
-            Each approved checkpoint creates a record both sides can verify—without
+            Each released npm work session creates a record both sides can verify—without
             asking a platform to vouch for them.
           </p>
           <p className="loud-copy">

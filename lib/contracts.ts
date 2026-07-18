@@ -3,17 +3,15 @@
  */
 
 import { Client as StreamClient } from "../contracts/bindings/stream/src/index";
-import { Client as AttestationClient, networks as attestNetworks } from "../contracts/bindings/attestation/src/index";
-import { Client as ReputationClient, networks as reputationNetworks } from "../contracts/bindings/reputation/src/index";
+import { Client as AttestationClient } from "../contracts/bindings/attestation/src/index";
+import { Client as ReputationClient } from "../contracts/bindings/reputation/src/index";
 import { signTransaction } from "@stellar/freighter-api";
 
 export const SOROBAN_RPC_URL = "https://soroban-testnet.stellar.org";
 export const NETWORK_PASSPHRASE = "Test SDF Network ; September 2015";
 export const STREAM_CONTRACT_ID = process.env.NEXT_PUBLIC_STREAM_CONTRACT_ID ?? "";
-export const ATTESTATION_CONTRACT_ID =
-  process.env.NEXT_PUBLIC_ATTESTATION_CONTRACT_ID ?? attestNetworks.testnet.contractId;
-export const REPUTATION_CONTRACT_ID =
-  process.env.NEXT_PUBLIC_REPUTATION_CONTRACT_ID ?? reputationNetworks.testnet.contractId;
+export const ATTESTATION_CONTRACT_ID = process.env.NEXT_PUBLIC_ATTESTATION_CONTRACT_ID ?? "";
+export const REPUTATION_CONTRACT_ID = process.env.NEXT_PUBLIC_REPUTATION_CONTRACT_ID ?? "";
 
 /** USDC on Stellar testnet */
 export const USDC_ASSET_ID = "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA";
@@ -62,6 +60,9 @@ export function getStreamClient(publicKey: string) {
 }
 
 export function getAttestationClient(publicKey: string) {
+  if (!ATTESTATION_CONTRACT_ID) {
+    throw new Error("NEXT_PUBLIC_ATTESTATION_CONTRACT_ID is not configured.");
+  }
   return new AttestationClient({
     ...baseOptions(publicKey),
     contractId: ATTESTATION_CONTRACT_ID,
@@ -69,6 +70,9 @@ export function getAttestationClient(publicKey: string) {
 }
 
 export function getReputationClient(publicKey: string) {
+  if (!REPUTATION_CONTRACT_ID) {
+    throw new Error("NEXT_PUBLIC_REPUTATION_CONTRACT_ID is not configured.");
+  }
   return new ReputationClient({
     ...baseOptions(publicKey),
     contractId: REPUTATION_CONTRACT_ID,

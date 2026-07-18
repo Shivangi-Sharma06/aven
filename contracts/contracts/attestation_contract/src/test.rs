@@ -100,8 +100,8 @@ fn test_mint_only_by_stream_contract() {
         &0,
         &true,
         &false,
-        &None,
-        &None::<BytesN<32>>,
+        &Some(Address::generate(&env)),
+        &Some(BytesN::from_array(&env, &[8; 32])),
     );
     assert_eq!(res.unwrap_err().unwrap(), Error::Unauthorized);
 }
@@ -233,14 +233,31 @@ fn test_get_recipient_attestations() {
         &0,
         &true,
         &false,
-        &None,
-        &None::<BytesN<32>>,
+        &Some(Address::generate(&env)),
+        &Some(BytesN::from_array(&env, &[8; 32])),
     );
     
     let attestations = client.get_recipient_attestations(&recipient);
     assert_eq!(attestations.len(), 2);
     assert_eq!(attestations.get(0).unwrap(), id1);
     assert_eq!(attestations.get(1).unwrap(), id2);
+}
+
+#[test]
+fn test_empty_indexes_return_empty_lists() {
+    let (env, client, _stream_contract, _sender, _recipient) = setup();
+    assert_eq!(
+        client
+            .get_recipient_attestations(&Address::generate(&env))
+            .len(),
+        0
+    );
+    assert_eq!(
+        client
+            .get_sender_attestations(&Address::generate(&env))
+            .len(),
+        0
+    );
 }
 
 #[test]
@@ -265,8 +282,8 @@ fn test_get_sender_attestations() {
         &3600,
         &true,
         &false,
-        &None,
-        &None::<BytesN<32>>,
+        &Some(Address::generate(&env)),
+        &Some(BytesN::from_array(&env, &[8; 32])),
     );
 
     let attestations = client.get_sender_attestations(&sender);
@@ -298,7 +315,7 @@ fn test_duplicate_work_session_attestation_rejected() {
         &3600,
         &true,
         &false,
-        &None,
+        &Some(Address::generate(&env)),
         &Some(evidence.clone()),
     );
     assert!(id > 0);
@@ -321,7 +338,7 @@ fn test_duplicate_work_session_attestation_rejected() {
         &3600,
         &true,
         &false,
-        &None,
+        &Some(Address::generate(&env)),
         &Some(evidence),
     );
     assert_eq!(res.unwrap_err().unwrap(), Error::DuplicateAttestation);

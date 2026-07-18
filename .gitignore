@@ -6,3 +6,6 @@ tsconfig.tsbuildinfo
 .env*.local
 .codex
 .aven/
+.vercel
+.env*
+scripts/set-vercel-env.sh

@@ -1,6 +1,6 @@
 {
   "name": "aven-stellar",
-  "version": "0.1.2",
+  "version": "0.1.5",
   "description": "Privacy-conscious Git work sessions for Aven payment streams on Stellar.",
   "type": "module",
   "bin": {
@@ -14,6 +14,7 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
+    "test": "npm run build && node --test test/*.test.mjs",
     "prepublishOnly": "npm run typecheck && npm run build"
   },
   "engines": {
@@ -21,12 +22,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Shivangi-Sharma06/aven.git",
+    "url": "git+https://github.com/kartikeywastaken/aven-ste.git",
     "directory": "packages/aven-work-session"
   },
-  "homepage": "https://github.com/Shivangi-Sharma06/aven#readme",
+  "homepage": "https://github.com/kartikeywastaken/aven-ste#readme",
   "bugs": {
-    "url": "https://github.com/Shivangi-Sharma06/aven/issues"
+    "url": "https://github.com/kartikeywastaken/aven-ste/issues"
   },
   "keywords": [
     "aven",

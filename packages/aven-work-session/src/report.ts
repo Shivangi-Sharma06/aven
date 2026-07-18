@@ -1,6 +1,7 @@
 import { captureGitState, collectChanges, collectCommits, repositoryIdentifier } from "./git.js";
 import { createPrivacyFilter } from "./privacy.js";
 import type { AvenConfig, LocalSession, WorkSessionReport } from "./types.js";
+import { PACKAGE_VERSION } from "./version.js";
 
 function amountUnits(value: string) {
   const match = /^(0|[1-9]\d*)(?:\.(\d{1,7}))?$/.exec(value.trim());
@@ -20,12 +21,20 @@ export function calculateAutomaticPayment(
   available: string,
 ) {
   if (!ratePerSecond) throw new Error("The dashboard did not return the stream payment rate.");
+  if (!Number.isSafeInteger(activeSeconds) || activeSeconds <= 0) {
+    throw new Error(
+      "No active work time was recorded. Keep the session running for at least one second before stopping it.",
+    );
+  }
   const rateUnits = amountUnits(ratePerSecond);
   const availableUnits = amountUnits(available);
+  if (availableUnits <= 0n) {
+    throw new Error("No unreserved escrow remains on this stream.");
+  }
   const sessionUnits = rateUnits * BigInt(activeSeconds);
   const paymentUnits = sessionUnits < availableUnits ? sessionUnits : availableUnits;
   if (paymentUnits <= 0n) {
-    throw new Error("No escrow remains for the tracked active time.");
+    throw new Error("The stream rate is too small to pay one tracked second.");
   }
   return formatAmountUnits(paymentUnits);
 }
@@ -36,8 +45,8 @@ export async function buildReport(
   session: LocalSession,
   message: string,
   payment: { available: string; ratePerSecond: string },
+  endedAt = new Date(),
 ): Promise<WorkSessionReport> {
-  const endedAt = new Date();
   const endingState = await captureGitState(repositoryRoot);
   const privacyFilter = await createPrivacyFilter(repositoryRoot);
   const [changes, commits, repositoryId] = await Promise.all([
@@ -75,7 +84,7 @@ export async function buildReport(
       totalSeconds,
       activeSeconds,
       idleSeconds,
-      packageVersion: "0.1.0",
+      packageVersion: PACKAGE_VERSION,
     },
     repository: {
       repositoryId,

@@ -91,6 +91,7 @@ export type LocalSession = {
   workerAddress: string;
   status: "active" | "stopped";
   startedAt: string;
+  stoppedAt?: string;
   startingCommit?: string;
   startingBranch: string;
   dirtyAtStart: boolean;

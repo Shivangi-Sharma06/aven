@@ -1,11 +1,12 @@
-import { mkdir, rename, writeFile } from "node:fs/promises";
+import { mkdir, rename, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { inspectStream, submitReport } from "./api.js";
 import { readConfig } from "./config.js";
 import { findRepositoryRoot } from "./git.js";
 import { buildReport, printReport } from "./report.js";
-import { deleteSession, readSession, writeSession } from "./session.js";
+import { deleteSession, readSession, sessionPath, writeSession } from "./session.js";
+import type { LocalSession } from "./types.js";
 
 export type StopOptions = {
   message?: string;
@@ -13,6 +14,16 @@ export type StopOptions = {
 };
 
 const delay = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+export function resolveStopTimestamp(
+  session: Pick<LocalSession, "status" | "stoppedAt">,
+  legacySessionModifiedAt: Date | null,
+  now = new Date(),
+) {
+  if (session.stoppedAt) return new Date(session.stoppedAt);
+  if (session.status === "stopped" && legacySessionModifiedAt) return legacySessionModifiedAt;
+  return now;
+}
 
 async function question(prompt: string, fallback?: string) {
   const terminal = createInterface({ input: process.stdin, output: process.stdout });
@@ -41,6 +52,12 @@ export async function stopCommand(options: StopOptions) {
   ]);
   if (!config) throw new Error("This repository is not connected to Aven. Run `aven start` first.");
   if (!initialSession) throw new Error("No active Aven work session was found.");
+  let legacySessionModifiedAt: Date | null = null;
+  if (initialSession.status === "stopped" && !initialSession.stoppedAt) {
+    legacySessionModifiedAt = await stat(sessionPath(repositoryRoot))
+      .then((details) => details.mtime)
+      .catch(() => null);
+  }
   if (initialSession.watcherPid) {
     try {
       process.kill(initialSession.watcherPid, "SIGTERM");
@@ -50,15 +67,24 @@ export async function stopCommand(options: StopOptions) {
     }
   }
   const session = (await readSession(repositoryRoot)) ?? initialSession;
+  const stoppedAt = resolveStopTimestamp(session, legacySessionModifiedAt);
   session.status = "stopped";
+  session.stoppedAt = stoppedAt.toISOString();
   await writeSession(repositoryRoot, session);
 
   const stream = await inspectStream(config.dashboardUrl, config.streamId, config.token);
   const message = options.message ?? await question("What did you work on during this session?");
-  const report = await buildReport(repositoryRoot, config, session, message, {
-    available: stream.available,
-    ratePerSecond: stream.ratePerSecond,
-  });
+  const report = await buildReport(
+    repositoryRoot,
+    config,
+    session,
+    message,
+    {
+      available: stream.available,
+      ratePerSecond: stream.ratePerSecond,
+    },
+    stoppedAt,
+  );
   await saveLocalReport(repositoryRoot, report);
   printReport(report);
   process.stdout.write(

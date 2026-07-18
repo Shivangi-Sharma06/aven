@@ -26,13 +26,20 @@ export async function inspectStream(
     headers: { authorization: `Bearer ${token}` },
   });
   await responseJson(response);
+  const available = response.headers.get("x-aven-available");
+  const ratePerSecond = response.headers.get("x-aven-rate-per-second");
+  if (available === null || ratePerSecond === null) {
+    throw new Error(
+      "This Aven dashboard does not expose npm-authoritative payment metadata. Update and restart the dashboard.",
+    );
+  }
   return {
     asset: response.headers.get("x-aven-stream-asset") as "USDC" | "XLM",
     contractId: response.headers.get("x-aven-stream-contract") ?? "",
     status: response.headers.get("x-aven-stream-status") ?? "",
     workerAddress: response.headers.get("x-aven-worker-address") ?? "",
-    available: response.headers.get("x-aven-available") ?? "0.0000000",
-    ratePerSecond: response.headers.get("x-aven-rate-per-second") ?? "",
+    available,
+    ratePerSecond,
   };
 }
 

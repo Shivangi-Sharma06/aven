@@ -20,6 +20,15 @@ npx aven-stellar start
 npx aven-stellar stop
 ```
 
+When testing a newly published fix, force `npx` to resolve the current package:
+
+```bash
+npx --yes aven-stellar@latest --version
+```
+
+If submission failed after a session was stopped, run `stop` again. The CLI
+retains the original stop time and retries without adding the delay as work.
+
 Or install both the `aven` and `aven-stellar` command aliases globally:
 
 ```bash
@@ -87,7 +96,7 @@ npx aven-stellar stop \
 
 ## Current enforcement boundary
 
-Work-session review is enforced on-chain in the current release. When the Aven dashboard verifies a session report, the stream contract's `verify_work` function is called atomically: funds are transferred to the worker and an attestation record is minted in a single transaction. If either step fails the entire transaction reverts — the worker receives no funds and no attestation. The stream contract and the attestation contract are authoritative for on-chain state.
+Work-session payment math is enforced on-chain in the current release. The dashboard verifier reserves exactly `active seconds × stream rate`, capped by unreserved escrow. The sender can then approve or dispute the request, and an attestation is minted only when the approved payment is released. Ledger time and legacy checkpoint accrual do not unlock funds.
 
 ## Package development
 

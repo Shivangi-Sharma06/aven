@@ -4,6 +4,7 @@ import { Command } from "commander";
 import { runActivityWatcher } from "./activity.js";
 import { startCommand } from "./start.js";
 import { stopCommand } from "./stop.js";
+import { PACKAGE_VERSION } from "./version.js";
 
 async function main() {
   if (process.argv[2] === "__watch") {
@@ -17,7 +18,7 @@ async function main() {
   program
     .name("aven")
     .description("Record a privacy-conscious work session for an Aven payment stream.")
-    .version("0.1.0");
+    .version(PACKAGE_VERSION);
 
   program
     .command("start")

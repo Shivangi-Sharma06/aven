@@ -55,8 +55,13 @@ async function firstTimeSetup(repositoryRoot: string, options: StartOptions): Pr
 export async function startCommand(options: StartOptions) {
   const repositoryRoot = await findRepositoryRoot();
   await ensureAvenIgnore(repositoryRoot);
-  if (await readSession(repositoryRoot)) {
-    throw new Error("An Aven work session already exists in this repository. Stop it before starting another.");
+  const existingSession = await readSession(repositoryRoot);
+  if (existingSession) {
+    throw new Error(
+      existingSession.status === "stopped"
+        ? "A previous Aven session is awaiting submission. Run `aven stop` again before starting another."
+        : "An Aven work session already exists in this repository. Stop it before starting another.",
+    );
   }
 
   let config = await readConfig(repositoryRoot);

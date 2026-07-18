@@ -130,3 +130,10 @@ The protocol contracts are currently live on **Stellar Testnet**:
 
 ## 🔒 Security & Verification
 All work-session payouts are verified cryptographically. The Aven dashboard uses an automated verifier signature generated from the private `AVEN_VERIFIER_SECRET`. Any manual claim verifies this signature on-chain before executing the payout.
+
+---
+
+## 👥 Contributing & Branches
+
+To contribute to Aven, please work on your feature branches (such as `pinky`) and open a Pull Request to the main branch.
+

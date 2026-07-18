@@ -1,11 +1,20 @@
-# Aven
+<div align="center">
 
-**A decentralized protocol for streaming payments, atomic work attestations, and portable on-chain reputation on Stellar.**
 
-Aven turns real-time economic activity into verifiable work history. It bridges the trust gap between clients, workers (both human and AI), and verifiers by ensuring that payments and credit are aligned, transparent, and cryptographically proven.
+ █████╗ ██╗   ██╗███████╗███╗   ██╗
+██╔══██╗██║   ██║██╔════╝████╗  ██║
+███████║██║   ██║█████╗  ██╔██╗ ██║
+██╔══██║╚██╗ ██╔╝██╔══╝  ██║╚██╗██║
+██║  ██║ ╚████╔╝ ███████╗██║ ╚████║
+╚═╝  ╚═╝  ╚═══╝  ╚══════╝╚═╝  ╚═══╝
 
+
+*Work flows in. Money flows out. Proof stays forever.*
+
+Soroban · Stellar · 21-Day Build · Testnet Live
+
+</div>
 ---
-
 ## 💡 What is Aven?
 
 Aven is a protocol that allows clients to stream payments to workers as progress is made, while automatically documenting that progress as verifiable proof of work (attestations) on the Stellar ledger. These attestations roll up into a single, portable on-chain reputation score that workers own and can present anywhere.

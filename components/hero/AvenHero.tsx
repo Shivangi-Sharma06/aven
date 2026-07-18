@@ -31,13 +31,10 @@ export default function AvenHero() {
       const logo = heroRef.current.querySelector('.aven-morph-logo')
       const network = heroRef.current.querySelector('.aven-network-wrap')
 
-      const nav = document.querySelector('.aven-nav')
-
       if (!logo || !network) return
 
       gsap.set(items, { autoAlpha: 0, y: 18 })
       gsap.set(network, { autoAlpha: 0 })
-      gsap.set(nav, { autoAlpha: 0.35 })
 
       const shapeA = logo.querySelector('#aven-shape-a') as any
       const shapeV = logo.querySelector('#aven-shape-v') as any
@@ -55,7 +52,6 @@ export default function AvenHero() {
       const tlIntro = gsap.timeline({ defaults: { ease: 'power3.out' } })
       tlIntro
         .to(network, { autoAlpha: 1, duration: 0.8 }, 0.1)
-        .to(nav, { autoAlpha: 1, duration: 0.45 }, 0.6)
         .to(items, { autoAlpha: 1, y: 0, duration: 0.58, stagger: 0.14 }, 0.7)
 
       const tlMorph = gsap.timeline({

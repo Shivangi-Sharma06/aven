@@ -89,11 +89,9 @@ export default function StreamDetailPage() {
     }
     setSessionsLoading(true);
     try {
+      await ensureBrowserSession();
       const sessionsPath = `/api/streams/${encodeURIComponent(id)}/work-sessions`;
-      const response = await fetch(sessionsPath, {
-        cache: "no-store",
-        headers: await walletHeaders(),
-      });
+      const response = await fetch(sessionsPath, { cache: "no-store" });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Failed to load work sessions.");
       const loaded = data as WorkSession[];
@@ -111,10 +109,7 @@ export default function StreamDetailPage() {
             }),
           ),
         );
-        const refreshed = await fetch(sessionsPath, {
-          cache: "no-store",
-          headers: await walletHeaders(),
-        });
+        const refreshed = await fetch(sessionsPath, { cache: "no-store" });
         const refreshedData = await refreshed.json();
         if (refreshed.ok) setSessions(refreshedData as WorkSession[]);
         else setSessions(loaded);
@@ -138,33 +133,34 @@ export default function StreamDetailPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, address]);
 
-  async function walletHeaders() {
+  async function ensureBrowserSession(): Promise<void> {
     if (!address) throw new Error("Connect your wallet first.");
-    const storageKey = `aven:dashboard-auth:${address.toUpperCase()}`;
+    const storageKey = `aven:browser-session:${address.toUpperCase()}`;
     const cached = window.sessionStorage.getItem(storageKey);
     if (cached) {
       try {
-        const parsed = JSON.parse(cached) as {
-          message: string;
-          signature: string;
-          expiresAt: number;
-        };
-        if (parsed.expiresAt > Date.now() + 10_000) {
-          return {
-            "content-type": "application/json",
-            "x-aven-wallet": address,
-            "x-aven-message": parsed.message,
-            "x-aven-signature": parsed.signature,
-          };
-        }
+        const parsed = JSON.parse(cached) as { expiresAt: number };
+        if (parsed.expiresAt > Date.now() + 30_000) return; // session still valid
       } catch {
         window.sessionStorage.removeItem(storageKey);
       }
     }
-    const issuedAt = Date.now();
-    const expiresAt = issuedAt + 15 * 60_000;
-    const message = `Aven dashboard access\n${address}\n${issuedAt}\n${expiresAt}`;
-    const signed = await signMessage(message, { address });
+
+    // Step 1: Get a single-line challenge (no newlines) from the server.
+    const challengeResponse = await fetch("/api/auth/wallet/challenge", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ walletAddress: address }),
+    });
+    const challengeData = await challengeResponse.json();
+    if (!challengeResponse.ok) throw new Error(challengeData.error ?? "Failed to create auth challenge.");
+    const { challenge, expiresAt } = challengeData as { challenge: string; expiresAt: number };
+
+    // Safety assertion: challenge must have no newline characters.
+    if (/[\r\n]/.test(challenge)) throw new Error("Server returned an invalid challenge.");
+
+    // Step 2: Sign the single-line challenge with the wallet.
+    const signed = await signMessage(challenge, { address });
     if (signed.error || !signed.signedMessage) {
       throw new Error(signed.error?.message ?? "The wallet did not return a signature.");
     }
@@ -174,17 +170,18 @@ export default function StreamDetailPage() {
     const signature = typeof signed.signedMessage === "string"
       ? signed.signedMessage
       : window.btoa(Array.from(signed.signedMessage, (byte) => String.fromCharCode(byte)).join(""));
-    const headers = {
-      "content-type": "application/json",
-      "x-aven-wallet": address,
-      "x-aven-message": message,
-      "x-aven-signature": signature,
-    };
-    window.sessionStorage.setItem(
-      storageKey,
-      JSON.stringify({ message, signature, expiresAt }),
-    );
-    return headers;
+
+    // Step 3: Verify on the server — server sets the aven_session HttpOnly cookie.
+    const verifyResponse = await fetch("/api/auth/wallet/verify", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ walletAddress: address, challenge, signature }),
+    });
+    const verifyData = await verifyResponse.json();
+    if (!verifyResponse.ok) throw new Error(verifyData.error ?? "Wallet verification failed.");
+
+    // Cache the expiry so we know when to renew.
+    window.sessionStorage.setItem(storageKey, JSON.stringify({ expiresAt }));
   }
 
   async function mutateSession(sessionId: string, action: "request-withdrawal" | "approve" | "dispute" | "release", body?: object) {
@@ -197,9 +194,10 @@ export default function StreamDetailPage() {
         if (action === "approve") await approveReviewedWithdrawal(id, address, session.id);
         if (action === "dispute") await disputeReviewedWithdrawal(id, address, session.id);
       }
+      await ensureBrowserSession();
       const response = await fetch(path, {
         method: "POST",
-        headers: await walletHeaders(),
+        headers: { "content-type": "application/json" },
         body: JSON.stringify(body ?? {}),
       });
       const data = await response.json();
@@ -224,9 +222,10 @@ export default function StreamDetailPage() {
     const preparePath = `/api/work-sessions/${encodeURIComponent(session.id)}/release/prepare`;
     const cancelPath = `/api/work-sessions/${encodeURIComponent(session.id)}/release/cancel`;
     try {
+      await ensureBrowserSession();
       const prepared = await fetch(preparePath, {
         method: "POST",
-        headers: await walletHeaders(),
+        headers: { "content-type": "application/json" },
         body: "{}",
       });
       const preparedData = await prepared.json();
@@ -236,7 +235,7 @@ export default function StreamDetailPage() {
       const path = `/api/work-sessions/${encodeURIComponent(session.id)}/release`;
       const response = await fetch(path, {
         method: "POST",
-        headers: await walletHeaders(),
+        headers: { "content-type": "application/json" },
         body: JSON.stringify({ txHash: result.txHash }),
       });
       const data = await response.json();
@@ -250,7 +249,7 @@ export default function StreamDetailPage() {
         try {
           await fetch(cancelPath, {
             method: "POST",
-            headers: await walletHeaders(),
+            headers: { "content-type": "application/json" },
             body: "{}",
           });
         } catch {

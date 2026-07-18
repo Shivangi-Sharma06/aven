@@ -5,7 +5,7 @@ import {
   addTimelineEvent,
   addressesEqual,
   authenticateCliRequest,
-  authenticateWalletRequest,
+  authenticateBrowserSession,
   getAvailableUnits,
   getSessionOnchainStream,
   parseAmountUnits,
@@ -34,7 +34,7 @@ export async function POST(
   const session = await getSession(sessionId);
   if (!session) return apiError("Work session was not found.", 404);
   const token = await authenticateCliRequest(request, "request_withdrawal");
-  const wallet = token?.walletAddress ?? authenticateWalletRequest(request);
+  const wallet = token?.walletAddress ?? await authenticateBrowserSession(request);
   if (!wallet || !addressesEqual(wallet, session.workerAddress)) {
     return apiError("Only the stream recipient can request this withdrawal.", 403);
   }

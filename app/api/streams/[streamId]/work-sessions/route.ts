@@ -4,7 +4,7 @@ import { STREAM_CONTRACT_ID } from "@/lib/contracts";
 import { listSessionsForStream } from "@/lib/session-store";
 import {
   authenticateCliRequest,
-  authenticateWalletRequest,
+  authenticateBrowserSession,
   formatAmountUnits,
   getAvailableUnits,
   getOnchainStream,
@@ -24,7 +24,7 @@ export async function GET(
   const stream = await getOnchainStream(streamId);
   if (!stream) return apiError("Stream was not found.", 404);
   const token = await authenticateCliRequest(request, "read_streams");
-  const wallet = token?.walletAddress ?? authenticateWalletRequest(request) ?? "";
+  const wallet = token?.walletAddress ?? await authenticateBrowserSession(request) ?? "";
   if (!wallet || roleForWallet(stream, wallet) === "unrelated") {
     return apiError("This wallet cannot view work sessions for the stream.", 403);
   }

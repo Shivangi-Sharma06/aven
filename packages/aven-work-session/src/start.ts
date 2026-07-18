@@ -65,8 +65,40 @@ export async function startCommand(options: StartOptions) {
   }
 
   let config = await readConfig(repositoryRoot);
-  if (config && (!config.contractId || (options.stream && config.streamId !== options.stream))) {
-    config = null;
+  if (config) {
+    // If the user explicitly passed a --dashboard URL that differs from the
+    // saved config, prompt them to reset.  Silently ignoring the flag would
+    // cause confusing mis-configuration between environments.
+    const dashboardChanged =
+      options.dashboard &&
+      options.dashboard.replace(/\/$/, "") !== config.dashboardUrl.replace(/\/$/, "");
+    const streamChanged = options.stream && config.streamId !== options.stream;
+    if (dashboardChanged || streamChanged || !config.contractId) {
+      if (options.nonInteractive) {
+        const reason = dashboardChanged
+          ? `--dashboard changed from ${config.dashboardUrl} to ${options.dashboard}. Delete .aven/config.json to reset.`
+          : streamChanged
+            ? `--stream changed from ${config.streamId} to ${options.stream}. Delete .aven/config.json to reset.`
+            : "The saved config is missing a contract ID.";
+        throw new Error(reason);
+      }
+      if (dashboardChanged) {
+        process.stdout.write(
+          `Dashboard URL changed from ${config.dashboardUrl} to ${options.dashboard}.\n`,
+        );
+      } else if (streamChanged) {
+        process.stdout.write(
+          `Stream ID changed from ${config.streamId} to ${options.stream}.\n`,
+        );
+      }
+      const confirm = (await question("Reset saved config and re-authorize?", "Y")).toLowerCase();
+      if (confirm !== "y" && confirm !== "yes") {
+        process.stdout.write("Keeping existing config. Pass --stream or --dashboard to force a reset.\n");
+        config = null; // Proceed with firstTimeSetup using existing dashboard URL.
+      } else {
+        config = null;
+      }
+    }
   }
   if (!config) config = await firstTimeSetup(repositoryRoot, options);
   try {

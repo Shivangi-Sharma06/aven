@@ -5,7 +5,7 @@ import {
   addTimelineEvent,
   addressesEqual,
   authenticateCliRequest,
-  authenticateWalletRequest,
+  authenticateBrowserSession,
   getSessionOnchainStream,
 } from "@/lib/work-session-server";
 
@@ -17,7 +17,7 @@ export async function POST(request: Request, context: { params: Promise<{ sessio
     return apiError("The work session does not match the current on-chain stream.", 409);
   }
   const token = await authenticateCliRequest(request, "request_withdrawal");
-  const wallet = token?.walletAddress ?? authenticateWalletRequest(request);
+  const wallet = token?.walletAddress ?? await authenticateBrowserSession(request);
   if (!wallet || !addressesEqual(wallet, session.workerAddress)) {
     return apiError("Only the worker can respond to this dispute.", 403);
   }

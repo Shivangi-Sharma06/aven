@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { Keypair } from "@stellar/stellar-sdk";
+import { getBrowserSession } from "./browser-session-store";
 import { getCliToken, type CliScope } from "./cli-auth-store";
 import { getStreamClient, STREAM_CONTRACT_ID, USDC_ASSET_ID } from "./contracts";
 import type { WorkSession, WorkSessionEvent, WorkSessionReport } from "./work-session";
@@ -143,28 +144,24 @@ export async function authenticateCliRequest(request: Request, scope: CliScope) 
   return token;
 }
 
-export function authenticateWalletRequest(request: Request) {
-  const walletAddress = request.headers.get("x-aven-wallet") ?? "";
-  const message = request.headers.get("x-aven-message") ?? "";
-  const signature = request.headers.get("x-aven-signature") ?? "";
-  const [purpose, signedAddress, issuedRaw, expiresRaw, ...extra] = message.split("\n");
-  const issuedAt = Number(issuedRaw);
-  const expiresAt = Number(expiresRaw);
-  const now = Date.now();
-  if (
-    purpose !== "Aven dashboard access" ||
-    extra.length > 0 ||
-    !addressesEqual(walletAddress, signedAddress ?? "") ||
-    !Number.isSafeInteger(issuedAt) ||
-    !Number.isSafeInteger(expiresAt) ||
-    issuedAt > now + 30_000 ||
-    expiresAt <= now ||
-    expiresAt - issuedAt > 60 * 60_000 ||
-    !verifyWalletSignature(walletAddress, message, signature)
-  ) {
-    return null;
-  }
-  return walletAddress;
+/**
+ * Authenticate a browser (dashboard) request via the aven_session HttpOnly
+ * cookie.  Returns the wallet address stored in Redis, or null if the session
+ * is missing or expired.
+ *
+ * The old multiline-header approach (x-aven-wallet / x-aven-message /
+ * x-aven-signature) was removed because HTTP headers cannot contain newline
+ * characters, causing browsers to reject the request before it reached the
+ * API handler.
+ */
+export async function authenticateBrowserSession(
+  request: Request,
+): Promise<string | null> {
+  const cookieHeader = request.headers.get("cookie") ?? "";
+  const match = /(?:^|;\s*)aven_session=([^;]+)/.exec(cookieHeader);
+  const sessionId = match?.[1];
+  if (!sessionId) return null;
+  return getBrowserSession(sessionId);
 }
 
 export function addTimelineEvent(

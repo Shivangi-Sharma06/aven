@@ -4,15 +4,18 @@ import { getSession, putSession } from "@/lib/session-store";
 import {
   addTimelineEvent,
   addressesEqual,
-  authenticateWalletRequest,
+  authenticateBrowserSession,
   getSessionOnchainStream,
 } from "@/lib/work-session-server";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function POST(request: Request, context: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await context.params;
   const session = await getSession(sessionId);
   if (!session) return apiError("Work session was not found.", 404);
-  const wallet = authenticateWalletRequest(request);
+  const wallet = await authenticateBrowserSession(request);
   const stream = await getSessionOnchainStream(session);
   if (!wallet || !stream || !addressesEqual(wallet, stream.sender)) {
     return apiError("Only the stream sender can dispute this request.", 403);

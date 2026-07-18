@@ -4,7 +4,7 @@ import { getSession } from "@/lib/session-store";
 import {
   addressesEqual,
   authenticateCliRequest,
-  authenticateWalletRequest,
+  authenticateBrowserSession,
   getSessionOnchainStream,
 } from "@/lib/work-session-server";
 
@@ -22,7 +22,7 @@ export async function GET(
     return apiError("The work session does not match the current on-chain stream.", 409);
   }
   const token = await authenticateCliRequest(request, "read_streams");
-  const wallet = token?.walletAddress ?? authenticateWalletRequest(request);
+  const wallet = token?.walletAddress ?? await authenticateBrowserSession(request);
   if (
     !wallet ||
     (!addressesEqual(wallet, session.workerAddress) && !addressesEqual(wallet, session.clientAddress))

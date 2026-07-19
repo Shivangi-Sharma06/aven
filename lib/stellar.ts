@@ -10,14 +10,27 @@ import {
   requestAccess,
   WatchWalletChanges,
 } from "@stellar/freighter-api";
+import {
+  Asset,
+  BASE_FEE,
+  Horizon,
+  Operation,
+  StrKey,
+  Transaction,
+  TransactionBuilder,
+} from "@stellar/stellar-sdk";
 
 import {
+  freighterSignTx,
   getStreamClient,
   getAttestationClient,
   getReputationClient,
   fromContractAmount,
   toContractAmount,
+  HORIZON_URL,
   USDC_ASSET_ID,
+  USDC_ASSET_CODE,
+  USDC_ISSUER,
   XLM_ASSET_ID,
   NETWORK_PASSPHRASE,
 } from "./contracts";
@@ -32,6 +45,8 @@ export type StreamCategory =
   | "Grant"
   | "AgentTask"
   | "Subscription";
+export const CREATE_STREAM_CATEGORIES = ["Freelance", "AgentTask"] as const;
+export type CreateStreamCategory = (typeof CREATE_STREAM_CATEGORIES)[number];
 export type StreamAsset = "USDC" | "XLM";
 
 export type StreamObject = {
@@ -85,20 +100,138 @@ export type CreateStreamInput = {
   totalAmount: number;
   asset: StreamAsset;
   durationLedgers: number;
-  ratePerSecond: number;
-  category: StreamCategory;
+  category: CreateStreamCategory;
   title: string;
   checkpointCount?: number;
   withdrawableCapPercent?: number;
   approvalTimeoutLedgers?: number;
 };
 
+export type UsdcTrustlineStatus = {
+  accountExists: boolean;
+  exists: boolean;
+  authorized: boolean;
+  balance: string;
+  limit: string | null;
+};
+
 const DEFAULT_APPROVAL_TIMEOUT_LEDGERS = 50;
+const STREAM_SECONDS_PER_LEDGER = 5;
+const horizon = new Horizon.Server(HORIZON_URL);
+const testnetUsdc = new Asset(USDC_ASSET_CODE, USDC_ISSUER);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function assetIdFor(asset: StreamAsset): string {
   return asset === "USDC" ? USDC_ASSET_ID : XLM_ASSET_ID;
+}
+
+export function isValidStellarAccountAddress(address: string): boolean {
+  return StrKey.isValidEd25519PublicKey(address.trim());
+}
+
+export async function getUsdcTrustlineStatus(
+  publicKey: string,
+): Promise<UsdcTrustlineStatus> {
+  if (!isValidStellarAccountAddress(publicKey)) {
+    throw new Error("Enter a valid Stellar account before checking its USDC trustline.");
+  }
+
+  let account;
+  try {
+    account = await horizon.loadAccount(publicKey);
+  } catch (error: any) {
+    if (error?.response?.status === 404) {
+      return {
+        accountExists: false,
+        exists: false,
+        authorized: false,
+        balance: "0.0000000",
+        limit: null,
+      };
+    }
+    throw error;
+  }
+
+  const trustline = account.balances.find(
+    (balance) =>
+      balance.asset_type !== "native" &&
+      "asset_code" in balance &&
+      "asset_issuer" in balance &&
+      balance.asset_code === USDC_ASSET_CODE &&
+      balance.asset_issuer === USDC_ISSUER,
+  );
+
+  if (!trustline || trustline.asset_type === "native") {
+    return {
+      accountExists: true,
+      exists: false,
+      authorized: false,
+      balance: "0.0000000",
+      limit: null,
+    };
+  }
+
+  return {
+    accountExists: true,
+    exists: true,
+    authorized:
+      !("is_authorized" in trustline) || trustline.is_authorized !== false,
+    balance: trustline.balance,
+    limit: "limit" in trustline ? trustline.limit : null,
+  };
+}
+
+export async function createUsdcTrustline(
+  publicKey: string,
+): Promise<{ txHash: string }> {
+  if (!isValidStellarAccountAddress(publicKey)) {
+    throw new Error("Connect a valid Stellar account before adding the USDC trustline.");
+  }
+
+  const current = await getUsdcTrustlineStatus(publicKey);
+  if (!current.accountExists) {
+    throw new Error("Fund this Stellar testnet account with XLM before adding a trustline.");
+  }
+  if (current.exists && current.authorized) {
+    throw new Error("This wallet already has the Circle testnet USDC trustline.");
+  }
+
+  const account = await horizon.loadAccount(publicKey);
+  const transaction = new TransactionBuilder(account, {
+    fee: BASE_FEE,
+    networkPassphrase: NETWORK_PASSPHRASE,
+  })
+    .addOperation(Operation.changeTrust({ asset: testnetUsdc }))
+    .setTimeout(180)
+    .build();
+
+  const signed = await freighterSignTx(transaction.toXDR(), {
+    networkPassphrase: NETWORK_PASSPHRASE,
+    address: publicKey,
+  });
+  if (!signed.signedTxXdr) {
+    throw new Error("Freighter did not return a signed trustline transaction.");
+  }
+
+  const signedTransaction = TransactionBuilder.fromXDR(
+    signed.signedTxXdr,
+    NETWORK_PASSPHRASE,
+  ) as Transaction;
+  const submitted = await horizon.submitTransaction(signedTransaction);
+
+  return { txHash: submitted.hash };
+}
+
+export function computeStreamRatePerSecond(
+  totalAmount: number,
+  durationLedgers: number,
+): number {
+  if (!Number.isFinite(totalAmount) || totalAmount <= 0) return 0;
+  if (!Number.isInteger(durationLedgers) || durationLedgers <= 0) return 0;
+
+  const durationSeconds = durationLedgers * STREAM_SECONDS_PER_LEDGER;
+  return Math.floor((totalAmount * 10_000_000) / durationSeconds) / 10_000_000;
 }
 
 function assetFromId(contractId: string): StreamAsset {
@@ -214,8 +347,20 @@ export async function createStream(
   data: CreateStreamInput,
   callerAddress: string
 ): Promise<{ streamId: string; txHash: string }> {
+  if (!CREATE_STREAM_CATEGORIES.includes(data.category)) {
+    throw new Error("Category must be Freelance or Agent Task.");
+  }
+
+  const computedRate = computeStreamRatePerSecond(
+    data.totalAmount,
+    data.durationLedgers,
+  );
+  if (computedRate <= 0) {
+    throw new Error("Amount and duration produce a rate below contract precision.");
+  }
+
   const client = getStreamClient(callerAddress);
-  const ratePerSecond = toContractAmount(data.ratePerSecond);
+  const ratePerSecond = toContractAmount(computedRate);
   const totalDeposited = toContractAmount(data.totalAmount);
 
   const tx = await client.create_stream({

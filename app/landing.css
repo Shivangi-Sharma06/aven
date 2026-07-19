@@ -95,7 +95,8 @@ a {
   backdrop-filter: blur(10px);
 }
 
-.aven-nav button {
+.aven-nav button,
+.aven-nav a {
   background: transparent;
   color: inherit;
   cursor: pointer;
@@ -110,7 +111,12 @@ a {
 
 .aven-nav__links {
   display: flex;
+  align-items: center;
   gap: 28px;
+}
+
+.aven-nav__docs {
+  font-weight: 700;
 }
 
 .stage {
@@ -1714,10 +1720,16 @@ a {
 
 @media (max-width: 900px) {
   .aven-nav {
-    padding: 18px 20px;
+    gap: 16px;
+    padding: 16px 18px;
   }
 
   .aven-nav__links {
+    margin-left: auto;
+    gap: 0;
+  }
+
+  .aven-nav__links button {
     display: none;
   }
 
@@ -1781,6 +1793,30 @@ a {
 }
 
 @media (max-width: 768px) {
+  .aven-nav {
+    min-height: 58px;
+    padding: 13px 16px;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+  }
+
+  .aven-nav__brand {
+    flex: 0 0 auto;
+  }
+
+  .aven-nav__docs {
+    white-space: nowrap;
+  }
+
+  .aven-nav__launch {
+    max-width: none;
+    white-space: nowrap;
+  }
+
+  .aven-layered-loop {
+    display: block;
+  }
+
   .aven-layered-panel {
     height: auto;
     min-height: 0;
@@ -1794,36 +1830,39 @@ a {
   }
 
   .aven-layered-panel > .stage {
-    min-height: 620px;
+    min-height: 100svh;
   }
 
   .aven-layered-panel--hero .hero-copy {
     height: auto;
-    min-height: 620px;
-    padding: 92px 18px 54px;
+    min-height: 100svh;
+    justify-content: flex-start;
+    padding: 104px 18px 64px;
   }
 
   .aven-layered-panel--hero .hero-brand {
-    width: min(62vw, 560px);
-    margin-bottom: 42px;
+    width: min(76vw, 360px);
+    margin-bottom: 30px;
   }
 
   .aven-layered-panel--hero .hero-copy h1 {
-    margin-top: 32px;
-    font-size: clamp(34px, 4.2vw, 64px);
+    margin-top: 24px;
+    font-size: clamp(38px, 10vw, 54px);
+    line-height: 0.96;
   }
 
   .aven-layered-panel--hero .hero-copy__body {
-    margin-top: 34px;
-    font-size: 16px;
+    width: min(100%, 520px);
+    margin-top: 24px;
+    font-size: 15px;
   }
 
   .aven-layered-panel--hero .live-counter {
-    margin-top: 46px;
+    margin-top: 32px;
   }
 
   .aven-layered-panel--hero .hero-actions {
-    margin-top: 42px;
+    margin-top: 30px;
   }
 
   .aven-layered-panel--how .steps-grid {
@@ -1832,7 +1871,38 @@ a {
 
   .aven-layered-panel > .aven-section,
   .aven-layered-panel--dense > .aven-section {
-    padding: 82px 20px;
+    padding: 68px 18px;
+  }
+
+  .aven-layered-panel .section-layout,
+  .aven-layered-panel--dense .section-layout {
+    gap: 28px;
+    margin-top: 24px;
+  }
+
+  .aven-layered-panel .section-visual {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .aven-layered-panel--dense .step-panel,
+  .aven-layered-panel--dense .protocol-stack article {
+    padding: 20px;
+  }
+
+  .stream-terminal,
+  .attestation-card,
+  .reputation-document-card,
+  .developer-terminal,
+  .agent-rails > article {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .developer-terminal pre,
+  .developer-terminal code {
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
   }
 
   .aven-layered-panel--cta {
@@ -1908,13 +1978,9 @@ a {
 }
 
 @media (max-width: 620px) {
-  .aven-nav__launch {
-    max-width: 112px;
-    text-align: right;
-  }
-
   .hero-actions {
-    width: min(100%, 280px);
+    width: 100%;
+    max-width: 360px;
     flex-direction: column;
   }
 
@@ -2069,15 +2135,16 @@ a {
   }
 
   .hero-copy h1 {
-    font-size: clamp(48px, 14vw, 74px);
+    font-size: clamp(38px, 11vw, 52px);
   }
 
   .aven-section h2,
   .final-cta h2 {
-    font-size: clamp(38px, 12vw, 64px);
+    font-size: clamp(36px, 10.5vw, 50px);
+    line-height: 0.94;
   }
 
   .live-counter strong {
-    font-size: 24px;
+    font-size: 22px;
   }
 }

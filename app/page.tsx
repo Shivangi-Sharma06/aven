@@ -22,6 +22,9 @@ export default function LandingPage() {
 
   useGSAP(
     () => {
+      const media = gsap.matchMedia();
+
+      media.add('(min-width: 769px)', () => {
       gsap.utils.toArray<HTMLElement>('.aven-section').forEach((section) => {
         const sectionHeader = section.querySelector('.section-kicker');
         const sectionVisual = section.querySelector('.section-visual');
@@ -60,7 +63,18 @@ export default function LandingPage() {
           }
         );
       });
+      });
 
+      media.add('(max-width: 768px)', () => {
+        gsap.set(
+          gsap.utils.toArray<HTMLElement>(
+            '.aven-section .section-kicker, .aven-section .section-visual',
+          ),
+          { autoAlpha: 1, y: 0 },
+        );
+      });
+
+      return () => media.revert();
     },
     { scope: appRef }
   );

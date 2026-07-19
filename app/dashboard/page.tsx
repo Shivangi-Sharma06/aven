@@ -8,6 +8,9 @@ import { pauseStream, resumeStream, cancelStream } from "@/lib/stellar";
 
 type Tab = "sending" | "receiving";
 
+const isOpenStream = (stream: StreamObject) =>
+  stream.status === "active" || stream.status === "paused";
+
 const STATUS_COLOR: Record<string, string> = {
   active: "#22c55e",
   paused: "#f59e0b",
@@ -31,6 +34,7 @@ export default function DashboardPage() {
   const [tab, setTab] = useState<Tab>("sending");
   const [sendingStreams, setSendingStreams] = useState<StreamObject[]>([]);
   const [receivingStreams, setReceivingStreams] = useState<StreamObject[]>([]);
+  const [totalReceived, setTotalReceived] = useState(0);
   const [attestationCount, setAttestationCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -46,8 +50,11 @@ export default function DashboardPage() {
         getRecipientStreams(address),
         getWorkerAttestations(address),
       ]);
-      setSendingStreams(sent);
-      setReceivingStreams(received);
+      // Terminal streams remain immutable on Stellar and reachable by direct
+      // URL, but the dashboard focuses on work that can still be managed.
+      setSendingStreams(sent.filter(isOpenStream));
+      setReceivingStreams(received.filter(isOpenStream));
+      setTotalReceived(received.reduce((sum, stream) => sum + stream.totalWithdrawn, 0));
       setAttestationCount(attestations.length);
     } catch (e: any) {
       setError(e?.message ?? "Failed to load streams");
@@ -62,7 +69,6 @@ export default function DashboardPage() {
 
   const streams = tab === "sending" ? sendingStreams : receivingStreams;
   const activeCount = [...sendingStreams, ...receivingStreams].filter((s) => s.status === "active").length;
-  const totalPaid = receivingStreams.reduce((a, s) => a + s.totalWithdrawn, 0);
 
   async function handleAction(action: string, stream: StreamObject) {
     if (!address) return;
@@ -107,7 +113,7 @@ export default function DashboardPage() {
           <div className="dash-stat-label">Active Streams</div>
         </div>
         <div className="dash-stat">
-          <div className="dash-stat-value">{totalPaid.toFixed(2)}</div>
+          <div className="dash-stat-value">{totalReceived.toFixed(2)}</div>
           <div className="dash-stat-label">Total Received</div>
         </div>
         <div className="dash-stat">
@@ -150,7 +156,7 @@ export default function DashboardPage() {
         </div>
       ) : streams.length === 0 ? (
         <div className="dash-no-streams">
-          <p>No {tab} streams found.</p>
+          <p>No active {tab} streams found.</p>
           {tab === "sending" && (
             <button className="dash-create-btn" onClick={() => router.push("/stream/create")}>
               Create your first stream →

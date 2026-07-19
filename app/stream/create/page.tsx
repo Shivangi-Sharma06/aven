@@ -1,14 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useWallet } from "@/components/WalletProvider";
-import { createStream, CreateStreamInput } from "@/lib/stellar";
+import {
+  computeStreamRatePerSecond,
+  createUsdcTrustline,
+  createStream,
+  CREATE_STREAM_CATEGORIES,
+  CreateStreamCategory,
+  CreateStreamInput,
+  getUsdcTrustlineStatus,
+  isValidStellarAccountAddress,
+} from "@/lib/stellar";
 
-type Category = "Freelance" | "Salary" | "Bounty" | "Grant" | "AgentTask" | "Subscription";
 type Asset = "USDC" | "XLM";
+type TrustlineState = "idle" | "checking" | "ready" | "missing" | "blocked" | "error";
 
-const CATEGORIES: Category[] = ["Freelance", "Salary", "Bounty", "Grant", "AgentTask", "Subscription"];
+const CATEGORY_DETAILS: Record<CreateStreamCategory, { label: string; description: string }> = {
+  Freelance: {
+    label: "Freelance",
+    description: "Client-funded work completed by an independent contributor.",
+  },
+  AgentTask: {
+    label: "Agent Task",
+    description: "A scoped task assigned to an autonomous software agent.",
+  },
+};
 
 // Approximate: 5 sec/ledger on testnet
 const SECONDS_PER_LEDGER = 5;
@@ -22,26 +40,86 @@ export default function CreateStreamPage() {
   const [recipient, setRecipient] = useState("");
   const [totalAmount, setTotalAmount] = useState("");
   const [durationDays, setDurationDays] = useState("7");
-  const [ratePerSecond, setRatePerSecond] = useState("");
-  const [category, setCategory] = useState<Category>("Freelance");
+  const [category, setCategory] = useState<CreateStreamCategory>("Freelance");
   const [asset, setAsset] = useState<Asset>("USDC");
   const [title, setTitle] = useState("");
   const [loading, setLoading] = useState(false);
+  const [addingTrustline, setAddingTrustline] = useState(false);
+  const [senderTrustline, setSenderTrustline] = useState<TrustlineState>("idle");
+  const [recipientTrustline, setRecipientTrustline] = useState<TrustlineState>("idle");
+  const [trustlineTxHash, setTrustlineTxHash] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<{ streamId: string; txHash: string } | null>(null);
 
-  // Auto-compute rate from total + duration (rounded down to 7 decimal places for contract safety)
   const durationLedgers = durationDays ? Math.round(parseFloat(durationDays) * LEDGERS_PER_DAY) : 0;
-  const computedRate =
-    totalAmount && durationLedgers > 0
-      ? (Math.floor((parseFloat(totalAmount) * 10000000) / (durationLedgers * SECONDS_PER_LEDGER)) / 10000000).toFixed(7)
-      : "";
+  const computedRateValue = computeStreamRatePerSecond(
+    parseFloat(totalAmount),
+    durationLedgers,
+  );
+  const computedRate = computedRateValue > 0 ? computedRateValue.toFixed(7) : "";
+  const hourlyRate = computedRateValue > 0 ? (computedRateValue * 3600).toFixed(6) : "—";
+
+  useEffect(() => {
+    let active = true;
+
+    if (asset !== "USDC" || !address) {
+      setSenderTrustline("idle");
+      return () => { active = false; };
+    }
+
+    setSenderTrustline("checking");
+    void getUsdcTrustlineStatus(address)
+      .then((status) => {
+        if (!active) return;
+        if (!status.accountExists || !status.exists) {
+          setSenderTrustline("missing");
+        } else {
+          setSenderTrustline(status.authorized ? "ready" : "blocked");
+        }
+      })
+      .catch(() => {
+        if (active) setSenderTrustline("error");
+      });
+
+    return () => { active = false; };
+  }, [address, asset]);
+
+  useEffect(() => {
+    let active = true;
+    const cleanRecipient = recipient.trim();
+
+    if (asset !== "USDC" || !isValidStellarAccountAddress(cleanRecipient)) {
+      setRecipientTrustline("idle");
+      return () => { active = false; };
+    }
+
+    setRecipientTrustline("checking");
+    const checkTimer = window.setTimeout(() => {
+      void getUsdcTrustlineStatus(cleanRecipient)
+        .then((status) => {
+          if (!active) return;
+          if (!status.accountExists || !status.exists) {
+            setRecipientTrustline("missing");
+          } else {
+            setRecipientTrustline(status.authorized ? "ready" : "blocked");
+          }
+        })
+        .catch(() => {
+          if (active) setRecipientTrustline("error");
+        });
+    }, 300);
+
+    return () => {
+      active = false;
+      window.clearTimeout(checkTimer);
+    };
+  }, [asset, recipient]);
 
   function friendlyError(raw: string): string {
     if (raw.includes("trustline entry is missing")) {
       const acct = raw.match(/GDW[A-Z0-9]{53}|G[A-Z0-9]{54}/)?.[0] ?? "your account";
       return `USDC trustline missing on ${acct.slice(0, 8)}…${acct.slice(-6)}. ` +
-        `Add a USDC trustline in Stellar Laboratory or Freighter before creating a USDC stream. ` +
+        `Add the Circle testnet USDC trustline from the funding section before creating a USDC stream. ` +
         `(Or switch the asset to XLM — XLM needs no trustline.)`;
     }
     if (raw.includes("insufficient funds") || raw.includes("balance would go below")) {
@@ -53,13 +131,33 @@ export default function CreateStreamPage() {
     return raw;
   }
 
+  async function handleAddUsdcTrustline() {
+    if (!connected || !address) {
+      openConnectModal();
+      return;
+    }
+
+    setAddingTrustline(true);
+    setError(null);
+    setTrustlineTxHash(null);
+    try {
+      const result = await createUsdcTrustline(address);
+      setTrustlineTxHash(result.txHash);
+      const status = await getUsdcTrustlineStatus(address);
+      setSenderTrustline(status.exists && status.authorized ? "ready" : "blocked");
+    } catch (trustlineError: any) {
+      setError(friendlyError(trustlineError?.message ?? "Could not add the USDC trustline."));
+    } finally {
+      setAddingTrustline(false);
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!connected || !address) return openConnectModal();
 
     const total = parseFloat(totalAmount);
     const days = parseFloat(durationDays);
-    const rate = parseFloat(ratePerSecond || computedRate);
 
     if (!recipient.startsWith("G") || recipient.length < 56) {
       setError("Recipient must be a valid Stellar address starting with G");
@@ -76,12 +174,25 @@ export default function CreateStreamPage() {
     setLoading(true);
     setError(null);
     try {
+      if (asset === "USDC") {
+        const senderStatus = await getUsdcTrustlineStatus(address);
+        if (!senderStatus.accountExists || !senderStatus.exists || !senderStatus.authorized) {
+          setSenderTrustline(senderStatus.exists ? "blocked" : "missing");
+          throw new Error("Your funding wallet must add the Circle testnet USDC trustline first.");
+        }
+
+        const recipientStatus = await getUsdcTrustlineStatus(recipient);
+        if (!recipientStatus.accountExists || !recipientStatus.exists || !recipientStatus.authorized) {
+          setRecipientTrustline(recipientStatus.exists ? "blocked" : "missing");
+          throw new Error("The recipient wallet must add the Circle testnet USDC trustline before this agreement can be created.");
+        }
+      }
+
       const input: CreateStreamInput = {
         recipient,
         totalAmount: total,
         asset,
         durationLedgers: Math.round(days * LEDGERS_PER_DAY),
-        ratePerSecond: rate,
         category,
         title: title.trim(),
       };
@@ -96,39 +207,77 @@ export default function CreateStreamPage() {
 
   if (success) {
     return (
-      <div className="form-success-wrap">
-        <div className="form-success-icon">✅</div>
-        <h2>Stream Created!</h2>
-        <p className="form-success-sub">Your payment stream is live on Stellar testnet.</p>
-        <div className="form-success-detail">
-          <div className="form-detail-row">
-            <span className="form-detail-label">Stream ID</span>
-            <span className="form-detail-value">#{success.streamId}</span>
+      <div className="stream-created">
+        <header className="stream-created__intro">
+          <div className="stream-created__seal" aria-hidden="true">
+            <span>AVEN</span>
+            <strong>LIVE</strong>
           </div>
-          <div className="form-detail-row">
-            <span className="form-detail-label">Tx Hash</span>
+          <div>
+            <span className="stream-created__kicker">AGREEMENT / CONFIRMED</span>
+            <h1>Stream<br />is live.</h1>
+            <p>
+              The work budget is funded and ready for verified sessions on
+              Stellar testnet.
+            </p>
+          </div>
+        </header>
+
+        <section className="stream-created__receipt" aria-label="Created stream receipt">
+          <div className="stream-created__receipt-bar">
+            <span>AVEN / STREAM RECORD</span>
+            <strong><i aria-hidden="true" /> ONCHAIN</strong>
+          </div>
+
+          <div className="stream-created__facts">
+            <div>
+              <span>Stream ID</span>
+              <strong>#{success.streamId}</strong>
+            </div>
+            <div>
+              <span>Network</span>
+              <strong>Stellar Testnet</strong>
+            </div>
+            <div>
+              <span>Status</span>
+              <strong>Active</strong>
+            </div>
+          </div>
+
+          <div className="stream-created__transaction">
+            <span>Transaction hash</span>
             <a
-              className="form-detail-link"
               href={`https://stellar.expert/explorer/testnet/tx/${success.txHash}`}
               target="_blank"
               rel="noopener noreferrer"
             >
               {success.txHash.slice(0, 12)}…{success.txHash.slice(-8)}
+              <span aria-hidden="true"> ↗</span>
             </a>
           </div>
-        </div>
-        <div className="form-success-actions">
+
+          <div className="stream-created__flow" aria-label="Stream lifecycle">
+            {["Funded", "Track work", "Review", "Release"].map((step, index) => (
+              <div key={step}>
+                <span>0{index + 1}</span>
+                <strong>{step}</strong>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <div className="stream-created__actions">
           <button
-            className="form-btn"
+            className="stream-created__primary"
             onClick={() => router.push(`/stream/${success.streamId}`)}
           >
-            View Stream →
+            View stream <span aria-hidden="true">→</span>
           </button>
           <button
-            className="form-btn-secondary"
+            className="stream-created__secondary"
             onClick={() => router.push("/dashboard")}
           >
-            Go to Dashboard
+            Go to dashboard
           </button>
         </div>
       </div>
@@ -138,15 +287,26 @@ export default function CreateStreamPage() {
   return (
     <div className="create-stream-wrap">
       <div className="create-stream-header">
-        <h1 className="create-stream-title">Create Payment Stream</h1>
-        <p className="create-stream-sub">
-          Fund a work agreement on Stellar. Payment unlocks only from npm-tracked active work sessions.
-        </p>
+        <span className="create-stream-kicker">NEW AGREEMENT / STELLAR TESTNET</span>
+        <div className="create-stream-heading">
+          <h1 className="create-stream-title">
+            Fund verified
+            <br />
+            work.
+          </h1>
+          <p className="create-stream-sub">
+            Lock a work budget in a Stellar contract. Funds become eligible only from
+            npm-tracked active work sessions that follow these terms.
+          </p>
+        </div>
       </div>
 
       {!connected && (
         <div className="create-connect-banner">
-          <span>Connect your wallet to create a stream</span>
+          <div>
+            <strong>Wallet required</strong>
+            <span>Connect the funding account before initializing this agreement.</span>
+          </div>
           <button className="wallet-btn" onClick={openConnectModal} id="create-connect-wallet">
             Connect Freighter
           </button>
@@ -154,131 +314,298 @@ export default function CreateStreamPage() {
       )}
 
       <form className="create-stream-form" onSubmit={handleSubmit} id="create-stream-form">
-        <div className="form-section">
-          <label className="form-label">Stream Title *</label>
-          <input
-            className="form-input"
-            placeholder="e.g. Smart Contract Audit – Phase 1"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            required
-            id="stream-title"
-          />
+        <div className="create-form-bar">
+          <div>
+            <span>STREAM TERMS</span>
+            <strong>PAYMENT AGREEMENT / DRAFT</strong>
+          </div>
+          <span>{connected ? "WALLET CONNECTED" : "AWAITING WALLET"}</span>
         </div>
 
-        <div className="form-section">
-          <label className="form-label">Recipient Address *</label>
-          <input
-            className="form-input form-input--mono"
-            placeholder="G…"
-            value={recipient}
-            onChange={(e) => setRecipient(e.target.value)}
-            aria-describedby="stream-recipient-help"
-            required
-            id="stream-recipient"
-          />
-          <small id="stream-recipient-help" className="form-label-hint">
-            Must be different from the connected sender wallet.
-          </small>
-        </div>
+        <div className="create-form-layout">
+          <div className="create-form-fields">
+            <section className="create-form-block">
+              <div className="create-form-block__heading">
+                <span>01</span>
+                <div>
+                  <strong>Work identity</strong>
+                  <small>Name the agreement and identify who will receive payment.</small>
+                </div>
+              </div>
 
-        <div className="form-row">
-          <div className="form-section" style={{ flex: 2 }}>
-            <label className="form-label">Total Amount *</label>
-            <input
-              className="form-input"
-              type="number"
-              placeholder="1000"
-              min="0"
-              step="any"
-              value={totalAmount}
-              onChange={(e) => setTotalAmount(e.target.value)}
-              required
-              id="stream-total-amount"
-            />
-          </div>
-          <div className="form-section" style={{ flex: 1 }}>
-            <label className="form-label">Asset</label>
-            <select
-              className="form-select"
-              value={asset}
-              onChange={(e) => setAsset(e.target.value as Asset)}
-              id="stream-asset"
-            >
-              <option value="USDC">USDC</option>
-              <option value="XLM">XLM</option>
-            </select>
-          </div>
-        </div>
+              <div className="form-section">
+                <label className="form-label" htmlFor="stream-title">
+                  Stream title *
+                </label>
+                <input
+                  className="form-input"
+                  placeholder="Smart Contract Audit — Phase 1"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  required
+                  id="stream-title"
+                />
+              </div>
 
-        <div className="form-row">
-          <div className="form-section" style={{ flex: 1 }}>
-            <label className="form-label">Duration (days) *</label>
-            <input
-              className="form-input"
-              type="number"
-              placeholder="7"
-              min="1"
-              value={durationDays}
-              onChange={(e) => setDurationDays(e.target.value)}
-              required
-              id="stream-duration"
-            />
-          </div>
-          <div className="form-section" style={{ flex: 1 }}>
-            <label className="form-label">
-              Rate / second
-              <span className="form-label-hint"> (auto-computed)</span>
-            </label>
-            <input
-              className="form-input"
-              type="number"
-              placeholder={computedRate || "0.00000116"}
-              step="any"
-              value={ratePerSecond}
-              onChange={(e) => setRatePerSecond(e.target.value)}
-              id="stream-rate"
-            />
-          </div>
-        </div>
+              <div className="form-section">
+                <label className="form-label" htmlFor="stream-recipient">
+                  Recipient address *
+                </label>
+                <input
+                  className="form-input form-input--mono"
+                  placeholder="G…"
+                  value={recipient}
+                  onChange={(e) => setRecipient(e.target.value)}
+                  aria-describedby="stream-recipient-help"
+                  required
+                  id="stream-recipient"
+                />
+                <small id="stream-recipient-help" className="form-label-hint">
+                  Must be a different Stellar account from the connected sender.
+                </small>
+              </div>
+            </section>
 
-        <div className="form-section">
-          <label className="form-label">Category</label>
-          <div className="form-category-grid" id="stream-category-grid">
-            {CATEGORIES.map((cat) => (
-              <button
-                key={cat}
-                type="button"
-                className={`form-cat-btn ${category === cat ? "selected" : ""}`}
-                onClick={() => setCategory(cat)}
-                id={`cat-${cat.toLowerCase()}`}
+            <section className="create-form-block">
+              <div className="create-form-block__heading">
+                <span>02</span>
+                <div>
+                  <strong>Funding terms</strong>
+                  <small>Set the total escrow and the agreement duration.</small>
+                </div>
+              </div>
+
+              <div className="create-funding-grid">
+                <div className="form-section create-amount-field">
+                  <label className="form-label" htmlFor="stream-total-amount">
+                    Total amount *
+                  </label>
+                  <input
+                    className="form-input"
+                    type="number"
+                    placeholder="1000"
+                    min="0"
+                    step="any"
+                    value={totalAmount}
+                    onChange={(e) => setTotalAmount(e.target.value)}
+                    required
+                    id="stream-total-amount"
+                  />
+                </div>
+                <div className="form-section">
+                  <label className="form-label" htmlFor="stream-asset">
+                    Asset
+                  </label>
+                  <select
+                    className="form-select"
+                    value={asset}
+                    onChange={(e) => setAsset(e.target.value as Asset)}
+                    id="stream-asset"
+                  >
+                    <option value="USDC">USDC</option>
+                    <option value="XLM">XLM</option>
+                  </select>
+                </div>
+                <div className="form-section">
+                  <label className="form-label" htmlFor="stream-duration">
+                    Duration *
+                  </label>
+                  <div className="create-input-suffix">
+                    <input
+                      className="form-input"
+                      type="number"
+                      placeholder="7"
+                      min="1"
+                      value={durationDays}
+                      onChange={(e) => setDurationDays(e.target.value)}
+                      required
+                      id="stream-duration"
+                    />
+                    <span>Days</span>
+                  </div>
+                </div>
+              </div>
+
+              {asset === "USDC" && (
+                <div className="create-trustline-card" aria-live="polite">
+                  <div className="create-trustline-card__header">
+                    <div>
+                      <span>Circle USDC / Stellar testnet</span>
+                      <strong>Trustline readiness</strong>
+                    </div>
+                    <small>Required to hold and release USDC</small>
+                  </div>
+
+                  <div className="create-trustline-row">
+                    <div>
+                      <span>Funding wallet</span>
+                      <strong>
+                        {!connected
+                          ? "Connect wallet"
+                          : senderTrustline === "checking"
+                            ? "Checking network…"
+                            : senderTrustline === "ready"
+                              ? "Ready"
+                              : senderTrustline === "missing"
+                                ? "Trustline required"
+                                : senderTrustline === "blocked"
+                                  ? "Not authorized"
+                                  : senderTrustline === "error"
+                                    ? "Check failed"
+                                    : "Waiting"}
+                      </strong>
+                    </div>
+                    {connected && senderTrustline !== "ready" && senderTrustline !== "checking" && (
+                      <button
+                        type="button"
+                        onClick={handleAddUsdcTrustline}
+                        disabled={addingTrustline || senderTrustline === "blocked"}
+                      >
+                        {addingTrustline ? "Signing…" : "Add USDC trustline ↗"}
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="create-trustline-row">
+                    <div>
+                      <span>Recipient wallet</span>
+                      <strong>
+                        {!isValidStellarAccountAddress(recipient)
+                          ? "Enter recipient"
+                          : recipientTrustline === "checking"
+                            ? "Checking network…"
+                            : recipientTrustline === "ready"
+                              ? "Ready"
+                              : recipientTrustline === "missing"
+                                ? "Recipient action required"
+                                : recipientTrustline === "blocked"
+                                  ? "Not authorized"
+                                  : recipientTrustline === "error"
+                                    ? "Check failed"
+                                    : "Waiting"}
+                      </strong>
+                    </div>
+                    <small>
+                      The recipient adds this trustline from their own wallet before release.
+                    </small>
+                  </div>
+
+                  {trustlineTxHash && (
+                    <a
+                      href={`https://stellar.expert/explorer/testnet/tx/${trustlineTxHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Trustline confirmed · View transaction ↗
+                    </a>
+                  )}
+                </div>
+              )}
+
+              <output
+                className="create-rate-output"
+                id="stream-rate"
+                aria-live="polite"
               >
-                {cat}
-              </button>
-            ))}
+                <div>
+                  <span>Contract-derived rate</span>
+                  <strong>{computedRate || "—"}</strong>
+                  <small>{asset} / active second</small>
+                </div>
+                <p>
+                  Locked from total amount ÷ duration. This value is recalculated by
+                  the transaction builder and cannot be edited.
+                </p>
+              </output>
+            </section>
+
+            <section className="create-form-block">
+              <div className="create-form-block__heading">
+                <span>03</span>
+                <div>
+                  <strong>Work type</strong>
+                  <small>Choose the verification path used for this agreement.</small>
+                </div>
+              </div>
+
+              <div className="form-category-grid" id="stream-category-grid">
+                {CREATE_STREAM_CATEGORIES.map((cat, index) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    className={`form-cat-btn ${category === cat ? "selected" : ""}`}
+                    onClick={() => setCategory(cat)}
+                    id={`cat-${cat.toLowerCase()}`}
+                    aria-pressed={category === cat}
+                  >
+                    <span>0{index + 1}</span>
+                    <strong>{CATEGORY_DETAILS[cat].label}</strong>
+                    <small>{CATEGORY_DETAILS[cat].description}</small>
+                  </button>
+                ))}
+              </div>
+            </section>
           </div>
+
+          <aside className="create-terms-summary">
+            <div className="create-terms-summary__header">
+              <span>LIVE TERMS</span>
+              <strong>{asset} AGREEMENT</strong>
+            </div>
+
+            <dl>
+              <div>
+                <dt>Escrow</dt>
+                <dd>{totalAmount ? `${totalAmount} ${asset}` : "—"}</dd>
+              </div>
+              <div>
+                <dt>Duration</dt>
+                <dd>{durationDays ? `${durationDays} days` : "—"}</dd>
+              </div>
+              <div>
+                <dt>Hourly equivalent</dt>
+                <dd>{hourlyRate === "—" ? "—" : `${hourlyRate} ${asset}`}</dd>
+              </div>
+              <div>
+                <dt>Work type</dt>
+                <dd>{CATEGORY_DETAILS[category].label}</dd>
+              </div>
+            </dl>
+
+            <div className="create-terms-flow" aria-label="Agreement lifecycle">
+              <div><span>01</span><strong>Fund</strong></div>
+              <div><span>02</span><strong>Track</strong></div>
+              <div><span>03</span><strong>Review</strong></div>
+              <div><span>04</span><strong>Release</strong></div>
+            </div>
+
+            <p className="create-terms-note">
+              Only npm-tracked active seconds can reserve payment from this escrow.
+            </p>
+
+            {error && <div className="form-error">{error}</div>}
+
+            <button
+              className="form-submit-btn"
+              type="submit"
+              disabled={
+                loading ||
+                !connected ||
+                (asset === "USDC" && senderTrustline !== "ready")
+              }
+              id="create-stream-submit"
+            >
+              {loading ? (
+                <span className="form-spinner" />
+              ) : (
+                <>
+                  <span>Initialize agreement</span>
+                  <span>↗</span>
+                </>
+              )}
+            </button>
+          </aside>
         </div>
-
-        {computedRate && (
-          <div className="form-rate-preview">
-            <span>≈ {computedRate} {asset}/sec · {(parseFloat(computedRate) * 3600).toFixed(6)} {asset}/hr</span>
-          </div>
-        )}
-
-        {error && <div className="form-error">{error}</div>}
-
-        <button
-          className="form-submit-btn"
-          type="submit"
-          disabled={loading || !connected}
-          id="create-stream-submit"
-        >
-          {loading ? (
-            <span className="form-spinner" />
-          ) : (
-            "Initialize Stream on Stellar"
-          )}
-        </button>
       </form>
     </div>
   );

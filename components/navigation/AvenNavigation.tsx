@@ -35,6 +35,14 @@ export default function AvenNavigation() {
             {label}
           </button>
         ))}
+        <a
+          className="aven-nav__docs"
+          href="https://heyaven09.mintlify.site/"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          DOCS ↗
+        </a>
       </div>
       <button className="aven-nav__launch" onClick={() => router.push('/dashboard')}>
         LAUNCH APP ↗

@@ -116,7 +116,7 @@ a {
 }
 
 .aven-nav__docs {
-  font-weight: 700;
+  font-weight: inherit;
 }
 
 .stage {

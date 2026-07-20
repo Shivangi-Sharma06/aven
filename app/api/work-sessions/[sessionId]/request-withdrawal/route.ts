@@ -6,6 +6,8 @@ import {
   addressesEqual,
   authenticateCliRequest,
   authenticateBrowserSession,
+  calculateSettlementSeconds,
+  formatAmountUnits,
   getAvailableUnits,
   getSessionOnchainStream,
   parseAmountUnits,
@@ -47,29 +49,67 @@ export async function POST(
     return apiError("The stream recipient could not be verified.", 403);
   }
   try {
+    const projectEnded = session.report?.session.projectEnded === true;
     const requestedAmount = session.report?.paymentRequest.requestedAmount;
     if (!requestedAmount) return apiError("The report has no payment request.");
-    const requestedUnits = parseAmountUnits(requestedAmount);
     const availableUnits = await getAvailableUnits(session.streamId);
+    const remainingEscrowUnits =
+      stream.totalDepositedUnits - stream.totalWithdrawnUnits;
+    if (projectEnded && availableUnits !== remainingEscrowUnits) {
+      return apiError(
+        "Resolve every pending or reserved work-session payment before requesting the final settlement.",
+        409,
+      );
+    }
+    const requestedUnits = projectEnded
+      ? availableUnits
+      : parseAmountUnits(requestedAmount);
     if (requestedUnits <= 0n || requestedUnits > availableUnits) {
       return apiError("The requested amount exceeds the stream earnings not already reserved.", 409);
     }
     if (!session.report) return apiError("The verified report is missing.", 409);
+    const settlementSeconds = projectEnded
+      ? calculateSettlementSeconds(stream, availableUnits)
+      : undefined;
+    if (projectEnded) {
+      session.report.paymentRequest = {
+        ...session.report.paymentRequest,
+        requestedAmount: formatAmountUnits(requestedUnits),
+        calculation: "remaining_escrow_via_settlement_seconds",
+        billableSeconds: session.report.session.activeSeconds,
+        settlementSeconds: settlementSeconds?.toString(),
+      };
+    }
     const onchain = await recordVerifiedWork({
       streamId: session.streamId,
       sessionId: session.id,
       amountUnits: requestedUnits,
       report: session.report,
+      onchainActiveSeconds: settlementSeconds,
     });
-    session.requestedAmount = requestedAmount;
+    session.requestedAmount = formatAmountUnits(requestedUnits);
     session.verifierTxHash = onchain.transactionHash ?? session.verifierTxHash;
     session.reportDigest = onchain.reportDigest;
     session.reviewDeadlineLedger = onchain.reviewDeadlineLedger;
-    addTimelineEvent(session, "WITHDRAWAL_REQUESTED", "worker", `Reserved ${requestedAmount} ${stream.asset} against the verified session.`);
+    addTimelineEvent(
+      session,
+      "WITHDRAWAL_REQUESTED",
+      "worker",
+      projectEnded
+        ? `Reserved the final ${session.requestedAmount} ${stream.asset} settlement using ${settlementSeconds} contract-equivalent seconds.`
+        : `Reserved ${session.requestedAmount} ${stream.asset} against the verified session.`,
+    );
     session.reviewDeadlineAt = new Date(
       Date.now() + Math.max(stream.approvalTimeoutLedgers, 1) * 5_000,
     ).toISOString();
-    addTimelineEvent(session, "PENDING_CLIENT_REVIEW", "system", "Client review window opened.");
+    addTimelineEvent(
+      session,
+      "PENDING_CLIENT_REVIEW",
+      "system",
+      projectEnded
+        ? "Final project settlement submitted for client review. The legacy contract timeout remains active."
+        : "Client review window opened.",
+    );
     await putSession(session);
     return NextResponse.json(session);
   } catch (error) {

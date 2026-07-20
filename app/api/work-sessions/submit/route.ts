@@ -8,6 +8,7 @@ import {
   addTimelineEvent,
   addressesEqual,
   authenticateCliRequest,
+  calculateSettlementSeconds,
   calculateSessionPaymentUnits,
   formatAmountUnits,
   getAvailableUnits,
@@ -55,20 +56,42 @@ export async function POST(request: Request) {
       return apiError("The report asset does not match the stream asset.");
     }
     const availableUnits = await getAvailableUnits(stream.id);
-    const calculatedUnits = calculateSessionPaymentUnits(
-      stream,
-      report.session.activeSeconds,
-      availableUnits,
-    );
-    if (calculatedUnits <= 0n) {
-      return apiError("No escrow remains for this session's tracked active time.", 409);
+    const projectEnded = report.session.projectEnded === true;
+    const remainingEscrowUnits =
+      stream.totalDepositedUnits - stream.totalWithdrawnUnits;
+    if (projectEnded && availableUnits !== remainingEscrowUnits) {
+      return apiError(
+        "Resolve every pending or reserved work-session payment before submitting the final project session.",
+        409,
+      );
     }
+    const calculatedUnits = projectEnded
+      ? availableUnits
+      : calculateSessionPaymentUnits(
+          stream,
+          report.session.activeSeconds,
+          availableUnits,
+        );
+    if (calculatedUnits <= 0n) {
+      return apiError(
+        projectEnded
+          ? "No unreserved escrow remains to complete this project."
+          : "No escrow remains for this session's tracked active time.",
+        409,
+      );
+    }
+    const settlementSeconds = projectEnded
+      ? calculateSettlementSeconds(stream, availableUnits)
+      : undefined;
     report.paymentRequest = {
       requestedAmount: formatAmountUnits(calculatedUnits),
       asset: stream.asset,
-      calculation: "active_time_x_stream_rate",
+      calculation: projectEnded
+        ? "remaining_escrow_via_settlement_seconds"
+        : "active_time_x_stream_rate",
       ratePerSecond: formatAmountUnits(ratePerSecondUnits(stream)),
       billableSeconds: report.session.activeSeconds,
+      settlementSeconds: settlementSeconds?.toString(),
     };
     // Excluded paths are useful in the worker's private local report, but the
     // dashboard only needs the aggregate privacy counts. Do not persist their

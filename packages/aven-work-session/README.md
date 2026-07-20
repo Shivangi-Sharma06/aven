@@ -18,6 +18,9 @@ Run the CLI without installing it globally:
 ```bash
 npx aven-stellar start
 npx aven-stellar stop
+
+# Use only for the final project session:
+npx aven-stellar stop --ended
 ```
 
 When testing a newly published fix, force `npx` to resolve the current package:
@@ -65,6 +68,10 @@ npx aven-stellar stop --message <summary>
 
 - `start --non-interactive` skips the collection confirmation.
 - `stop --submit` submits the previewed report without another prompt.
+- `stop --ended` marks the report as the final project session. The dashboard
+  calculates the remaining unreserved escrow and converts it into
+  contract-equivalent seconds before calling the existing `verify_work`
+  entrypoint. The real npm-tracked active seconds remain in the report.
 - `--message` supplies the worker's summary of the session.
 - The payment amount is calculated automatically from tracked active seconds and the stream's on-chain rate, capped by the unreserved escrow remaining.
 
@@ -96,7 +103,18 @@ npx aven-stellar stop \
 
 ## Current enforcement boundary
 
-Work-session payment math is enforced on-chain in the current release. The dashboard verifier reserves exactly `active seconds × stream rate`, capped by unreserved escrow. The sender can then approve or dispute the request, and an attestation is minted only when the approved payment is released. Ledger time and legacy checkpoint accrual do not unlock funds.
+Work-session payment math is enforced on-chain in the current release. For a
+normal session, the dashboard verifier reserves exactly
+`active seconds × stream rate`, capped by unreserved escrow. For `--ended`, the
+server uses `ceil(remaining escrow ÷ rate)` as the legacy contract's duration
+argument so the contract caps the verified amount to the exact remaining
+escrow. This compatibility duration is recorded separately from the real npm
+active time shown in the report. Pending or reserved session payments must be
+resolved before a final session can be submitted.
+
+The dashboard asks for explicit client approval on a final session. The
+currently deployed legacy contract still retains its original timeout-based
+release rule, so direct on-chain release after that deadline remains possible.
 
 ## Package development
 

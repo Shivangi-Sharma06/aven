@@ -4,6 +4,7 @@ import { getBrowserSession } from "./browser-session-store";
 import { getCliToken, type CliScope } from "./cli-auth-store";
 import { getStreamClient, STREAM_CONTRACT_ID, USDC_ASSET_ID } from "./contracts";
 import type { WorkSession, WorkSessionEvent, WorkSessionReport } from "./work-session";
+import { calculateSettlementSecondsForRate } from "./work-session-math";
 
 const ANONYMOUS_ADDRESS = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
 const AMOUNT_PATTERN = /^(0|[1-9]\d*)(?:\.(\d{1,7}))?$/;
@@ -77,6 +78,16 @@ export function formatAmountUnits(value: bigint): string {
 
 export function ratePerSecondUnits(stream: OnchainStream) {
   return stream.ratePerLedgerUnits / SECONDS_PER_LEDGER;
+}
+
+export function calculateSettlementSeconds(
+  stream: OnchainStream,
+  availableUnits: bigint,
+) {
+  return calculateSettlementSecondsForRate(
+    availableUnits,
+    ratePerSecondUnits(stream),
+  );
 }
 
 export function calculateSessionPaymentUnits(
@@ -207,6 +218,12 @@ export function validateWorkSessionReport(value: unknown): asserts value is Work
     report.session.activeSeconds > report.session.totalSeconds
   ) {
     throw new Error("Active session time must be a whole number no greater than total session time.");
+  }
+  if (
+    report.session.projectEnded !== undefined &&
+    typeof report.session.projectEnded !== "boolean"
+  ) {
+    throw new Error("projectEnded must be a boolean when provided.");
   }
   if (!Array.isArray(report.changes.changedFiles) || !Array.isArray(report.changes.commits)) {
     throw new Error("Changed files and commits must be arrays.");

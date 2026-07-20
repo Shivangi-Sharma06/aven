@@ -11,6 +11,7 @@ import type { LocalSession } from "./types.js";
 export type StopOptions = {
   message?: string;
   submit?: boolean;
+  ended?: boolean;
 };
 
 const delay = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -84,16 +85,22 @@ export async function stopCommand(options: StopOptions) {
       ratePerSecond: stream.ratePerSecond,
     },
     stoppedAt,
+    options.ended === true,
   );
   await saveLocalReport(repositoryRoot, report);
   printReport(report);
   process.stdout.write(
-    `Payment was calculated from ${report.session.activeSeconds}s of tracked active time at the stream rate.\n`,
+    report.session.projectEnded
+      ? "Project completion requested. Aven will calculate the remaining settlement on the server.\n"
+      : `Payment was calculated from ${report.session.activeSeconds}s of tracked active time at the stream rate.\n`,
   );
 
   let shouldSubmit = options.submit === true;
   if (!options.submit) {
-    const confirmation = (await question("Submit this work session to Aven?", "Y")).toLowerCase();
+    const prompt = report.session.projectEnded
+      ? "Submit this FINAL project session to Aven?"
+      : "Submit this work session to Aven?";
+    const confirmation = (await question(prompt, "Y")).toLowerCase();
     shouldSubmit = confirmation === "y" || confirmation === "yes";
   }
   if (!shouldSubmit) {

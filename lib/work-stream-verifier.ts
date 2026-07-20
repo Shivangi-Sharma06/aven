@@ -56,7 +56,7 @@ export async function recordVerifiedWork(input: {
   sessionId: string;
   amountUnits: bigint;
   report: WorkSessionReport;
-  activeSeconds?: number;
+  onchainActiveSeconds?: bigint | number;
   workStartLedger?: number;
 }) {
   const client = verifierClient();
@@ -67,7 +67,9 @@ export async function recordVerifiedWork(input: {
     request_id: input.sessionId,
     amount: input.amountUnits,
     evidence_hash: digest,
-    active_duration_seconds: BigInt(input.activeSeconds ?? input.report.session.activeSeconds ?? 0),
+    active_duration_seconds: BigInt(
+      input.onchainActiveSeconds ?? input.report.session.activeSeconds ?? 0,
+    ),
     work_start_ledger: input.workStartLedger ?? 0,
   });
   const sent = await transaction.signAndSend();

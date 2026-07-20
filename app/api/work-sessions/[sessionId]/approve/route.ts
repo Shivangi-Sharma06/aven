@@ -26,8 +26,23 @@ export async function POST(request: Request, context: { params: Promise<{ sessio
   if (session.status !== "PENDING_CLIENT_REVIEW") {
     return apiError(`Cannot approve while the session is ${session.status}.`, 409);
   }
-  addTimelineEvent(session, "APPROVED", "client", "Client approved the work session.");
-  addTimelineEvent(session, "RELEASE_ELIGIBLE", "system", "The approved amount is release-eligible.");
+  const projectEnded = session.report?.session.projectEnded === true;
+  addTimelineEvent(
+    session,
+    "APPROVED",
+    "client",
+    projectEnded
+      ? "Client approved the final project settlement."
+      : "Client approved the work session.",
+  );
+  addTimelineEvent(
+    session,
+    "RELEASE_ELIGIBLE",
+    "system",
+    projectEnded
+      ? "The final project settlement is release-eligible."
+      : "The approved amount is release-eligible.",
+  );
   await putSession(session);
   return NextResponse.json(session);
 }

@@ -59,6 +59,7 @@ export type WorkSessionReport = {
     activeSeconds: number;
     idleSeconds: number;
     packageVersion: string;
+    projectEnded?: boolean;
   };
   repository: {
     repositoryId: string;
@@ -91,9 +92,10 @@ export type WorkSessionReport = {
   paymentRequest: {
     requestedAmount: string;
     asset: "USDC" | "XLM";
-    calculation?: "active_time_x_stream_rate";
+    calculation?: "active_time_x_stream_rate" | "remaining_escrow_via_settlement_seconds";
     ratePerSecond?: string;
     billableSeconds?: number;
+    settlementSeconds?: string;
   };
   privacy: {
     profile: "standard";

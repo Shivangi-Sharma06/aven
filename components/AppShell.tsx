@@ -2,7 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, PlusCircle, User, ShieldCheck, Award, Wallet, LogOut } from "lucide-react";
+import {
+  LayoutDashboard,
+  PlusCircle,
+  User,
+  ShieldCheck,
+  Award,
+  BookOpen,
+  Wallet,
+  LogOut,
+} from "lucide-react";
 import { useWallet } from "./WalletProvider";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -43,6 +52,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Award size={20} />
           <span>Reputation</span>
         </Link>
+        <a
+          href="https://heyaven09.mintlify.site/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="nav-item"
+        >
+          <BookOpen size={20} />
+          <span>Docs</span>
+        </a>
 
         <div className="nav-wallet-status">
           {!connected ? (

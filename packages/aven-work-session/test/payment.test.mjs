@@ -1,9 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-  calculateAutomaticPayment,
-  calculateCompletionPayment,
-} from "../dist/report.js";
+import { calculateAutomaticPayment } from "../dist/report.js";
 
 test("calculates payment from active seconds and unreserved escrow", () => {
   assert.equal(
@@ -27,13 +24,5 @@ test("distinguishes zero tracked time from exhausted escrow", () => {
   assert.throws(
     () => calculateAutomaticPayment("0.0000173", 60, "0.0000000"),
     /No unreserved escrow remains/,
-  );
-});
-
-test("a final project session requests the exact remaining unreserved escrow", () => {
-  assert.equal(calculateCompletionPayment("18.6250000"), "18.6250000");
-  assert.throws(
-    () => calculateCompletionPayment("0.0000000"),
-    /No unreserved escrow remains to complete this project/,
   );
 });

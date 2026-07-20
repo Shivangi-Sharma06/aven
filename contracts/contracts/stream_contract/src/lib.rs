@@ -19,7 +19,6 @@ enum DataKey {
     SenderStreams(Address),
     RecipientStreams(Address),
     Withdrawal(u64, String),
-    FinalWithdrawal(u64, String),
     ReservedWithdrawals(u64),
     Verifier,
 }
@@ -310,94 +309,6 @@ impl StreamContract {
         Ok(())
     }
 
-    /// Reserves the entire remaining escrow for a final npm-tracked project
-    /// session. Unlike a normal work payment, this completion settlement is
-    /// not derived from active seconds and can never auto-release on timeout.
-    pub fn verify_final_work(
-        env: Env,
-        stream_id: u64,
-        request_id: String,
-        amount: i128,
-        evidence_hash: BytesN<32>,
-        active_duration_seconds: u64,
-        work_start_ledger: u32,
-    ) -> Result<(), Error> {
-        let verifier: Address = env
-            .storage()
-            .instance()
-            .get(&DataKey::Verifier)
-            .ok_or(Error::VerifierNotConfigured)?;
-        verifier.require_auth();
-        bump_instance(&env);
-
-        let stream = load_stream(&env, stream_id)?;
-        require_payable_status(&stream)?;
-        validate_request_id(&request_id)?;
-        if amount <= 0 {
-            return Err(Error::InvalidAmount);
-        }
-        if active_duration_seconds == 0 {
-            return Err(Error::InvalidActiveDuration);
-        }
-
-        let key = DataKey::Withdrawal(stream_id, request_id.clone());
-        if let Some(existing) = env.storage().persistent().get::<_, WithdrawalRecord>(&key) {
-            if existing.amount == amount
-                && existing.evidence_hash == Some(evidence_hash.clone())
-                && existing.active_duration_seconds == active_duration_seconds
-                && existing.work_start_ledger == work_start_ledger
-                && is_final_withdrawal(&env, stream_id, &request_id)
-                && (existing.status == WithdrawalStatus::Pending
-                    || existing.status == WithdrawalStatus::Approved)
-            {
-                return Ok(());
-            }
-            return Err(Error::WithdrawalAlreadyExists);
-        }
-
-        if load_reserved(&env, stream_id) != 0 {
-            return Err(Error::OutstandingWithdrawals);
-        }
-        let available = remaining_unreserved(&env, &stream)?;
-        if available <= 0 {
-            return Err(Error::AmountExceedsWithdrawable);
-        }
-        if amount != available {
-            return Err(Error::PaymentMismatch);
-        }
-
-        let requested_at_ledger = env.ledger().sequence();
-        let deadline_ledger = requested_at_ledger
-            .checked_add(stream.approval_timeout_ledgers)
-            .ok_or(Error::Overflow)?;
-        let record = WithdrawalRecord {
-            stream_id,
-            request_id: request_id.clone(),
-            amount,
-            requested_at_ledger,
-            deadline_ledger,
-            status: WithdrawalStatus::Pending,
-            evidence_hash: Some(evidence_hash.clone()),
-            work_start_ledger,
-            active_duration_seconds,
-        };
-        save_withdrawal(&env, &record);
-        save_final_withdrawal(&env, stream_id, &request_id);
-        save_reserved(&env, stream_id, amount);
-
-        WorkVerified {
-            stream_id,
-            recipient: stream.recipient,
-            request_id,
-            amount,
-            active_duration_seconds,
-            evidence_hash,
-            deadline_ledger,
-        }
-        .publish(&env);
-        Ok(())
-    }
-
     #[allow(clippy::too_many_arguments)]
     pub fn create_stream(
         env: Env,
@@ -647,17 +558,9 @@ impl StreamContract {
         }
         require_payable_status(&stream)?;
         let mut record = load_withdrawal(&env, stream_id, &request_id)?;
-        let final_withdrawal = is_final_withdrawal(&env, stream_id, &request_id);
         let auto_released = match record.status {
             WithdrawalStatus::Approved => false,
-            WithdrawalStatus::Pending
-                if !final_withdrawal && env.ledger().sequence() >= record.deadline_ledger =>
-            {
-                true
-            }
-            WithdrawalStatus::Pending if final_withdrawal => {
-                return Err(Error::WithdrawalApprovalRequired)
-            }
+            WithdrawalStatus::Pending if env.ledger().sequence() >= record.deadline_ledger => true,
             WithdrawalStatus::Pending => return Err(Error::WithdrawalNotApproved),
             WithdrawalStatus::Disputed => return Err(Error::WithdrawalDisputed),
             WithdrawalStatus::Withdrawn => return Err(Error::NothingToWithdraw),
@@ -1024,25 +927,6 @@ fn save_withdrawal(env: &Env, record: &WithdrawalRecord) {
     env.storage()
         .persistent()
         .extend_ttl(&key, LEDGER_BUMP, LEDGER_BUMP);
-}
-
-fn save_final_withdrawal(env: &Env, stream_id: u64, request_id: &String) {
-    let key = DataKey::FinalWithdrawal(stream_id, request_id.clone());
-    env.storage().persistent().set(&key, &true);
-    env.storage()
-        .persistent()
-        .extend_ttl(&key, LEDGER_BUMP, LEDGER_BUMP);
-}
-
-fn is_final_withdrawal(env: &Env, stream_id: u64, request_id: &String) -> bool {
-    let key = DataKey::FinalWithdrawal(stream_id, request_id.clone());
-    let is_final = env.storage().persistent().get(&key).unwrap_or(false);
-    if is_final {
-        env.storage()
-            .persistent()
-            .extend_ttl(&key, LEDGER_BUMP, LEDGER_BUMP);
-    }
-    is_final
 }
 
 fn append_id(env: &Env, key: DataKey, id: u64) -> Result<(), Error> {

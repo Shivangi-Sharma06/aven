@@ -18,9 +18,6 @@ Run the CLI without installing it globally:
 ```bash
 npx aven-stellar start
 npx aven-stellar stop
-
-# For the final project session only:
-npx aven-stellar stop --ended
 ```
 
 When testing a newly published fix, force `npx` to resolve the current package:
@@ -68,9 +65,6 @@ npx aven-stellar stop --message <summary>
 
 - `start --non-interactive` skips the collection confirmation.
 - `stop --submit` submits the previewed report without another prompt.
-- `stop --ended` marks the project as complete and requests the remaining
-  unreserved escrow. This final release always requires explicit client approval
-  and never becomes eligible through the review timeout.
 - `--message` supplies the worker's summary of the session.
 - The payment amount is calculated automatically from tracked active seconds and the stream's on-chain rate, capped by the unreserved escrow remaining.
 

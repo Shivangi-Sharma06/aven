@@ -16,9 +16,6 @@ export async function POST(_request: Request, context: { params: Promise<{ sessi
   if (session.status !== "PENDING_CLIENT_REVIEW") {
     return apiError(`Cannot finalize timeout while the session is ${session.status}.`, 409);
   }
-  if (session.report?.session.projectEnded) {
-    return apiError("Final project settlement requires explicit client approval.", 409);
-  }
   if (!session.reviewDeadlineAt || Date.parse(session.reviewDeadlineAt) > Date.now()) {
     return apiError("The client review window has not expired.", 409);
   }

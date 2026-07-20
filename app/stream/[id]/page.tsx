@@ -98,7 +98,6 @@ export default function StreamDetailPage() {
       const expired = loaded.filter(
         (session) =>
           session.status === "PENDING_CLIENT_REVIEW" &&
-          !session.report?.session.projectEnded &&
           session.reviewDeadlineAt &&
           Date.parse(session.reviewDeadlineAt) <= Date.now(),
       );
@@ -442,7 +441,6 @@ export default function StreamDetailPage() {
                       <div>
                         <span>Session #{sessions.length - index}</span>
                         <strong>{report ? new Date(report.session.endedAt).toLocaleDateString() : "REPORT PENDING"}</strong>
-                        {report?.session.projectEnded && <code>FINAL PROJECT SESSION</code>}
                       </div>
                       <div>
                         <span>{session.status.replaceAll("_", " ")}</span>
@@ -458,11 +456,7 @@ export default function StreamDetailPage() {
                     </div>
 
                     {session.status === "PENDING_CLIENT_REVIEW" && (
-                      <div className={styles["work-session-deadline"]}>
-                        {report?.session.projectEnded
-                          ? "Explicit client approval required · no automatic release"
-                          : deadlineLabel(session.reviewDeadlineAt)}
-                      </div>
+                      <div className={styles["work-session-deadline"]}>{deadlineLabel(session.reviewDeadlineAt)}</div>
                     )}
 
                     {expanded && report && (
@@ -470,12 +464,6 @@ export default function StreamDetailPage() {
                         <div className={styles["work-session-statement"]}>
                           <span>Worker statement</span>
                           <p>{report.workerStatement?.message ?? "No worker statement was provided."}</p>
-                          {report.session.projectEnded && (
-                            <p>
-                              The worker marked this as the final project session and requested
-                              settlement of the remaining unreserved escrow.
-                            </p>
-                          )}
                         </div>
                         <div className={styles["work-session-verification"]}>
                           <span>Verification</span>
@@ -524,11 +512,7 @@ export default function StreamDetailPage() {
                           disabled={actionBusy}
                           onClick={() => mutateSession(session.id, "request-withdrawal")}
                         >
-                          {actionBusy
-                            ? "Requesting…"
-                            : report?.session.projectEnded
-                              ? "Request final settlement"
-                              : "Request withdrawal"}
+                          {actionBusy ? "Requesting…" : "Request withdrawal"}
                         </button>
                       )}
                       {isRecipient && session.status === "RELEASE_ELIGIBLE" && (

@@ -223,14 +223,6 @@ export interface Client {
   compute_available: ({stream_id}: {stream_id: u64}, options?: MethodOptions) => Promise<AssembledTransaction<Result<i128>>>
 
   /**
-   * Construct and simulate a verify_final_work transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
-   * Reserves the entire remaining escrow for a final npm-tracked project
-   * session. Unlike a normal work payment, this completion settlement is
-   * not derived from active seconds and can never auto-release on timeout.
-   */
-  verify_final_work: ({stream_id, request_id, amount, evidence_hash, active_duration_seconds, work_start_ledger}: {stream_id: u64, request_id: string, amount: i128, evidence_hash: Buffer, active_duration_seconds: u64, work_start_ledger: u32}, options?: MethodOptions) => Promise<AssembledTransaction<Result<void>>>
-
-  /**
    * Construct and simulate a withdraw_approved transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
    */
   withdraw_approved: ({stream_id, recipient, request_id}: {stream_id: u64, recipient: string, request_id: string}, options?: MethodOptions) => Promise<AssembledTransaction<Result<i128>>>
@@ -302,7 +294,6 @@ export class Client extends ContractClient {
         "AAAAAAAAADdUb3RhbCB2YWx1ZSBhbHJlYWR5IG1lYXN1cmVkIGJ5IHN1Ym1pdHRlZCBucG0gc2Vzc2lvbnMuAAAAAA5jb21wdXRlX2Vhcm5lZAAAAAAAAQAAAAAAAAAJc3RyZWFtX2lkAAAAAAAABgAAAAEAAAPpAAAACwAAAAM=",
         "AAAAAAAAAAAAAAAOZ2V0X3dpdGhkcmF3YWwAAAAAAAIAAAAAAAAACXN0cmVhbV9pZAAAAAAAAAYAAAAAAAAACnJlcXVlc3RfaWQAAAAAABAAAAABAAAD6QAAB9AAAAAQV2l0aGRyYXdhbFJlY29yZAAAAAM=",
         "AAAAAAAAAD9VbnJlc2VydmVkIGVzY3JvdyBzdGlsbCBhdmFpbGFibGUgZm9yIGZ1dHVyZSBucG0gd29yayBzZXNzaW9ucy4AAAAAEWNvbXB1dGVfYXZhaWxhYmxlAAAAAAAAAQAAAAAAAAAJc3RyZWFtX2lkAAAAAAAABgAAAAEAAAPpAAAACwAAAAM=",
-        "AAAAAAAAANBSZXNlcnZlcyB0aGUgZW50aXJlIHJlbWFpbmluZyBlc2Nyb3cgZm9yIGEgZmluYWwgbnBtLXRyYWNrZWQgcHJvamVjdApzZXNzaW9uLiBVbmxpa2UgYSBub3JtYWwgd29yayBwYXltZW50LCB0aGlzIGNvbXBsZXRpb24gc2V0dGxlbWVudCBpcwpub3QgZGVyaXZlZCBmcm9tIGFjdGl2ZSBzZWNvbmRzIGFuZCBjYW4gbmV2ZXIgYXV0by1yZWxlYXNlIG9uIHRpbWVvdXQuAAAAEXZlcmlmeV9maW5hbF93b3JrAAAAAAAABgAAAAAAAAAJc3RyZWFtX2lkAAAAAAAABgAAAAAAAAAKcmVxdWVzdF9pZAAAAAAAEAAAAAAAAAAGYW1vdW50AAAAAAALAAAAAAAAAA1ldmlkZW5jZV9oYXNoAAAAAAAD7gAAACAAAAAAAAAAF2FjdGl2ZV9kdXJhdGlvbl9zZWNvbmRzAAAAAAYAAAAAAAAAEXdvcmtfc3RhcnRfbGVkZ2VyAAAAAAAABAAAAAEAAAPpAAAAAgAAAAM=",
         "AAAAAAAAAAAAAAARd2l0aGRyYXdfYXBwcm92ZWQAAAAAAAADAAAAAAAAAAlzdHJlYW1faWQAAAAAAAAGAAAAAAAAAAlyZWNpcGllbnQAAAAAAAATAAAAAAAAAApyZXF1ZXN0X2lkAAAAAAAQAAAAAQAAA+kAAAALAAAAAw==",
         "AAAAAAAAAAAAAAASYXBwcm92ZV93aXRoZHJhd2FsAAAAAAADAAAAAAAAAAlzdHJlYW1faWQAAAAAAAAGAAAAAAAAAAZzZW5kZXIAAAAAABMAAAAAAAAACnJlcXVlc3RfaWQAAAAAABAAAAABAAAD6QAAAAIAAAAD",
         "AAAAAAAAAAAAAAASZGlzcHV0ZV93aXRoZHJhd2FsAAAAAAADAAAAAAAAAAlzdHJlYW1faWQAAAAAAAAGAAAAAAAAAAZzZW5kZXIAAAAAABMAAAAAAAAACnJlcXVlc3RfaWQAAAAAABAAAAABAAAD6QAAAAIAAAAD",
@@ -330,7 +321,6 @@ export class Client extends ContractClient {
         compute_earned: this.txFromJSON<Result<i128>>,
         get_withdrawal: this.txFromJSON<Result<WithdrawalRecord>>,
         compute_available: this.txFromJSON<Result<i128>>,
-        verify_final_work: this.txFromJSON<Result<void>>,
         withdraw_approved: this.txFromJSON<Result<i128>>,
         approve_withdrawal: this.txFromJSON<Result<void>>,
         dispute_withdrawal: this.txFromJSON<Result<void>>,

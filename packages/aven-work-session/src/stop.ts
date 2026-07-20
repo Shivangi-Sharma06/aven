@@ -11,7 +11,6 @@ import type { LocalSession } from "./types.js";
 export type StopOptions = {
   message?: string;
   submit?: boolean;
-  ended?: boolean;
 };
 
 const delay = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -85,26 +84,16 @@ export async function stopCommand(options: StopOptions) {
       ratePerSecond: stream.ratePerSecond,
     },
     stoppedAt,
-    options.ended === true,
   );
   await saveLocalReport(repositoryRoot, report);
   printReport(report);
-  if (report.session.projectEnded) {
-    process.stdout.write(
-      "Final project completion requested. The remaining escrow requires explicit client approval and cannot auto-release.\n",
-    );
-  } else {
-    process.stdout.write(
-      `Payment was calculated from ${report.session.activeSeconds}s of tracked active time at the stream rate.\n`,
-    );
-  }
+  process.stdout.write(
+    `Payment was calculated from ${report.session.activeSeconds}s of tracked active time at the stream rate.\n`,
+  );
 
   let shouldSubmit = options.submit === true;
   if (!options.submit) {
-    const prompt = report.session.projectEnded
-      ? "Submit this FINAL project session and request the remaining escrow?"
-      : "Submit this work session to Aven?";
-    const confirmation = (await question(prompt, "Y")).toLowerCase();
+    const confirmation = (await question("Submit this work session to Aven?", "Y")).toLowerCase();
     shouldSubmit = confirmation === "y" || confirmation === "yes";
   }
   if (!shouldSubmit) {

@@ -17,7 +17,12 @@ const jetbrains = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono" }
 export const metadata: Metadata = {
   title: "Aven",
   description: "Payment streams and work attestations on Stellar.",
-  metadataBase: new URL("https://aven.app")
+  metadataBase: new URL("https://aven.app"),
+  icons: {
+    icon: "/icon.png",
+    shortcut: "/icon.png",
+    apple: "/icon.png",
+  },
 };
 
 export const viewport: Viewport = {

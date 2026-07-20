@@ -209,38 +209,39 @@ export default function CreateStreamPage() {
     return (
       <div className="stream-created">
         <header className="stream-created__intro">
-          <div className="stream-created__seal" aria-hidden="true">
-            <span>AVEN</span>
-            <strong>LIVE</strong>
-          </div>
+          <div className="stream-created__mark" aria-hidden="true" />
           <div>
-            <span className="stream-created__kicker">AGREEMENT / CONFIRMED</span>
-            <h1>Stream<br />is live.</h1>
+            <span className="stream-created__kicker">AVEN / AGREEMENT CONFIRMED</span>
+            <h1>Ready for work.</h1>
             <p>
-              The work budget is funded and ready for verified sessions on
-              Stellar testnet.
+              Stream #{success.streamId} is funded on Stellar testnet. The recipient
+              can now connect a project and submit npm-tracked work sessions.
             </p>
+          </div>
+          <div className="stream-created__status">
+            <i aria-hidden="true" />
+            <span>Active</span>
           </div>
         </header>
 
         <section className="stream-created__receipt" aria-label="Created stream receipt">
           <div className="stream-created__receipt-bar">
-            <span>AVEN / STREAM RECORD</span>
-            <strong><i aria-hidden="true" /> ONCHAIN</strong>
+            <span>STREAM RECORD / #{success.streamId}</span>
+            <strong>STELLAR TESTNET / ONCHAIN</strong>
           </div>
 
           <div className="stream-created__facts">
             <div>
-              <span>Stream ID</span>
-              <strong>#{success.streamId}</strong>
+              <span>Funding</span>
+              <strong>Escrow locked</strong>
             </div>
             <div>
-              <span>Network</span>
-              <strong>Stellar Testnet</strong>
+              <span>Work signal</span>
+              <strong>npm active time</strong>
             </div>
             <div>
-              <span>Status</span>
-              <strong>Active</strong>
+              <span>Next action</span>
+              <strong>Connect project</strong>
             </div>
           </div>
 
@@ -264,22 +265,25 @@ export default function CreateStreamPage() {
               </div>
             ))}
           </div>
-        </section>
 
-        <div className="stream-created__actions">
-          <button
-            className="stream-created__primary"
-            onClick={() => router.push(`/stream/${success.streamId}`)}
-          >
-            View stream <span aria-hidden="true">→</span>
-          </button>
-          <button
-            className="stream-created__secondary"
-            onClick={() => router.push("/dashboard")}
-          >
-            Go to dashboard
-          </button>
-        </div>
+          <footer className="stream-created__footer">
+            <p>Agreement created successfully. No additional setup is required from the sender.</p>
+            <div className="stream-created__actions">
+              <button
+                className="stream-created__primary"
+                onClick={() => router.push(`/stream/${success.streamId}`)}
+              >
+                View stream <span aria-hidden="true">→</span>
+              </button>
+              <button
+                className="stream-created__secondary"
+                onClick={() => router.push("/dashboard")}
+              >
+                Dashboard
+              </button>
+            </div>
+          </footer>
+        </section>
       </div>
     );
   }

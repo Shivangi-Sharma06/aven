@@ -33,6 +33,10 @@ async function main() {
     .description("Stop the session, generate a report, and optionally submit it.")
     .option("--message <text>", "Worker statement")
     .option("--submit", "Submit without an additional confirmation")
+    .option(
+      "--ended",
+      "Mark the project as complete and request the remaining unreserved escrow",
+    )
     .action(stopCommand);
 
   await program.parseAsync(process.argv);

@@ -55,18 +55,28 @@ export async function POST(request: Request) {
       return apiError("The report asset does not match the stream asset.");
     }
     const availableUnits = await getAvailableUnits(stream.id);
-    const calculatedUnits = calculateSessionPaymentUnits(
-      stream,
-      report.session.activeSeconds,
-      availableUnits,
-    );
+    const projectEnded = report.session.projectEnded === true;
+    const calculatedUnits = projectEnded
+      ? availableUnits
+      : calculateSessionPaymentUnits(
+          stream,
+          report.session.activeSeconds,
+          availableUnits,
+        );
     if (calculatedUnits <= 0n) {
-      return apiError("No escrow remains for this session's tracked active time.", 409);
+      return apiError(
+        projectEnded
+          ? "No unreserved escrow remains to complete this project."
+          : "No escrow remains for this session's tracked active time.",
+        409,
+      );
     }
     report.paymentRequest = {
       requestedAmount: formatAmountUnits(calculatedUnits),
       asset: stream.asset,
-      calculation: "active_time_x_stream_rate",
+      calculation: projectEnded
+        ? "remaining_escrow_on_completion"
+        : "active_time_x_stream_rate",
       ratePerSecond: formatAmountUnits(ratePerSecondUnits(stream)),
       billableSeconds: report.session.activeSeconds,
     };

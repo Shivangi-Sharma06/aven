@@ -6,6 +6,7 @@ import {
   addressesEqual,
   authenticateCliRequest,
   authenticateBrowserSession,
+  formatAmountUnits,
   getAvailableUnits,
   getSessionOnchainStream,
   parseAmountUnits,
@@ -47,29 +48,58 @@ export async function POST(
     return apiError("The stream recipient could not be verified.", 403);
   }
   try {
+    const projectEnded = session.report?.session.projectEnded === true;
     const requestedAmount = session.report?.paymentRequest.requestedAmount;
     if (!requestedAmount) return apiError("The report has no payment request.");
-    const requestedUnits = parseAmountUnits(requestedAmount);
     const availableUnits = await getAvailableUnits(session.streamId);
+    const requestedUnits = projectEnded
+      ? availableUnits
+      : parseAmountUnits(requestedAmount);
     if (requestedUnits <= 0n || requestedUnits > availableUnits) {
       return apiError("The requested amount exceeds the stream earnings not already reserved.", 409);
     }
     if (!session.report) return apiError("The verified report is missing.", 409);
+    if (projectEnded) {
+      session.report.paymentRequest = {
+        ...session.report.paymentRequest,
+        requestedAmount: formatAmountUnits(requestedUnits),
+        calculation: "remaining_escrow_on_completion",
+        billableSeconds: session.report.session.activeSeconds,
+      };
+    }
     const onchain = await recordVerifiedWork({
       streamId: session.streamId,
       sessionId: session.id,
       amountUnits: requestedUnits,
       report: session.report,
+      projectEnded,
     });
-    session.requestedAmount = requestedAmount;
+    session.requestedAmount = formatAmountUnits(requestedUnits);
     session.verifierTxHash = onchain.transactionHash ?? session.verifierTxHash;
     session.reportDigest = onchain.reportDigest;
     session.reviewDeadlineLedger = onchain.reviewDeadlineLedger;
-    addTimelineEvent(session, "WITHDRAWAL_REQUESTED", "worker", `Reserved ${requestedAmount} ${stream.asset} against the verified session.`);
-    session.reviewDeadlineAt = new Date(
-      Date.now() + Math.max(stream.approvalTimeoutLedgers, 1) * 5_000,
-    ).toISOString();
-    addTimelineEvent(session, "PENDING_CLIENT_REVIEW", "system", "Client review window opened.");
+    addTimelineEvent(
+      session,
+      "WITHDRAWAL_REQUESTED",
+      "worker",
+      projectEnded
+        ? `Requested final project settlement of ${session.requestedAmount} ${stream.asset}.`
+        : `Reserved ${session.requestedAmount} ${stream.asset} against the verified session.`,
+    );
+    if (projectEnded) {
+      delete session.reviewDeadlineAt;
+      addTimelineEvent(
+        session,
+        "PENDING_CLIENT_REVIEW",
+        "system",
+        "Final project settlement requires explicit client approval and cannot auto-release.",
+      );
+    } else {
+      session.reviewDeadlineAt = new Date(
+        Date.now() + Math.max(stream.approvalTimeoutLedgers, 1) * 5_000,
+      ).toISOString();
+      addTimelineEvent(session, "PENDING_CLIENT_REVIEW", "system", "Client review window opened.");
+    }
     await putSession(session);
     return NextResponse.json(session);
   } catch (error) {

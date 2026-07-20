@@ -208,6 +208,12 @@ export function validateWorkSessionReport(value: unknown): asserts value is Work
   ) {
     throw new Error("Active session time must be a whole number no greater than total session time.");
   }
+  if (
+    report.session.projectEnded !== undefined &&
+    typeof report.session.projectEnded !== "boolean"
+  ) {
+    throw new Error("projectEnded must be a boolean when provided.");
+  }
   if (!Array.isArray(report.changes.changedFiles) || !Array.isArray(report.changes.commits)) {
     throw new Error("Changed files and commits must be arrays.");
   }

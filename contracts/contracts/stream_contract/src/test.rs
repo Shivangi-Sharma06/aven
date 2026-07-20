@@ -109,6 +109,24 @@ fn verify(
     );
 }
 
+fn verify_final(
+    env: &Env,
+    client: &StreamContractClient,
+    id: u64,
+    request: &str,
+    amount: i128,
+    seconds: u64,
+) {
+    client.verify_final_work(
+        &id,
+        &String::from_str(env, request),
+        &amount,
+        &BytesN::from_array(env, &[9; 32]),
+        &seconds,
+        &0,
+    );
+}
+
 #[test]
 fn stream_creation_rejects_self_payment_and_keeps_legacy_fields_inert() {
     let env = Env::default();
@@ -226,10 +244,7 @@ fn dispute_frees_capacity_and_pending_claim_blocks_cancel() {
 
     verify(&env, &client, id, "session-dispute", 500, 50);
     assert_eq!(
-        client
-            .try_cancel_stream(&id, &sender)
-            .unwrap_err()
-            .unwrap(),
+        client.try_cancel_stream(&id, &sender).unwrap_err().unwrap(),
         Error::OutstandingWithdrawals
     );
     client.dispute_withdrawal(&id, &sender, &request);
@@ -248,15 +263,74 @@ fn full_escrow_release_completes_stream() {
     let asset = create_asset(&env, &sender, 100_000);
     let (client, _, _) = setup(&env);
     let id = create_stream(&env, &client, &sender, &recipient, &asset, 10, 20_000, 400);
-    let request = String::from_str(&env, "session-complete");
+    let first_request = String::from_str(&env, "session-first");
+    let final_request = String::from_str(&env, "session-complete");
 
-    verify(&env, &client, id, "session-complete", 20_000, 2_000);
-    client.approve_withdrawal(&id, &sender, &request);
-    client.withdraw_approved(&id, &recipient, &request);
+    verify(&env, &client, id, "session-first", 1_000, 100);
+    client.approve_withdrawal(&id, &sender, &first_request);
+    client.withdraw_approved(&id, &recipient, &first_request);
+
+    verify_final(&env, &client, id, "session-complete", 19_000, 25);
+    client.approve_withdrawal(&id, &sender, &final_request);
+    assert_eq!(
+        client.withdraw_approved(&id, &recipient, &final_request),
+        19_000
+    );
 
     assert_eq!(client.get_stream(&id).status, StreamStatus::Completed);
     assert_eq!(client.compute_available(&id), 0);
     assert_eq!(client.compute_earned(&id), 20_000);
+}
+
+#[test]
+fn final_release_requires_exact_remaining_balance_and_explicit_approval() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_sequence_number(100);
+    let sender = Address::generate(&env);
+    let recipient = Address::generate(&env);
+    let asset = create_asset(&env, &sender, 100_000);
+    let (client, _, _) = setup(&env);
+    let id = create_stream(&env, &client, &sender, &recipient, &asset, 10, 20_000, 400);
+    let request = String::from_str(&env, "session-final");
+    let evidence = BytesN::from_array(&env, &[9; 32]);
+
+    let mismatch = client.try_verify_final_work(&id, &request, &19_999, &evidence, &10, &0);
+    assert_eq!(mismatch.unwrap_err().unwrap(), Error::PaymentMismatch);
+
+    verify_final(&env, &client, id, "session-final", 20_000, 10);
+    env.ledger().set_sequence_number(10_000);
+    assert_eq!(
+        client
+            .try_withdraw_approved(&id, &recipient, &request)
+            .unwrap_err()
+            .unwrap(),
+        Error::WithdrawalApprovalRequired
+    );
+
+    client.approve_withdrawal(&id, &sender, &request);
+    assert_eq!(client.withdraw_approved(&id, &recipient, &request), 20_000);
+}
+
+#[test]
+fn final_release_rejects_outstanding_withdrawals() {
+    let env = Env::default();
+    let sender = Address::generate(&env);
+    let recipient = Address::generate(&env);
+    let asset = create_asset(&env, &sender, 100_000);
+    let (client, _, _) = setup(&env);
+    let id = create_stream(&env, &client, &sender, &recipient, &asset, 10, 20_000, 400);
+
+    verify(&env, &client, id, "session-pending", 500, 50);
+    let result = client.try_verify_final_work(
+        &id,
+        &String::from_str(&env, "session-final"),
+        &19_500,
+        &BytesN::from_array(&env, &[9; 32]),
+        &10,
+        &0,
+    );
+    assert_eq!(result.unwrap_err().unwrap(), Error::OutstandingWithdrawals);
 }
 
 #[test]
@@ -267,11 +341,7 @@ fn configured_verifier_blocks_legacy_requests() {
     let asset = create_asset(&env, &sender, 100_000);
     let (client, _, _) = setup(&env);
     let id = create_stream(&env, &client, &sender, &recipient, &asset, 10, 20_000, 400);
-    let result = client.try_request_withdrawal(
-        &id,
-        &recipient,
-        &String::from_str(&env, "legacy"),
-        &1,
-    );
+    let result =
+        client.try_request_withdrawal(&id, &recipient, &String::from_str(&env, "legacy"), &1);
     assert_eq!(result.unwrap_err().unwrap(), Error::VerificationRequired);
 }

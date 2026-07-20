@@ -39,6 +39,14 @@ export function calculateAutomaticPayment(
   return formatAmountUnits(paymentUnits);
 }
 
+export function calculateCompletionPayment(available: string) {
+  const availableUnits = amountUnits(available);
+  if (availableUnits <= 0n) {
+    throw new Error("No unreserved escrow remains to complete this project.");
+  }
+  return formatAmountUnits(availableUnits);
+}
+
 export async function buildReport(
   repositoryRoot: string,
   config: AvenConfig,
@@ -46,6 +54,7 @@ export async function buildReport(
   message: string,
   payment: { available: string; ratePerSecond: string },
   endedAt = new Date(),
+  projectEnded = false,
 ): Promise<WorkSessionReport> {
   const endingState = await captureGitState(repositoryRoot);
   const privacyFilter = await createPrivacyFilter(repositoryRoot);
@@ -59,11 +68,18 @@ export async function buildReport(
   const unmeasured = Math.max(0, totalSeconds - measured);
   const activeSeconds = session.activeSeconds + Math.min(unmeasured, 600);
   const idleSeconds = Math.max(0, totalSeconds - activeSeconds);
-  const requestedAmount = calculateAutomaticPayment(
-    payment.ratePerSecond,
-    activeSeconds,
-    payment.available,
-  );
+  if (!Number.isSafeInteger(activeSeconds) || activeSeconds <= 0) {
+    throw new Error(
+      "No active work time was recorded. Keep the session running for at least one second before stopping it.",
+    );
+  }
+  const requestedAmount = projectEnded
+    ? calculateCompletionPayment(payment.available)
+    : calculateAutomaticPayment(
+        payment.ratePerSecond,
+        activeSeconds,
+        payment.available,
+      );
   const included = changes.changedFiles.filter((file) => file.includedInVerification);
   const substantive = included.filter((file) => file.category === "source" || file.category === "test");
   const flags: string[] = [];
@@ -85,6 +101,7 @@ export async function buildReport(
       activeSeconds,
       idleSeconds,
       packageVersion: PACKAGE_VERSION,
+      projectEnded,
     },
     repository: {
       repositoryId,
@@ -118,7 +135,9 @@ export async function buildReport(
     paymentRequest: {
       requestedAmount,
       asset: config.asset,
-      calculation: "active_time_x_stream_rate",
+      calculation: projectEnded
+        ? "remaining_escrow_on_completion"
+        : "active_time_x_stream_rate",
       ratePerSecond: payment.ratePerSecond,
       billableSeconds: activeSeconds,
     },
@@ -141,6 +160,7 @@ export function printReport(report: WorkSessionReport) {
   process.stdout.write(`Files         ${report.changes.changedFiles.length} (${report.privacy.excludedFileCount} excluded)\n`);
   process.stdout.write(`Changes       +${report.changes.additions} / -${report.changes.deletions}\n`);
   process.stdout.write(`Requested     ${report.paymentRequest.requestedAmount} ${report.paymentRequest.asset}\n`);
+  process.stdout.write(`Project end   ${report.session.projectEnded ? "YES — CLIENT APPROVAL REQUIRED" : "NO"}\n`);
   process.stdout.write(`Verification  ${report.localVerification.summary}\n`);
   if (report.privacy.secretWarnings > 0) {
     process.stdout.write(`Privacy       ${report.privacy.secretWarnings} sensitive path warning(s); excluded\n`);

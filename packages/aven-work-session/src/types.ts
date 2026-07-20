@@ -83,6 +83,8 @@ export type AvenConfig = {
   asset: "USDC" | "XLM";
   token: string;
   tokenExpiresAt?: string;
+  /** Seven-decimal Stellar amount, cached for local recorded-payment estimates. */
+  ratePerSecond?: string;
 };
 
 export type LocalSession = {
@@ -102,4 +104,18 @@ export type LocalSession = {
   idleSeconds: number;
   activityEvents: number;
   watcherPid?: number;
+  /** ISO timestamp refreshed by the activity watcher. */
+  watcherHeartbeatAt?: string;
+};
+
+// Minimal server-side work session shape used by `aven sessions`.
+export type WorkSession = {
+  id: string;
+  status: string;
+  requestedAmount?: string;
+  submittedAt?: string;
+  updatedAt: string;
+  disputeReason?: string;
+  workerResponse?: string;
+  verificationSummary?: string;
 };

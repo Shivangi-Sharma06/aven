@@ -378,13 +378,13 @@ export default function CreateStreamPage() {
       >
         <div className="create-form-bar">
           <div>
-            <span>GUIDED SETUP / STEP 0{currentStep} OF 04</span>
-            <strong>{CREATE_STEPS[currentStep - 1].label} / DRAFT</strong>
+            <span>STEP 0{currentStep} OF 04</span>
+            <strong>{CREATE_STEPS[currentStep - 1].label}</strong>
           </div>
           <span>{connected ? "WALLET CONNECTED" : "AWAITING WALLET"}</span>
         </div>
 
-        <ol className="create-step-track" aria-label="Agreement setup progress">
+        <ol className="create-step-progress" aria-label="Agreement setup progress">
           {CREATE_STEPS.map((step) => (
             <li
               className={
@@ -402,8 +402,7 @@ export default function CreateStreamPage() {
                 disabled={step.number > currentStep}
                 aria-current={step.number === currentStep ? "step" : undefined}
               >
-                <span>0{step.number}</span>
-                <strong>{step.label}</strong>
+                <span>0{step.number}</span> {step.label}
               </button>
             </li>
           ))}
@@ -414,7 +413,6 @@ export default function CreateStreamPage() {
             <header className="create-wizard-stage__header">
               <span>0{currentStep}</span>
               <div>
-                <p>{currentStep === 1 ? "WHO IS THIS AGREEMENT FOR?" : currentStep === 2 ? "WHAT WILL BE FUNDED?" : currentStep === 3 ? "HOW IS WORK CLASSIFIED?" : "READY TO SIGN?"}</p>
                 <h2 id="create-step-heading" ref={stepHeadingRef} tabIndex={-1}>
                   {CREATE_STEPS[currentStep - 1].label}
                 </h2>
@@ -656,26 +654,6 @@ export default function CreateStreamPage() {
             </footer>
           </section>
 
-          <aside className="create-step-guide" aria-label="Current step guidance">
-            <span>STEP 0{currentStep} / GUIDANCE</span>
-            <h3>{currentStep === 4 ? "Before you sign" : "Why we ask"}</h3>
-            <p>
-              {currentStep === 1 && "The title and recipient become part of the agreement record. The recipient address cannot be changed after signing."}
-              {currentStep === 2 && "Escrow sets the maximum payment. Duration converts that amount into a contract-controlled active-work rate."}
-              {currentStep === 3 && "The work type labels the proof record so future clients and agents can interpret it correctly."}
-              {currentStep === 4 && "Check the recipient most carefully. Stellar transactions are final once the network accepts the signature."}
-            </p>
-            <dl className="create-step-guide__live">
-              <div><dt>Escrow</dt><dd>{totalAmount ? `${totalAmount} ${asset}` : "Not set"}</dd></div>
-              <div><dt>Duration</dt><dd>{durationDays ? `${durationDays} days` : "Not set"}</dd></div>
-              <div><dt>Recipient</dt><dd>{recipient ? `${recipient.slice(0, 8)}…${recipient.slice(-5)}` : "Not set"}</dd></div>
-              <div><dt>Verification</dt><dd>{CATEGORY_DETAILS[category].label}</dd></div>
-            </dl>
-            <div className="create-step-guide__flow">
-              <span>AFTER CREATION</span>
-              <p>Fund → Track work → Review proof → Release</p>
-            </div>
-          </aside>
         </div>
       </form>
     </div>

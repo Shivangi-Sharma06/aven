@@ -60,19 +60,6 @@ export default function ProfilePage() {
 
   const truncate = (addr: string) => addr.slice(0, 8) + "…" + addr.slice(-6);
 
-  const breakdown = score
-    ? [
-        { label: "Freelance", value: score.freelance },
-        { label: "Salary", value: score.salary },
-        { label: "Bounty", value: score.bounty },
-        { label: "Grant", value: score.grant },
-        { label: "Agent Task", value: score.agentTask },
-        { label: "Subscription", value: score.subscription },
-      ]
-    : [];
-
-  const maxVal = breakdown.length > 0 ? Math.max(...breakdown.map((b) => b.value), 1) : 1;
-
   return (
     <div className="profile-wrap">
       {/* Header */}
@@ -111,46 +98,11 @@ export default function ProfilePage() {
         </div>
       ) : (
         <>
-          {/* Score breakdown */}
-          {score && (
-            <div className="profile-section">
-              <div className="profile-section-heading">
-                <div>
-                  <span>01 / Signals</span>
-                  <h3 className="profile-section-title">Reputation breakdown</h3>
-                </div>
-                <p>Verified delivery grouped by the type of funded work.</p>
-              </div>
-              <div className="score-breakdown">
-                {breakdown.map((b) => (
-                  <div key={b.label} className="score-row">
-                    <span
-                      className="score-row-label"
-                      style={{ color: CATEGORY_COLORS[b.label.replace(" ", "")] ?? "#888" }}
-                    >
-                      {b.label}
-                    </span>
-                    <div className="score-bar-track">
-                      <div
-                        className="score-bar-fill"
-                        style={{
-                          width: `${(b.value / maxVal) * 100}%`,
-                          background: CATEGORY_COLORS[b.label.replace(" ", "")] ?? "#6366f1",
-                        }}
-                      />
-                    </div>
-                    <span className="score-row-value">{b.value.toFixed(2)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* Attestations */}
           <div className="profile-section">
             <div className="profile-section-heading">
               <div>
-                <span>02 / Proof</span>
+                <span>01 / Proof</span>
                 <h3 className="profile-section-title">Work attestations</h3>
               </div>
               <p>{attestations.length} on-chain record{attestations.length === 1 ? "" : "s"}</p>

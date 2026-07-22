@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useWallet } from "@/components/WalletProvider";
 import {
@@ -16,6 +16,14 @@ import {
 
 type Asset = "USDC" | "XLM";
 type TrustlineState = "idle" | "checking" | "ready" | "missing" | "blocked" | "error";
+type CreateStep = 1 | 2 | 3 | 4;
+
+const CREATE_STEPS: Array<{ number: CreateStep; label: string; detail: string }> = [
+  { number: 1, label: "Identity", detail: "Name the agreement and its recipient." },
+  { number: 2, label: "Funding", detail: "Set escrow, duration, and asset readiness." },
+  { number: 3, label: "Verification", detail: "Choose how completed work is verified." },
+  { number: 4, label: "Review", detail: "Confirm every term before signing." },
+];
 
 const CATEGORY_DETAILS: Record<CreateStreamCategory, { label: string; description: string }> = {
   Freelance: {
@@ -36,7 +44,9 @@ const LEDGERS_PER_DAY = LEDGERS_PER_HOUR * 24;
 export default function CreateStreamPage() {
   const { connected, address, openConnectModal } = useWallet();
   const router = useRouter();
+  const stepHeadingRef = useRef<HTMLHeadingElement>(null);
 
+  const [currentStep, setCurrentStep] = useState<CreateStep>(1);
   const [recipient, setRecipient] = useState("");
   const [totalAmount, setTotalAmount] = useState("");
   const [durationDays, setDurationDays] = useState("7");
@@ -58,6 +68,46 @@ export default function CreateStreamPage() {
   );
   const computedRate = computedRateValue > 0 ? computedRateValue.toFixed(7) : "";
   const hourlyRate = computedRateValue > 0 ? (computedRateValue * 3600).toFixed(6) : "—";
+
+  function moveToStep(step: CreateStep) {
+    setCurrentStep(step);
+    setError(null);
+    window.requestAnimationFrame(() => {
+      stepHeadingRef.current?.focus({ preventScroll: true });
+      stepHeadingRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
+  function validateCurrentStep(): string | null {
+    if (currentStep === 1) {
+      if (!title.trim()) return "Give this agreement a clear title before continuing.";
+      if (!isValidStellarAccountAddress(recipient.trim())) {
+        return "Enter a valid Stellar recipient address starting with G.";
+      }
+      if (address && recipient.trim().toUpperCase() === address.trim().toUpperCase()) {
+        return "Sender and recipient must be different Stellar wallets.";
+      }
+    }
+
+    if (currentStep === 2) {
+      const total = parseFloat(totalAmount);
+      const days = parseFloat(durationDays);
+      if (!total || total <= 0) return "Enter a total escrow amount greater than zero.";
+      if (!days || days <= 0) return "Enter an agreement duration greater than zero days.";
+    }
+
+    return null;
+  }
+
+  function continueFlow() {
+    const validationError = validateCurrentStep();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    if (currentStep < 4) moveToStep((currentStep + 1) as CreateStep);
+  }
 
   useEffect(() => {
     let active = true;
@@ -154,6 +204,10 @@ export default function CreateStreamPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (currentStep < 4) {
+      continueFlow();
+      return;
+    }
     if (!connected || !address) return openConnectModal();
 
     const total = parseFloat(totalAmount);
@@ -317,297 +371,310 @@ export default function CreateStreamPage() {
         </div>
       )}
 
-      <form className="create-stream-form" onSubmit={handleSubmit} id="create-stream-form">
+      <form
+        className="create-stream-form create-stream-wizard"
+        onSubmit={handleSubmit}
+        id="create-stream-form"
+      >
         <div className="create-form-bar">
           <div>
-            <span>STREAM TERMS</span>
-            <strong>PAYMENT AGREEMENT / DRAFT</strong>
+            <span>GUIDED SETUP / STEP 0{currentStep} OF 04</span>
+            <strong>{CREATE_STEPS[currentStep - 1].label} / DRAFT</strong>
           </div>
           <span>{connected ? "WALLET CONNECTED" : "AWAITING WALLET"}</span>
         </div>
 
-        <div className="create-form-layout">
-          <div className="create-form-fields">
-            <section className="create-form-block">
-              <div className="create-form-block__heading">
-                <span>01</span>
-                <div>
-                  <strong>Work identity</strong>
-                  <small>Name the agreement and identify who will receive payment.</small>
-                </div>
-              </div>
+        <ol className="create-step-track" aria-label="Agreement setup progress">
+          {CREATE_STEPS.map((step) => (
+            <li
+              className={
+                step.number === currentStep
+                  ? "is-current"
+                  : step.number < currentStep
+                    ? "is-complete"
+                    : ""
+              }
+              key={step.number}
+            >
+              <button
+                type="button"
+                onClick={() => moveToStep(step.number)}
+                disabled={step.number > currentStep}
+                aria-current={step.number === currentStep ? "step" : undefined}
+              >
+                <span>0{step.number}</span>
+                <strong>{step.label}</strong>
+              </button>
+            </li>
+          ))}
+        </ol>
 
-              <div className="form-section">
-                <label className="form-label" htmlFor="stream-title">
-                  Stream title *
-                </label>
-                <input
-                  className="form-input"
-                  placeholder="Smart Contract Audit — Phase 1"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  required
-                  id="stream-title"
-                />
+        <div className="create-wizard-layout">
+          <section className="create-wizard-stage" aria-labelledby="create-step-heading">
+            <header className="create-wizard-stage__header">
+              <span>0{currentStep}</span>
+              <div>
+                <p>{currentStep === 1 ? "WHO IS THIS AGREEMENT FOR?" : currentStep === 2 ? "WHAT WILL BE FUNDED?" : currentStep === 3 ? "HOW IS WORK CLASSIFIED?" : "READY TO SIGN?"}</p>
+                <h2 id="create-step-heading" ref={stepHeadingRef} tabIndex={-1}>
+                  {CREATE_STEPS[currentStep - 1].label}
+                </h2>
+                <small>{CREATE_STEPS[currentStep - 1].detail}</small>
               </div>
+            </header>
 
-              <div className="form-section">
-                <label className="form-label" htmlFor="stream-recipient">
-                  Recipient address *
-                </label>
-                <input
-                  className="form-input form-input--mono"
-                  placeholder="G…"
-                  value={recipient}
-                  onChange={(e) => setRecipient(e.target.value)}
-                  aria-describedby="stream-recipient-help"
-                  required
-                  id="stream-recipient"
-                />
-                <small id="stream-recipient-help" className="form-label-hint">
-                  Must be a different Stellar account from the connected sender.
-                </small>
-              </div>
-            </section>
-
-            <section className="create-form-block">
-              <div className="create-form-block__heading">
-                <span>02</span>
-                <div>
-                  <strong>Funding terms</strong>
-                  <small>Set the total escrow and the agreement duration.</small>
-                </div>
-              </div>
-
-              <div className="create-funding-grid">
-                <div className="form-section create-amount-field">
-                  <label className="form-label" htmlFor="stream-total-amount">
-                    Total amount *
+            {currentStep === 1 && (
+              <div className="create-step-content">
+                <div className="form-section">
+                  <label className="form-label" htmlFor="stream-title">
+                    Agreement title *
                   </label>
                   <input
                     className="form-input"
-                    type="number"
-                    placeholder="1000"
-                    min="0"
-                    step="any"
-                    value={totalAmount}
-                    onChange={(e) => setTotalAmount(e.target.value)}
+                    placeholder="Smart Contract Audit — Phase 1"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
                     required
-                    id="stream-total-amount"
+                    autoFocus
+                    id="stream-title"
                   />
+                  <small className="form-label-hint">
+                    Use a name both parties will recognize in their stream history.
+                  </small>
                 </div>
+
                 <div className="form-section">
-                  <label className="form-label" htmlFor="stream-asset">
-                    Asset
+                  <label className="form-label" htmlFor="stream-recipient">
+                    Recipient Stellar address *
                   </label>
-                  <select
-                    className="form-select"
-                    value={asset}
-                    onChange={(e) => setAsset(e.target.value as Asset)}
-                    id="stream-asset"
-                  >
-                    <option value="USDC">USDC</option>
-                    <option value="XLM">XLM</option>
-                  </select>
+                  <input
+                    className="form-input form-input--mono"
+                    placeholder="G…"
+                    value={recipient}
+                    onChange={(e) => setRecipient(e.target.value)}
+                    aria-describedby="stream-recipient-help"
+                    required
+                    id="stream-recipient"
+                  />
+                  <small id="stream-recipient-help" className="form-label-hint">
+                    Payment can only be released to this address. It must differ from the sender.
+                  </small>
                 </div>
-                <div className="form-section">
-                  <label className="form-label" htmlFor="stream-duration">
-                    Duration *
-                  </label>
-                  <div className="create-input-suffix">
+              </div>
+            )}
+
+            {currentStep === 2 && (
+              <div className="create-step-content">
+                <div className="create-funding-grid">
+                  <div className="form-section create-amount-field">
+                    <label className="form-label" htmlFor="stream-total-amount">
+                      Total escrow *
+                    </label>
                     <input
                       className="form-input"
                       type="number"
-                      placeholder="7"
-                      min="1"
-                      value={durationDays}
-                      onChange={(e) => setDurationDays(e.target.value)}
+                      placeholder="1000"
+                      min="0"
+                      step="any"
+                      value={totalAmount}
+                      onChange={(e) => setTotalAmount(e.target.value)}
                       required
-                      id="stream-duration"
+                      id="stream-total-amount"
                     />
-                    <span>Days</span>
+                  </div>
+                  <div className="form-section">
+                    <label className="form-label" htmlFor="stream-asset">Asset</label>
+                    <select
+                      className="form-select"
+                      value={asset}
+                      onChange={(e) => setAsset(e.target.value as Asset)}
+                      id="stream-asset"
+                    >
+                      <option value="USDC">USDC</option>
+                      <option value="XLM">XLM</option>
+                    </select>
+                  </div>
+                  <div className="form-section">
+                    <label className="form-label" htmlFor="stream-duration">Duration *</label>
+                    <div className="create-input-suffix">
+                      <input
+                        className="form-input"
+                        type="number"
+                        placeholder="7"
+                        min="1"
+                        value={durationDays}
+                        onChange={(e) => setDurationDays(e.target.value)}
+                        required
+                        id="stream-duration"
+                      />
+                      <span>Days</span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {asset === "USDC" && (
-                <div className="create-trustline-card" aria-live="polite">
-                  <div className="create-trustline-card__header">
-                    <div>
-                      <span>Circle USDC / Stellar testnet</span>
-                      <strong>Trustline readiness</strong>
+                {asset === "USDC" && (
+                  <div className="create-trustline-card" aria-live="polite">
+                    <div className="create-trustline-card__header">
+                      <div>
+                        <span>Circle USDC / Stellar testnet</span>
+                        <strong>Trustline readiness</strong>
+                      </div>
+                      <small>Required to hold and release USDC</small>
                     </div>
-                    <small>Required to hold and release USDC</small>
-                  </div>
 
-                  <div className="create-trustline-row">
-                    <div>
-                      <span>Funding wallet</span>
-                      <strong>
-                        {!connected
-                          ? "Connect wallet"
-                          : senderTrustline === "checking"
-                            ? "Checking network…"
-                            : senderTrustline === "ready"
-                              ? "Ready"
-                              : senderTrustline === "missing"
-                                ? "Trustline required"
-                                : senderTrustline === "blocked"
-                                  ? "Not authorized"
-                                  : senderTrustline === "error"
-                                    ? "Check failed"
-                                    : "Waiting"}
-                      </strong>
+                    <div className="create-trustline-row">
+                      <div>
+                        <span>Funding wallet</span>
+                        <strong>
+                          {!connected ? "Connect wallet" : senderTrustline === "checking" ? "Checking network…" : senderTrustline === "ready" ? "Ready" : senderTrustline === "missing" ? "Trustline required" : senderTrustline === "blocked" ? "Not authorized" : senderTrustline === "error" ? "Check failed" : "Waiting"}
+                        </strong>
+                      </div>
+                      {connected && senderTrustline !== "ready" && senderTrustline !== "checking" && (
+                        <button
+                          type="button"
+                          onClick={handleAddUsdcTrustline}
+                          disabled={addingTrustline || senderTrustline === "blocked"}
+                        >
+                          {addingTrustline ? "Signing…" : "Add USDC trustline ↗"}
+                        </button>
+                      )}
                     </div>
-                    {connected && senderTrustline !== "ready" && senderTrustline !== "checking" && (
-                      <button
-                        type="button"
-                        onClick={handleAddUsdcTrustline}
-                        disabled={addingTrustline || senderTrustline === "blocked"}
-                      >
-                        {addingTrustline ? "Signing…" : "Add USDC trustline ↗"}
-                      </button>
+
+                    <div className="create-trustline-row">
+                      <div>
+                        <span>Recipient wallet</span>
+                        <strong>
+                          {!isValidStellarAccountAddress(recipient) ? "Enter recipient" : recipientTrustline === "checking" ? "Checking network…" : recipientTrustline === "ready" ? "Ready" : recipientTrustline === "missing" ? "Recipient action required" : recipientTrustline === "blocked" ? "Not authorized" : recipientTrustline === "error" ? "Check failed" : "Waiting"}
+                        </strong>
+                      </div>
+                      <small>The recipient adds this trustline from their own wallet before release.</small>
+                    </div>
+
+                    {trustlineTxHash && (
+                      <a href={`https://stellar.expert/explorer/testnet/tx/${trustlineTxHash}`} target="_blank" rel="noopener noreferrer">
+                        Trustline confirmed · View transaction ↗
+                      </a>
                     )}
                   </div>
+                )}
 
-                  <div className="create-trustline-row">
-                    <div>
-                      <span>Recipient wallet</span>
-                      <strong>
-                        {!isValidStellarAccountAddress(recipient)
-                          ? "Enter recipient"
-                          : recipientTrustline === "checking"
-                            ? "Checking network…"
-                            : recipientTrustline === "ready"
-                              ? "Ready"
-                              : recipientTrustline === "missing"
-                                ? "Recipient action required"
-                                : recipientTrustline === "blocked"
-                                  ? "Not authorized"
-                                  : recipientTrustline === "error"
-                                    ? "Check failed"
-                                    : "Waiting"}
-                      </strong>
-                    </div>
-                    <small>
-                      The recipient adds this trustline from their own wallet before release.
-                    </small>
+                <output className="create-rate-output" id="stream-rate" aria-live="polite">
+                  <div>
+                    <span>Contract-derived rate</span>
+                    <strong>{computedRate || "—"}</strong>
+                    <small>{asset} / active second</small>
                   </div>
+                  <p>
+                    Total escrow is divided across the agreement duration. The contract
+                    reserves value only while verified active work is recorded.
+                  </p>
+                </output>
+              </div>
+            )}
 
-                  {trustlineTxHash && (
-                    <a
-                      href={`https://stellar.expert/explorer/testnet/tx/${trustlineTxHash}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
+            {currentStep === 3 && (
+              <div className="create-step-content">
+                <div className="create-verification-intro">
+                  <strong>One agreement, two work paths.</strong>
+                  <p>
+                    Both paths use npm-tracked active sessions. The classification keeps
+                    reputation and proof records understandable later.
+                  </p>
+                </div>
+                <div className="form-category-grid" id="stream-category-grid">
+                  {CREATE_STREAM_CATEGORIES.map((cat, index) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      className={`form-cat-btn ${category === cat ? "selected" : ""}`}
+                      onClick={() => setCategory(cat)}
+                      id={`cat-${cat.toLowerCase()}`}
+                      aria-pressed={category === cat}
                     >
-                      Trustline confirmed · View transaction ↗
-                    </a>
-                  )}
-                </div>
-              )}
-
-              <output
-                className="create-rate-output"
-                id="stream-rate"
-                aria-live="polite"
-              >
-                <div>
-                  <span>Contract-derived rate</span>
-                  <strong>{computedRate || "—"}</strong>
-                  <small>{asset} / active second</small>
-                </div>
-                <p>
-                  Locked from total amount ÷ duration. This value is recalculated by
-                  the transaction builder and cannot be edited.
-                </p>
-              </output>
-            </section>
-
-            <section className="create-form-block">
-              <div className="create-form-block__heading">
-                <span>03</span>
-                <div>
-                  <strong>Work type</strong>
-                  <small>Choose the verification path used for this agreement.</small>
+                      <span>0{index + 1}</span>
+                      <strong>{CATEGORY_DETAILS[cat].label}</strong>
+                      <small>{CATEGORY_DETAILS[cat].description}</small>
+                      <i aria-hidden="true">{category === cat ? "Selected" : "Select"} →</i>
+                    </button>
+                  ))}
                 </div>
               </div>
+            )}
 
-              <div className="form-category-grid" id="stream-category-grid">
-                {CREATE_STREAM_CATEGORIES.map((cat, index) => (
-                  <button
-                    key={cat}
-                    type="button"
-                    className={`form-cat-btn ${category === cat ? "selected" : ""}`}
-                    onClick={() => setCategory(cat)}
-                    id={`cat-${cat.toLowerCase()}`}
-                    aria-pressed={category === cat}
-                  >
-                    <span>0{index + 1}</span>
-                    <strong>{CATEGORY_DETAILS[cat].label}</strong>
-                    <small>{CATEGORY_DETAILS[cat].description}</small>
-                  </button>
-                ))}
+            {currentStep === 4 && (
+              <div className="create-step-content create-review">
+                <div className="create-review__headline">
+                  <span>FINAL AGREEMENT</span>
+                  <strong>{title || "Untitled agreement"}</strong>
+                  <p>
+                    Creating this stream locks the full escrow in the Stellar contract.
+                    Review these terms before approving the transaction in Freighter.
+                  </p>
+                </div>
+                <dl className="create-review__terms">
+                  <div><dt>Recipient</dt><dd>{recipient || "—"}</dd></div>
+                  <div><dt>Escrow</dt><dd>{totalAmount ? `${totalAmount} ${asset}` : "—"}</dd></div>
+                  <div><dt>Duration</dt><dd>{durationDays ? `${durationDays} days` : "—"}</dd></div>
+                  <div><dt>Hourly equivalent</dt><dd>{hourlyRate === "—" ? "—" : `${hourlyRate} ${asset}`}</dd></div>
+                  <div><dt>Work type</dt><dd>{CATEGORY_DETAILS[category].label}</dd></div>
+                  <div><dt>Network</dt><dd>Stellar testnet</dd></div>
+                </dl>
+                <div className="create-review__notice">
+                  <strong>What happens next</strong>
+                  <p>
+                    Freighter opens once. After signing, the recipient can attach a project,
+                    submit tracked sessions, and build a verifiable work record.
+                  </p>
+                </div>
               </div>
-            </section>
-          </div>
-
-          <aside className="create-terms-summary">
-            <div className="create-terms-summary__header">
-              <span>LIVE TERMS</span>
-              <strong>{asset} AGREEMENT</strong>
-            </div>
-
-            <dl>
-              <div>
-                <dt>Escrow</dt>
-                <dd>{totalAmount ? `${totalAmount} ${asset}` : "—"}</dd>
-              </div>
-              <div>
-                <dt>Duration</dt>
-                <dd>{durationDays ? `${durationDays} days` : "—"}</dd>
-              </div>
-              <div>
-                <dt>Hourly equivalent</dt>
-                <dd>{hourlyRate === "—" ? "—" : `${hourlyRate} ${asset}`}</dd>
-              </div>
-              <div>
-                <dt>Work type</dt>
-                <dd>{CATEGORY_DETAILS[category].label}</dd>
-              </div>
-            </dl>
-
-            <div className="create-terms-flow" aria-label="Agreement lifecycle">
-              <div><span>01</span><strong>Fund</strong></div>
-              <div><span>02</span><strong>Track</strong></div>
-              <div><span>03</span><strong>Review</strong></div>
-              <div><span>04</span><strong>Release</strong></div>
-            </div>
-
-            <p className="create-terms-note">
-              Only npm-tracked active seconds can reserve payment from this escrow.
-            </p>
+            )}
 
             {error && <div className="form-error">{error}</div>}
 
-            <button
-              className="form-submit-btn"
-              type="submit"
-              disabled={
-                loading ||
-                !connected ||
-                (asset === "USDC" && senderTrustline !== "ready")
-              }
-              id="create-stream-submit"
-            >
-              {loading ? (
-                <span className="form-spinner" />
+            <footer className="create-wizard-actions">
+              <button
+                className="create-wizard-back"
+                type="button"
+                onClick={() => moveToStep((currentStep - 1) as CreateStep)}
+                disabled={currentStep === 1 || loading}
+              >
+                ← Back
+              </button>
+              {currentStep < 4 ? (
+                <button className="create-wizard-next" type="button" onClick={continueFlow}>
+                  Continue <span>→</span>
+                </button>
               ) : (
-                <>
-                  <span>Initialize agreement</span>
-                  <span>↗</span>
-                </>
+                <button
+                  className="form-submit-btn"
+                  type="submit"
+                  disabled={loading || !connected || (asset === "USDC" && senderTrustline !== "ready")}
+                  id="create-stream-submit"
+                >
+                  {loading ? <span className="form-spinner" /> : <><span>Initialize agreement</span><span>↗</span></>}
+                </button>
               )}
-            </button>
+            </footer>
+          </section>
+
+          <aside className="create-step-guide" aria-label="Current step guidance">
+            <span>STEP 0{currentStep} / GUIDANCE</span>
+            <h3>{currentStep === 4 ? "Before you sign" : "Why we ask"}</h3>
+            <p>
+              {currentStep === 1 && "The title and recipient become part of the agreement record. The recipient address cannot be changed after signing."}
+              {currentStep === 2 && "Escrow sets the maximum payment. Duration converts that amount into a contract-controlled active-work rate."}
+              {currentStep === 3 && "The work type labels the proof record so future clients and agents can interpret it correctly."}
+              {currentStep === 4 && "Check the recipient most carefully. Stellar transactions are final once the network accepts the signature."}
+            </p>
+            <dl className="create-step-guide__live">
+              <div><dt>Escrow</dt><dd>{totalAmount ? `${totalAmount} ${asset}` : "Not set"}</dd></div>
+              <div><dt>Duration</dt><dd>{durationDays ? `${durationDays} days` : "Not set"}</dd></div>
+              <div><dt>Recipient</dt><dd>{recipient ? `${recipient.slice(0, 8)}…${recipient.slice(-5)}` : "Not set"}</dd></div>
+              <div><dt>Verification</dt><dd>{CATEGORY_DETAILS[category].label}</dd></div>
+            </dl>
+            <div className="create-step-guide__flow">
+              <span>AFTER CREATION</span>
+              <p>Fund → Track work → Review proof → Release</p>
+            </div>
           </aside>
         </div>
       </form>

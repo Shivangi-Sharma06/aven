@@ -33,7 +33,13 @@ export default function LiveStreamCounter({ compact = false }: { compact?: boole
   return (
     <div className={compact ? 'live-counter live-counter--compact' : 'live-counter'}>
       <span>SESSION VERIFIED</span>
-      <strong>$ {formattedAmount}</strong>
+      <strong
+        className="live-counter__amount"
+        aria-label={`${formattedAmount} dollars`}
+      >
+        <span aria-hidden="true">$</span>
+        <span aria-hidden="true">{formattedAmount}</span>
+      </strong>
       <small>
         {activeSeconds.toLocaleString('en-US')} ACTIVE SECONDS × $
         {RATE_PER_SECOND.toFixed(6)}

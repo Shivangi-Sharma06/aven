@@ -3,12 +3,13 @@ import { mkdir, rename, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { promisify } from "node:util";
+import { simpleGit } from "simple-git";
 import { inspectStream, submitReport } from "./api.js";
-import { readConfig } from "./config.js";
+import { readConfig, readGithubConfig } from "./config.js";
 import { findRepositoryRoot } from "./git.js";
 import { buildReport, printReport } from "./report.js";
 import { deleteSession, readSession, sessionPath, writeSession } from "./session.js";
-import type { LocalSession } from "./types.js";
+import type { LocalSession, WorkSessionReport } from "./types.js";
 import { isProcessAlive, isWatcherHealthy } from "./watcher.js";
 
 const execFileAsync = promisify(execFile);
@@ -154,7 +155,7 @@ export async function stopCommand(options: StopOptions) {
 
   const stream = await inspectStream(config.dashboardUrl, config.streamId, config.token);
   const message = options.message ?? await question("What did you work on during this session?");
-  const report = await buildReport(
+  let report = await buildReport(
     repositoryRoot,
     config,
     session,
@@ -166,6 +167,104 @@ export async function stopCommand(options: StopOptions) {
     stoppedAt,
     options.ended === true,
   );
+
+  // ── GitHub delivery tracking (when --ended) ────────────────────────────────
+  if (options.ended === true) {
+    try {
+      const githubConfig = await readGithubConfig(repositoryRoot);
+      if (githubConfig) {
+        const git = simpleGit(repositoryRoot);
+        // List local branches
+        const branchSummary = await git.branchLocal();
+        const localBranches = branchSummary.all;
+        const currentBranch = branchSummary.current;
+
+        // Prompt worker to select delivery branches
+        const terminal = createInterface({ input: process.stdin, output: process.stdout });
+        process.stdout.write("\nSelect branches to include in the delivery:\n");
+        localBranches.forEach((b, i) => {
+          const current = b === currentBranch ? " (current)" : "";
+          process.stdout.write(`  [${i + 1}] ${b}${current}\n`);
+        });
+        process.stdout.write(`  [a] All branches\n`);
+        const answer = (await terminal.question("Enter branch numbers (comma-separated) or 'a' for all: ")).trim();
+        terminal.close();
+
+        let selectedNames: string[];
+        if (answer.toLowerCase() === "a") {
+          selectedNames = localBranches;
+        } else {
+          const indices = answer.split(",").map((s) => parseInt(s.trim(), 10) - 1);
+          selectedNames = indices
+            .filter((i) => i >= 0 && i < localBranches.length)
+            .map((i) => localBranches[i]);
+        }
+
+        if (selectedNames.length === 0) selectedNames = [currentBranch];
+
+        // Resolve head commit and verify each branch on GitHub via the dashboard API
+        const deliveryBranches: WorkSessionReport["delivery"] extends undefined ? never : NonNullable<WorkSessionReport["delivery"]>["selectedBranches"] = [];
+        let allVerified = true;
+
+        for (const branchName of selectedNames) {
+          let headCommit = "";
+          try {
+            const log = await git.log({ maxCount: 1, from: branchName });
+            headCommit = log.latest?.hash ?? "";
+          } catch { /* ignore */ }
+
+          // Verify on GitHub via dashboard API
+          let verifiedOnRemote = false;
+          try {
+            const checkUrl = `${config.dashboardUrl}/api/streams/${config.streamId}/repository`;
+            const resp = await fetch(checkUrl, {
+              headers: { authorization: `Bearer ${config.token}` },
+            });
+            if (resp.ok) {
+              const repoData = await resp.json() as { fullName?: string };
+              if (repoData.fullName) {
+                const verifyUrl = `${config.dashboardUrl}/api/github/verify-branch`;
+                const vResp = await fetch(verifyUrl, {
+                  method: "POST",
+                  headers: { authorization: `Bearer ${config.token}`, "content-type": "application/json" },
+                  body: JSON.stringify({ fullName: repoData.fullName, branch: branchName }),
+                });
+                if (vResp.ok) {
+                  const vData = await vResp.json() as { exists?: boolean };
+                  verifiedOnRemote = vData.exists === true;
+                }
+              }
+            }
+          } catch { /* offline — mark as not verified */ }
+
+          if (!verifiedOnRemote) {
+            process.stdout.write(`  ⚠ Branch '${branchName}' could not be verified on the remote repository.\n`);
+            allVerified = false;
+          }
+          deliveryBranches.push({ name: branchName, headCommit, verifiedOnRemote });
+        }
+
+        if (!allVerified) {
+          process.stdout.write(
+            "One or more selected branches were not found on the remote.\n" +
+            "Push them before requesting final payment transfer.\n",
+          );
+        }
+
+        // Attach delivery tracking to the report
+        const delivery: NonNullable<WorkSessionReport["delivery"]> = {
+          selectedBranches: deliveryBranches,
+          includedTags: [],
+          repositoryComplete: allVerified,
+          verifiedAt: new Date().toISOString(),
+        };
+        report = { ...report, delivery };
+      }
+    } catch (error) {
+      // Delivery tracking is best-effort — do not fail the stop command
+      process.stderr.write(`GitHub delivery tracking unavailable: ${error instanceof Error ? error.message : String(error)}\n`);
+    }
+  }
   await saveLocalReport(repositoryRoot, report);
   printReport(report);
   process.stdout.write(

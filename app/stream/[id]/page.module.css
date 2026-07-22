@@ -159,8 +159,8 @@
 
 .work-session-section {
   --text-primary: #000;
-  --text-secondary: rgba(0, 0, 0, 0.56);
-  --text-mono: rgba(0, 0, 0, 0.52);
+  --text-secondary: #333;
+  --text-mono: #404040;
   --border: rgba(0, 0, 0, 0.18);
   --surface: #fff;
   --surface-high: #f6f6f3;
@@ -229,6 +229,7 @@
   overflow-wrap: anywhere;
   font-family: var(--font-mono), monospace;
   font-size: 13px;
+  font-weight: 600;
 }
 
 .work-session-setup {
@@ -253,7 +254,7 @@
 
 .work-session-list {
   display: grid;
-  gap: 14px;
+  gap: 12px;
   margin-top: 18px;
 }
 
@@ -273,7 +274,7 @@
 
 .work-session-card-header {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) auto;
   width: 100%;
   border: 0;
   border-bottom: 1px solid var(--border);
@@ -299,7 +300,7 @@
 .work-session-deadline {
   color: var(--text-secondary);
   font-family: var(--font-mono), monospace;
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -403,6 +404,7 @@
   padding: 14px 16px;
 }
 
+/* Default action button */
 .work-session-actions button,
 .work-session-dispute button {
   border: 1px solid var(--border);
@@ -410,10 +412,34 @@
   background: var(--surface-high);
   color: var(--text-primary);
   font-family: var(--font-mono), monospace;
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
+}
+
+/* APPROVE — primary: black background, white text */
+.work-session-actions button[data-action="approve"] {
+  background: #000;
+  color: #fff;
+  border: none;
+}
+
+.work-session-actions button[data-action="approve"]:hover:not(:disabled) {
+  background: #222;
+}
+
+/* DISPUTE / CANCEL STREAM — danger: red border, red text */
+.work-session-actions button[data-action="dispute"],
+.work-session-actions button[data-action="cancel"] {
+  border: 1.5px solid #9b1c1c;
+  color: #9b1c1c;
+  background: transparent;
+}
+
+.work-session-actions button[data-action="dispute"]:hover:not(:disabled),
+.work-session-actions button[data-action="cancel"]:hover:not(:disabled) {
+  background: #fff5f5;
 }
 
 .work-session-actions button:disabled,

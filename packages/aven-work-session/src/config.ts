@@ -76,3 +76,25 @@ export async function writeConfig(repositoryRoot: string, config: AvenConfig) {
   await mkdir(join(repositoryRoot, CONFIG_DIRECTORY), { recursive: true, mode: 0o700 });
   await writeAtomic(configPath(repositoryRoot), config);
 }
+
+export type GithubRepoConfig = {
+  fullName: string;
+  htmlUrl: string;
+  cloneUrl: string;
+  sshUrl: string;
+};
+
+/**
+ * Reads optional .aven/github.json written by the dashboard after repository creation.
+ * Returns null if the file does not exist (GitHub integration not set up).
+ */
+export async function readGithubConfig(repositoryRoot: string): Promise<GithubRepoConfig | null> {
+  try {
+    const raw = await readFile(join(repositoryRoot, CONFIG_DIRECTORY, "github.json"), "utf8");
+    const parsed = JSON.parse(raw) as Partial<GithubRepoConfig>;
+    if (typeof parsed.fullName !== "string") return null;
+    return parsed as GithubRepoConfig;
+  } catch {
+    return null;
+  }
+}

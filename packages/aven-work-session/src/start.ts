@@ -149,6 +149,13 @@ export async function startCommand(options: StartOptions) {
   }
 
   const git = await captureGitState(repositoryRoot);
+  if (!git.commit) {
+    process.stderr.write(
+      "No commits found. Aven cannot track changes without a starting commit.\n" +
+      "Please make an initial commit before running `aven start`.\n",
+    );
+    process.exit(1);
+  }
   process.stdout.write(`\nAven will collect:\n`);
   process.stdout.write(`  • relative file paths and change types\n`);
   process.stdout.write(`  • Git branch, commit, and diff statistics\n`);
@@ -175,6 +182,7 @@ export async function startCommand(options: StartOptions) {
     activeSeconds: 0,
     idleSeconds: 0,
     activityEvents: 0,
+    startingUntrackedFiles: git.untrackedFiles,
   };
   await writeSession(repositoryRoot, session);
 

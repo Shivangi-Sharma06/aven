@@ -1699,6 +1699,23 @@ h1, h2, h3, h4, h5, h6, .display-text {
   box-shadow: none;
 }
 
+.app-layout .attestation-title {
+  color: #000;
+  font-weight: 600;
+}
+
+.app-layout .attestation-meta,
+.app-layout .attestation-id {
+  color: #000;
+  opacity: 1;
+}
+
+.app-layout .attestation-verified-badge {
+  color: #1a7a1a;
+  font-weight: 500;
+  opacity: 1;
+}
+
 .app-layout .dash-stat {
   min-height: 118px;
   display: flex;

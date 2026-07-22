@@ -40,6 +40,12 @@ export type WorkSessionReport = {
     endingCommit?: string;
     dirtyAtStart: boolean;
     dirtyAtEnd: boolean;
+    // GitHub integration fields (optional, populated by stop --ended)
+    githubRepositoryId?: number;
+    githubFullName?: string;
+    compareUrl?: string;
+    baselineVerifiedOnRemote?: boolean;
+    endingCommitVerifiedOnRemote?: boolean;
   };
   changes: {
     changedFiles: FileChangeSummary[];
@@ -70,6 +76,17 @@ export type WorkSessionReport = {
     excludedFileCount: number;
     secretWarnings: number;
     fullFilesIncluded: false;
+  };
+  // Optional delivery tracking (populated when session ends with --ended)
+  delivery?: {
+    selectedBranches: Array<{
+      name: string;
+      headCommit: string;
+      verifiedOnRemote: boolean;
+    }>;
+    includedTags: string[];
+    repositoryComplete: boolean;
+    verifiedAt?: string;
   };
 };
 
@@ -106,6 +123,12 @@ export type LocalSession = {
   watcherPid?: number;
   /** ISO timestamp refreshed by the activity watcher. */
   watcherHeartbeatAt?: string;
+  /**
+   * Untracked (not-added) files present at session start.
+   * Used by collectChanges to avoid reporting pre-existing untracked
+   * files as newly created by the worker.
+   */
+  startingUntrackedFiles?: string[];
 };
 
 // Minimal server-side work session shape used by `aven sessions`.

@@ -14,7 +14,7 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "test": "npm run build && node --test test/*.test.mjs",
+    "test": "npm run build && node --test test/*.test.mjs dist/__tests__/*.test.js",
     "prepublishOnly": "npm run typecheck && npm run build"
   },
   "engines": {

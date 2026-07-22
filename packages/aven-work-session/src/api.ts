@@ -1,4 +1,4 @@
-import type { AvenConfig, WorkSessionReport } from "./types.js";
+import type { AvenConfig, GithubRepoConfig, WorkSession, WorkSessionReport } from "./types.js";
 
 async function responseJson(response: Response) {
   const data = await response.json().catch(() => ({}));
@@ -53,4 +53,69 @@ export async function submitReport(config: AvenConfig, report: WorkSessionReport
     body: JSON.stringify(report),
   });
   return responseJson(response) as Promise<{ sessionId: string; status: string }>;
+}
+
+export async function getGithubRepository(
+  dashboardUrl: string,
+  streamId: string,
+  token: string,
+): Promise<GithubRepoConfig | null> {
+  const response = await fetch(
+    `${dashboardUrl}/api/streams/${encodeURIComponent(streamId)}/repository`,
+    { headers: { authorization: `Bearer ${token}` } },
+  );
+  if (response.status === 404) return null;
+  const data = await responseJson(response) as {
+    githubRepositoryId: number;
+    fullName: string;
+    htmlUrl: string;
+    cloneUrl: string;
+    sshUrl: string;
+  };
+  return {
+    repositoryId: data.githubRepositoryId,
+    fullName: data.fullName,
+    htmlUrl: data.htmlUrl,
+    cloneUrl: data.cloneUrl,
+    sshUrl: data.sshUrl,
+  };
+}
+
+export async function verifyGithubReference(
+  config: AvenConfig,
+  reference: { branch?: string; commit?: string; expectedHead?: string },
+) {
+  const response = await fetch(`${config.dashboardUrl}/api/github/verify-branch`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${config.token}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ streamId: config.streamId, ...reference }),
+  });
+  return responseJson(response) as Promise<{
+    exists: boolean;
+    branchExists?: boolean;
+    commitExists?: boolean;
+    headMatches?: boolean;
+  }>;
+}
+
+export async function listSessions(
+  dashboardUrl: string,
+  streamId: string,
+  token: string,
+): Promise<{ sessions: WorkSession[]; streamStatus: string; available: string; asset: string }> {
+  const response = await fetch(
+    `${dashboardUrl}/api/streams/${encodeURIComponent(streamId)}/work-sessions`,
+    { headers: { authorization: `Bearer ${token}` } },
+  );
+  const body = await responseJson(response) as WorkSession[];
+  const sessions = Array.isArray(body) ? body : [];
+  return {
+    sessions,
+    streamStatus: response.headers.get("x-aven-stream-status") ?? "unknown",
+    available: response.headers.get("x-aven-available") ?? "0.0000000",
+    asset: response.headers.get("x-aven-stream-asset") ?? "USDC",
+  };
 }

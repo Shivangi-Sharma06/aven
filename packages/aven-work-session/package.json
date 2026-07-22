@@ -1,6 +1,6 @@
 {
   "name": "aven-stellar",
-  "version": "0.1.7",
+  "version": "0.2.0",
   "description": "Privacy-conscious Git work sessions for Aven payment streams on Stellar.",
   "type": "module",
   "bin": {
@@ -14,7 +14,7 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "test": "npm run build && node --test test/*.test.mjs",
+    "test": "npm run build && node --test test/*.test.mjs dist/__tests__/*.test.js",
     "prepublishOnly": "npm run typecheck && npm run build"
   },
   "engines": {

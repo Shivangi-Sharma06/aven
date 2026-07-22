@@ -3,18 +3,42 @@ import { randomUUID } from "node:crypto";
 import { createInterface } from "node:readline/promises";
 import { basename } from "node:path";
 import { authorizeCli } from "./auth.js";
-import { inspectStream } from "./api.js";
+import { getGithubRepository, inspectStream } from "./api.js";
 import { readConfig, writeConfig } from "./config.js";
 import { captureGitState, findRepositoryRoot } from "./git.js";
 import { ensureAvenIgnore } from "./privacy.js";
-import { readSession, writeSession } from "./session.js";
+import { deleteSession, readSession, writeSession } from "./session.js";
 import type { AvenConfig, LocalSession } from "./types.js";
+import {
+  isWatcherHealthy,
+  removeWatcherSentinel,
+} from "./watcher.js";
 
 export type StartOptions = {
   stream?: string;
   dashboard?: string;
   nonInteractive?: boolean;
 };
+
+export async function ensureAvenRemote(
+  repositoryRoot: string,
+  github: NonNullable<AvenConfig["github"]>,
+) {
+  const git = (await import("simple-git")).simpleGit(repositoryRoot);
+  const remote = (await git.getRemotes(true)).find((candidate) => candidate.name === "aven");
+  const acceptedUrls = new Set([github.sshUrl, github.cloneUrl]);
+  if (!remote) {
+    process.stdout.write(`git remote add aven ${github.sshUrl}\n`);
+    await git.addRemote("aven", github.sshUrl);
+    return;
+  }
+  if (!acceptedUrls.has(remote.refs.fetch) || !acceptedUrls.has(remote.refs.push)) {
+    throw new Error(
+      `The existing 'aven' remote points to ${remote.refs.fetch || remote.refs.push}, not ${github.fullName}. ` +
+      "Remove or rename it yourself, then run `aven start` again. Aven never overwrites remotes.",
+    );
+  }
+}
 
 async function question(prompt: string, fallback?: string) {
   const terminal = createInterface({ input: process.stdin, output: process.stdout });
@@ -47,6 +71,7 @@ async function firstTimeSetup(repositoryRoot: string, options: StartOptions): Pr
     workerAddress: authorization.walletAddress,
     asset: stream.asset,
     token: authorization.token,
+    ratePerSecond: stream.ratePerSecond,
   };
   await writeConfig(repositoryRoot, config);
   return config;
@@ -57,11 +82,31 @@ export async function startCommand(options: StartOptions) {
   await ensureAvenIgnore(repositoryRoot);
   const existingSession = await readSession(repositoryRoot);
   if (existingSession) {
-    throw new Error(
-      existingSession.status === "stopped"
-        ? "A previous Aven session is awaiting submission. Run `aven stop` again before starting another."
-        : "An Aven work session already exists in this repository. Stop it before starting another.",
+    if (existingSession.status === "stopped") {
+      throw new Error(
+        "A previous Aven session is awaiting submission. Run `aven stop` again before starting another.",
+      );
+    }
+
+    // Active session — check whether its watcher is still actually running.
+    const watcherAlive = await isWatcherHealthy(repositoryRoot, existingSession);
+
+    if (watcherAlive) {
+      throw new Error(
+        "An Aven work session already exists in this repository. Stop it before starting another.",
+      );
+    }
+
+    // Dead watcher — inform the user and let them decide what to do.
+    const started = existingSession.startedAt;
+    const active = existingSession.activeSeconds;
+    const streamId = existingSession.streamId;
+    process.stdout.write(
+      `A session from ${started} was interrupted (watcher is no longer running).\n` +
+      `It recorded ${active}s of active time on stream #${streamId}.\n` +
+      `Run \`aven stop\` to generate a report and submit it, or delete .aven/session.json to discard it.\n`,
     );
+    throw new Error("Interrupted session detected. Resolve it before starting a new one.");
   }
 
   let config = await readConfig(repositoryRoot);
@@ -112,13 +157,32 @@ export async function startCommand(options: StartOptions) {
     if (stream.status !== "active" && stream.status !== "paused") {
       throw new Error(`The configured stream is ${stream.status}.`);
     }
+    // Refresh ratePerSecond in config so offline estimates stay accurate.
+    if (stream.ratePerSecond && stream.ratePerSecond !== config.ratePerSecond) {
+      config.ratePerSecond = stream.ratePerSecond;
+      await writeConfig(repositoryRoot, config);
+    }
   } catch (error) {
     if (options.nonInteractive) throw error;
     process.stdout.write("The saved CLI authorization is unavailable. Authorizing again…\n");
     config = await firstTimeSetup(repositoryRoot, { ...options, stream: config.streamId, dashboard: config.dashboardUrl });
   }
 
+  const github = await getGithubRepository(config.dashboardUrl, config.streamId, config.token);
+  if (github) {
+    config.github = github;
+    await writeConfig(repositoryRoot, config);
+    await ensureAvenRemote(repositoryRoot, github);
+  }
+
   const git = await captureGitState(repositoryRoot);
+  if (!git.commit) {
+    process.stderr.write(
+      "No commits found. Aven cannot track changes without a starting commit.\n" +
+      "Please make an initial commit before running `aven start`.\n",
+    );
+    process.exit(1);
+  }
   process.stdout.write(`\nAven will collect:\n`);
   process.stdout.write(`  • relative file paths and change types\n`);
   process.stdout.write(`  • Git branch, commit, and diff statistics\n`);
@@ -145,6 +209,7 @@ export async function startCommand(options: StartOptions) {
     activeSeconds: 0,
     idleSeconds: 0,
     activityEvents: 0,
+    startingUntrackedFiles: git.untrackedFiles,
   };
   await writeSession(repositoryRoot, session);
 
@@ -153,9 +218,56 @@ export async function startCommand(options: StartOptions) {
     stdio: "ignore",
     cwd: repositoryRoot,
   });
-  child.unref();
+  const watcherState: { spawnError?: Error } = {};
+  child.once("error", (error) => {
+    watcherState.spawnError = error;
+  });
+  if (!child.pid) {
+    await deleteSession(repositoryRoot);
+    throw new Error("The activity watcher could not be started.");
+  }
   session.watcherPid = child.pid;
   await writeSession(repositoryRoot, session);
+  const cleanupFailedStart = async () => {
+    try {
+      process.kill(child.pid!, "SIGTERM");
+    } catch {
+      // The failed watcher may already have exited.
+    }
+    await removeWatcherSentinel(repositoryRoot, {
+      pid: child.pid!,
+      sessionId: session.sessionId,
+    }).catch(() => undefined);
+    await deleteSession(repositoryRoot);
+  };
+  const deadline = Date.now() + 3_000;
+  while (Date.now() < deadline) {
+    const latestSession = await readSession(repositoryRoot);
+    if (
+      latestSession &&
+      latestSession.sessionId === session.sessionId &&
+      await isWatcherHealthy(repositoryRoot, latestSession)
+    ) {
+      session.watcherHeartbeatAt = latestSession.watcherHeartbeatAt;
+      break;
+    }
+    if (watcherState.spawnError) {
+      await cleanupFailedStart();
+      throw new Error(
+        `The activity watcher could not be started: ${watcherState.spawnError.message}`,
+      );
+    }
+    if (child.exitCode !== null) {
+      await cleanupFailedStart();
+      throw new Error("The activity watcher exited before it became ready.");
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  if (!session.watcherHeartbeatAt) {
+    await cleanupFailedStart();
+    throw new Error("The activity watcher did not become ready within 3 seconds.");
+  }
+  child.unref();
   process.stdout.write(`Aven session ${session.sessionId} started for stream #${config.streamId}.\n`);
   process.stdout.write(`Run \`npx aven-stellar stop\` when this work period is finished.\n`);
 }

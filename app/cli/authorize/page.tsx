@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { signMessage } from "@stellar/freighter-api";
 import { useWallet } from "@/components/WalletProvider";
+import styles from "./page.module.css";
 
 function signatureToBase64(signature: string | Uint8Array) {
   if (typeof signature === "string") return signature;
@@ -63,27 +64,41 @@ export default function CliAuthorizePage() {
   }
 
   return (
-    <div className="create-stream-wrap">
-      <div className="create-stream-header">
-        <span className="mono-text">CLI / DEVICE AUTHORIZATION</span>
-        <h1 className="create-stream-title">Connect this project to Aven.</h1>
-        <p className="create-stream-sub">
+    <div className={styles.wrap}>
+      <div className={styles.card}>
+        <span className={styles.eyebrow}>CLI / Device Authorization</span>
+        <h1 className={styles.title}>Connect this project to Aven.</h1>
+        <p className={styles.subtitle}>
           This grants a short-lived worker token. It cannot create streams, approve payments, or act as a client.
         </p>
-      </div>
 
-      <div className="create-stream-form">
-        <div className="form-section">
-          <span className="form-label">Device code</span>
-          <code className="form-input form-input--mono">{deviceCode || "Missing device code"}</code>
-        </div>
-        {error && <div className="form-error">{error}</div>}
+        {error && <div className={styles.error}>{error}</div>}
+
         {status === "authorized" ? (
-          <div className="form-success-banner">CLI access authorized. You can return to the terminal.</div>
+          <div className={styles.success}>
+            <span className={styles.successIcon}>✓</span>
+            <span className={styles.successTitle}>Authorization successful</span>
+            <p className={styles.successMessage}>You can return to the terminal.</p>
+          </div>
         ) : (
-          <button className="form-btn" onClick={authorize} disabled={connecting || status === "signing"}>
-            {!connected ? "Connect Freighter" : status === "signing" ? "Waiting for signature…" : "Authorize Aven CLI"}
-          </button>
+          <>
+            <span className={styles.deviceCodeLabel}>Device code</span>
+            <code className={`${styles.deviceCode}${deviceCode ? "" : ` ${styles["deviceCode--missing"]}`}`}>
+              {deviceCode || "Missing device code"}
+            </code>
+            <button
+              id="cli-authorize-btn"
+              className={styles.btn}
+              onClick={authorize}
+              disabled={connecting || status === "signing"}
+            >
+              {!connected
+                ? "Connect Freighter"
+                : status === "signing"
+                  ? "Waiting for signature…"
+                  : "Authorize Aven CLI"}
+            </button>
+          </>
         )}
       </div>
     </div>

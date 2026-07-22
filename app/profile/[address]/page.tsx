@@ -211,8 +211,11 @@ function AttestationCard({ attestation, onView }: { attestation: AttestationObje
       <div className="attestation-title">{attestation.title}</div>
       <div className="attestation-meta">
         <span>{attestation.amountPaid.toFixed(2)} {attestation.asset}</span>
-        <span>·</span>
-        <span>ledger {attestation.startLedger.toLocaleString()} → {attestation.endLedger.toLocaleString()}</span>
+        <span
+          title="Stellar ledger sequence numbers representing the on-chain verification window — not an XLM amount"
+        >
+          Verified on ledgers {attestation.startLedger.toLocaleString()}–{attestation.endLedger.toLocaleString()}
+        </span>
       </div>
       <div className="attestation-verified-badge">✓ On-Chain Verified</div>
     </div>

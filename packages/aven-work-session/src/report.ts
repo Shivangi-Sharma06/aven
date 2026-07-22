@@ -51,7 +51,7 @@ export async function buildReport(
   const endingState = await captureGitState(repositoryRoot);
   const privacyFilter = await createPrivacyFilter(repositoryRoot);
   const [changes, commits, repositoryId] = await Promise.all([
-    collectChanges(repositoryRoot, session.startingCommit, privacyFilter),
+    collectChanges(repositoryRoot, session.startingCommit, privacyFilter, session.startingUntrackedFiles ?? []),
     collectCommits(repositoryRoot, session.startingCommit),
     repositoryIdentifier(repositoryRoot),
   ]);

@@ -17,6 +17,8 @@
     "@mantine/hooks": "^7.17.8",
     "@mantine/modals": "^7.17.8",
     "@mantine/notifications": "^7.17.8",
+    "@octokit/app": "^16.1.2",
+    "@octokit/rest": "^22.0.1",
     "@stellar/freighter-api": "^4.1.0",
     "@stellar/stellar-sdk": "^16.0.1",
     "@types/animejs": "^3.1.13",

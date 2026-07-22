@@ -2,7 +2,9 @@
 
 import { Command } from "commander";
 import { runActivityWatcher } from "./activity.js";
+import { sessionsCommand } from "./sessions.js";
 import { startCommand } from "./start.js";
+import { statusCommand } from "./status.js";
 import { stopCommand } from "./stop.js";
 import { PACKAGE_VERSION } from "./version.js";
 
@@ -38,6 +40,16 @@ async function main() {
       "Mark this as the final project session and request settlement of the remaining escrow",
     )
     .action(stopCommand);
+
+  program
+    .command("status")
+    .description("Show the current session status and estimated payment.")
+    .action(statusCommand);
+
+  program
+    .command("sessions")
+    .description("List work sessions for the configured stream.")
+    .action(sessionsCommand);
 
   await program.parseAsync(process.argv);
 }

@@ -22,7 +22,13 @@ export async function captureGitState(repositoryRoot: string) {
   } catch {
     commit = undefined;
   }
-  return { branch, commit, dirty: !status.isClean() };
+  return {
+    branch,
+    commit,
+    dirty: !status.isClean(),
+    /** Files present on disk but not tracked by Git at this moment. */
+    untrackedFiles: status.not_added,
+  };
 }
 
 function parseNameStatus(raw: string) {
@@ -47,16 +53,35 @@ export async function collectChanges(
   repositoryRoot: string,
   startingCommit: string | undefined,
   excluded: (path: string) => boolean,
+  startingUntrackedFiles: readonly string[] = [],
 ) {
+  if (!startingCommit) {
+    // No deterministic baseline — return empty rather than reporting every
+    // file in the working tree as "created".
+    return { changedFiles: [], additions: 0, deletions: 0, excludedFileCount: 0, secretWarnings: 0 };
+  }
+
   const git = simpleGit(repositoryRoot);
-  const status = await git.status();
-  const diffArguments = startingCommit ? [startingCommit, "--"] : ["--"];
+  const diffArguments = [startingCommit, "HEAD", "--"];
   const [summary, nameStatus] = await Promise.all([
     git.diffSummary(diffArguments),
     git.diff(["--name-status", ...diffArguments]),
   ]);
   const statuses = parseNameStatus(nameStatus);
-  for (const path of status.not_added) statuses.set(path, "created");
+
+  // Only include untracked files that did NOT exist at the starting commit
+  // AND were not already on disk when the session started.
+  //
+  // `startingUntrackedFiles` is the set of `git status --porcelain` "??"
+  // paths captured when `aven start` ran.  Any path in that set that is
+  // still untracked at session end was pre-existing and must not be
+  // reported as a session creation.
+  const preExisting = new Set(startingUntrackedFiles);
+  const status = await git.status();
+  for (const path of status.not_added) {
+    if (preExisting.has(path)) continue; // pre-existed before the session
+    statuses.set(path, "created");
+  }
 
   const stats = new Map(summary.files.map((file) => [file.file, file]));
   const changedFiles: FileChangeSummary[] = [];
@@ -67,6 +92,7 @@ export async function collectChanges(
     if (isExcluded) {
       excludedFileCount += 1;
       if (/secret|credential|password|\.env|\.pem|\.key/i.test(path)) secretWarnings += 1;
+      continue;
     }
     const stat = stats.get(path);
     const additions = stat && "insertions" in stat ? stat.insertions : 0;
@@ -78,8 +104,7 @@ export async function collectChanges(
       additions,
       deletions,
       category: categoryForPath(path),
-      includedInVerification: !isExcluded,
-      excludedReason: isExcluded ? "Excluded by Git/Aven privacy rules." : undefined,
+      includedInVerification: true,
     });
   }
 

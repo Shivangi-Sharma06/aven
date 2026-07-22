@@ -69,6 +69,12 @@ export type WorkSessionReport = {
     endingCommit?: string;
     dirtyAtStart: boolean;
     dirtyAtEnd: boolean;
+    // GitHub integration fields (optional, populated by stop --ended)
+    githubRepositoryId?: number;
+    githubFullName?: string;
+    compareUrl?: string;
+    baselineVerifiedOnRemote?: boolean;
+    endingCommitVerifiedOnRemote?: boolean;
   };
   changes: {
     changedFiles: FileChangeSummary[];
@@ -102,6 +108,17 @@ export type WorkSessionReport = {
     excludedFileCount: number;
     secretWarnings: number;
     fullFilesIncluded: false;
+  };
+  // Optional delivery tracking (populated when session ends with --ended)
+  delivery?: {
+    selectedBranches: Array<{
+      name: string;
+      headCommit: string;
+      verifiedOnRemote: boolean;
+    }>;
+    includedTags: string[];
+    repositoryComplete: boolean;
+    verifiedAt?: string;
   };
 };
 

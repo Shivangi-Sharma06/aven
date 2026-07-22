@@ -1,6 +1,6 @@
 import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { AvenConfig } from "./types.js";
+import type { AvenConfig, GithubRepoConfig } from "./types.js";
 
 const CONFIG_DIRECTORY = ".aven";
 const CONFIG_FILE = "config.json";
@@ -36,6 +36,14 @@ export function isAvenConfig(value: unknown): value is AvenConfig {
       dashboardUrlValid = false;
     }
   }
+  const githubValid = config.github === undefined || (
+    Number.isSafeInteger(config.github.repositoryId) &&
+    config.github.repositoryId > 0 &&
+    isNonEmptyString(config.github.fullName) &&
+    isNonEmptyString(config.github.htmlUrl) &&
+    isNonEmptyString(config.github.cloneUrl) &&
+    isNonEmptyString(config.github.sshUrl)
+  );
   return config.version === 1 &&
     dashboardUrlValid &&
     isNonEmptyString(config.projectId) &&
@@ -46,6 +54,7 @@ export function isAvenConfig(value: unknown): value is AvenConfig {
     (config.asset === "USDC" || config.asset === "XLM") &&
     isNonEmptyString(config.token) &&
     (config.tokenExpiresAt === undefined || isIsoTimestamp(config.tokenExpiresAt)) &&
+    githubValid &&
     (
       config.ratePerSecond === undefined ||
       (
@@ -77,24 +86,6 @@ export async function writeConfig(repositoryRoot: string, config: AvenConfig) {
   await writeAtomic(configPath(repositoryRoot), config);
 }
 
-export type GithubRepoConfig = {
-  fullName: string;
-  htmlUrl: string;
-  cloneUrl: string;
-  sshUrl: string;
-};
-
-/**
- * Reads optional .aven/github.json written by the dashboard after repository creation.
- * Returns null if the file does not exist (GitHub integration not set up).
- */
 export async function readGithubConfig(repositoryRoot: string): Promise<GithubRepoConfig | null> {
-  try {
-    const raw = await readFile(join(repositoryRoot, CONFIG_DIRECTORY, "github.json"), "utf8");
-    const parsed = JSON.parse(raw) as Partial<GithubRepoConfig>;
-    if (typeof parsed.fullName !== "string") return null;
-    return parsed as GithubRepoConfig;
-  } catch {
-    return null;
-  }
+  return (await readConfig(repositoryRoot))?.github ?? null;
 }

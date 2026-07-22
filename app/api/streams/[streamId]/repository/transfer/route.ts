@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { apiError } from "@/lib/api-response";
-import { getRepository, putRepository, findStreamIdByRepoId } from "@/lib/github-repository-store";
+import {
+  acquireRepositoryTransfer,
+  getRepository,
+  putRepository,
+  releaseRepositoryTransfer,
+} from "@/lib/github-repository-store";
 import { transferRepository, getRepositoryOwner } from "@/lib/github-service";
+import { checkTransferEligibility } from "@/lib/github-transfer";
 import { authenticateBrowserSession, addressesEqual, getOnchainStream } from "@/lib/work-session-server";
 
 export const runtime = "nodejs";
@@ -16,7 +22,7 @@ type Params = { params: Promise<{ streamId: string }> };
  * Runs all preflight checks again internally — never trusts a prior preflight call.
  * Body: { destination: string }
  *
- * State transitions: ACTIVE → TRANSFER_PENDING → TRANSFER_READY
+ * State transitions: ACTIVE/TRANSFER_FAILED → TRANSFER_PENDING
  */
 export async function POST(request: Request, context: Params) {
   const { streamId } = await context.params;
@@ -28,55 +34,52 @@ export async function POST(request: Request, context: Params) {
     const destination = typeof body?.destination === "string" ? body.destination.trim() : "";
     if (!destination) return apiError("destination is required.", 400);
 
-    const stream = await getOnchainStream(streamId);
-    if (!stream) return apiError("Stream not found.", 404);
-    if (!addressesEqual(stream.sender, walletAddress)) {
-      return apiError("Only the stream sender can initiate a transfer.", 403);
+    const eligibility = await checkTransferEligibility({ streamId, walletAddress, destination });
+    if (!eligibility.eligible) return apiError(eligibility.reason, eligibility.status);
+    const { repository } = eligibility;
+    if (!await acquireRepositoryTransfer(streamId)) {
+      return apiError("A repository transfer is already in progress.", 409);
     }
-
-    const repository = await getRepository(streamId);
-    if (!repository) return apiError("No repository found for this stream.", 404);
-
-    if (repository.status !== "ACTIVE" && repository.status !== "TRANSFER_FAILED") {
-      return apiError(
-        `Cannot transfer: repository status is ${repository.status}.`,
-        409,
-      );
-    }
-
-    const now = new Date().toISOString();
-
-    // Mark as TRANSFER_PENDING before calling GitHub (prevents double-submit)
-    await putRepository({
-      ...repository,
-      status: "TRANSFER_PENDING",
-      transferDestination: destination,
-      updatedAt: now,
-    });
 
     try {
-      await transferRepository(repository.fullName, destination);
-    } catch (err) {
-      // Rollback to TRANSFER_FAILED so the client can retry
+      const now = new Date().toISOString();
+
+      // Mark as TRANSFER_PENDING before calling GitHub (prevents double-submit)
       await putRepository({
         ...repository,
-        status: "TRANSFER_FAILED",
+        status: "TRANSFER_PENDING",
         transferDestination: destination,
-        lastError: err instanceof Error ? err.message : String(err),
+        updatedAt: now,
+      });
+
+      try {
+        await transferRepository(repository.fullName, destination);
+      } catch (err) {
+        // Rollback to TRANSFER_FAILED so the client can retry
+        await putRepository({
+          ...repository,
+          status: "TRANSFER_FAILED",
+          transferDestination: destination,
+          lastError: err instanceof Error ? err.message : String(err),
+          updatedAt: new Date().toISOString(),
+        });
+        return apiError(`Transfer failed: ${err instanceof Error ? err.message : String(err)}`, 502);
+      }
+
+      // GitHub accepted the request. Keep TRANSFER_PENDING until reconciliation
+      // or the signed webhook confirms the new owner.
+      await putRepository({
+        ...repository,
+        status: "TRANSFER_PENDING",
+        transferDestination: destination,
+        lastError: undefined,
         updatedAt: new Date().toISOString(),
       });
-      return apiError(`Transfer failed: ${err instanceof Error ? err.message : String(err)}`, 502);
+
+      return NextResponse.json({ pending: true, destination });
+    } finally {
+      await releaseRepositoryTransfer(streamId);
     }
-
-    // GitHub accepted the transfer — mark as TRANSFER_READY (not yet TRANSFERRED)
-    await putRepository({
-      ...repository,
-      status: "TRANSFER_READY",
-      transferDestination: destination,
-      updatedAt: new Date().toISOString(),
-    });
-
-    return NextResponse.json({ pending: true, destination });
   } catch (error) {
     return apiError(error);
   }
@@ -105,7 +108,7 @@ export async function GET(request: Request, context: Params) {
     const repository = await getRepository(streamId);
     if (!repository) return apiError("No repository found.", 404);
 
-    if (repository.status !== "TRANSFER_PENDING" && repository.status !== "TRANSFER_READY") {
+    if (repository.status !== "TRANSFER_PENDING") {
       return NextResponse.json(repository);
     }
 

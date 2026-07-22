@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { promisify } from "node:util";
 import { simpleGit } from "simple-git";
-import { inspectStream, submitReport } from "./api.js";
+import { inspectStream, submitReport, verifyGithubReference } from "./api.js";
 import { readConfig, readGithubConfig } from "./config.js";
 import { findRepositoryRoot } from "./git.js";
 import { buildReport, printReport } from "./report.js";
@@ -168,27 +168,48 @@ export async function stopCommand(options: StopOptions) {
     options.ended === true,
   );
 
-  // ── GitHub delivery tracking (when --ended) ────────────────────────────────
-  if (options.ended === true) {
+  // ── GitHub repository and delivery verification ───────────────────────────
+  const githubConfig = await readGithubConfig(repositoryRoot);
+  if (githubConfig) {
     try {
-      const githubConfig = await readGithubConfig(repositoryRoot);
-      if (githubConfig) {
+      const [baseline, ending] = await Promise.all([
+        report.repository.startingCommit
+          ? verifyGithubReference(config, { commit: report.repository.startingCommit })
+          : Promise.resolve({ exists: false }),
+        report.repository.endingCommit
+          ? verifyGithubReference(config, { commit: report.repository.endingCommit })
+          : Promise.resolve({ exists: false }),
+      ]);
+      report = {
+        ...report,
+        repository: {
+          ...report.repository,
+          githubRepositoryId: githubConfig.repositoryId,
+          githubFullName: githubConfig.fullName,
+          compareUrl: report.repository.startingCommit && report.repository.endingCommit
+            ? `${githubConfig.htmlUrl}/compare/${report.repository.startingCommit}...${report.repository.endingCommit}`
+            : undefined,
+          baselineVerifiedOnRemote: baseline.exists,
+          endingCommitVerifiedOnRemote: ending.exists,
+        },
+      };
+
+      if (options.ended === true) {
         const git = simpleGit(repositoryRoot);
-        // List local branches
-        const branchSummary = await git.branchLocal();
-        const localBranches = branchSummary.all;
-        const currentBranch = branchSummary.current;
+        const localBranches = (await git.raw(["branch", "--format=%(refname:short)"]))
+          .split(/\r?\n/)
+          .map((branch) => branch.trim())
+          .filter(Boolean);
+        const currentBranch = (await git.revparse(["--abbrev-ref", "HEAD"])).trim();
 
         // Prompt worker to select delivery branches
-        const terminal = createInterface({ input: process.stdin, output: process.stdout });
-        process.stdout.write("\nSelect branches to include in the delivery:\n");
+        process.stdout.write("\nWhich branches should be included in the delivery?\n");
         localBranches.forEach((b, i) => {
           const current = b === currentBranch ? " (current)" : "";
           process.stdout.write(`  [${i + 1}] ${b}${current}\n`);
         });
         process.stdout.write(`  [a] All branches\n`);
-        const answer = (await terminal.question("Enter branch numbers (comma-separated) or 'a' for all: ")).trim();
-        terminal.close();
+        const answer = await question("Enter branch numbers (comma-separated) or 'a' for all", String(localBranches.indexOf(currentBranch) + 1));
 
         let selectedNames: string[];
         if (answer.toLowerCase() === "a") {
@@ -213,32 +234,19 @@ export async function stopCommand(options: StopOptions) {
             headCommit = log.latest?.hash ?? "";
           } catch { /* ignore */ }
 
-          // Verify on GitHub via dashboard API
           let verifiedOnRemote = false;
           try {
-            const checkUrl = `${config.dashboardUrl}/api/streams/${config.streamId}/repository`;
-            const resp = await fetch(checkUrl, {
-              headers: { authorization: `Bearer ${config.token}` },
+            const verification = await verifyGithubReference(config, {
+              branch: branchName,
+              expectedHead: headCommit,
             });
-            if (resp.ok) {
-              const repoData = await resp.json() as { fullName?: string };
-              if (repoData.fullName) {
-                const verifyUrl = `${config.dashboardUrl}/api/github/verify-branch`;
-                const vResp = await fetch(verifyUrl, {
-                  method: "POST",
-                  headers: { authorization: `Bearer ${config.token}`, "content-type": "application/json" },
-                  body: JSON.stringify({ fullName: repoData.fullName, branch: branchName }),
-                });
-                if (vResp.ok) {
-                  const vData = await vResp.json() as { exists?: boolean };
-                  verifiedOnRemote = vData.exists === true;
-                }
-              }
-            }
+            verifiedOnRemote = verification.exists;
           } catch { /* offline — mark as not verified */ }
 
           if (!verifiedOnRemote) {
-            process.stdout.write(`  ⚠ Branch '${branchName}' could not be verified on the remote repository.\n`);
+            process.stdout.write(
+              `  ⚠ Branch '${branchName}' is missing remotely or does not point to ${headCommit.slice(0, 7)}.\n`,
+            );
             allVerified = false;
           }
           deliveryBranches.push({ name: branchName, headCommit, verifiedOnRemote });

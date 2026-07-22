@@ -106,6 +106,21 @@ describe("collectChanges", () => {
     }
   });
 
+  it("reports an untracked file created during the session as 'created'", async () => {
+    const { dir, git } = await makeRepo();
+    try {
+      const startingCommit = await commitFile(git, dir, "base.txt", "base content");
+      await writeFile(join(dir, "during-session.txt"), "new work", "utf8");
+
+      const result = await collectChanges(dir, startingCommit, noExclusions, []);
+      const found = result.changedFiles.find((file) => file.path === "during-session.txt");
+      assert.ok(found);
+      assert.equal(found.changeType, "created");
+    } finally {
+      await cleanRepo(dir);
+    }
+  });
+
   // ── Untracked file present BEFORE session is NOT reported as created ──────────
 
   it("does NOT report an untracked file that existed before startingCommit as created", async () => {
@@ -219,14 +234,8 @@ describe("collectChanges", () => {
 
       const result = await collectChanges(dir, startingCommit, avenExclusions);
       const found = result.changedFiles.find((f) => f.path.startsWith(".aven/"));
-      const includedAven = result.changedFiles.find(
-        (f) => f.path.startsWith(".aven/") && f.includedInVerification,
-      );
-      assert.equal(includedAven, undefined, ".aven files must not be included in verification");
-      // They may appear in changedFiles but must be excluded from verification
-      if (found) {
-        assert.equal(found.includedInVerification, false);
-      }
+      assert.equal(found, undefined, ".aven files must never appear in changedFiles");
+      assert.equal(result.excludedFileCount, 1);
     } finally {
       await cleanRepo(dir);
     }

@@ -40,6 +40,7 @@ export type ProjectRepositoryRecord = {
 const localRecords = new Map<string, ProjectRepositoryRecord>(); // key: streamId
 // Secondary index for webhook reconciliation: githubRepositoryId → streamId
 const localRepoIdIndex = new Map<number, string>();
+const localTransferLocks = new Set<string>();
 
 // ─── Redis key helpers ────────────────────────────────────────────────────────
 
@@ -49,6 +50,10 @@ function repoKey(streamId: string) {
 
 function repoIdIndexKey(githubRepositoryId: number) {
   return `${dataNamespace}:github-repo-id:${githubRepositoryId}`;
+}
+
+function transferLockKey(streamId: string) {
+  return `${dataNamespace}:github-repo-transfer-lock:${streamId}`;
 }
 
 // ─── Exported functions ───────────────────────────────────────────────────────
@@ -88,4 +93,23 @@ export async function findStreamIdByRepoId(
     return (await sharedRedis.get<string>(repoIdIndexKey(githubRepositoryId))) ?? null;
   }
   return localRepoIdIndex.get(githubRepositoryId) ?? null;
+}
+
+export async function acquireRepositoryTransfer(streamId: string): Promise<boolean> {
+  assertProductionPersistence();
+  if (sharedRedis) {
+    return (await sharedRedis.set(transferLockKey(streamId), "locked", { nx: true, ex: 5 * 60 })) !== null;
+  }
+  if (localTransferLocks.has(streamId)) return false;
+  localTransferLocks.add(streamId);
+  return true;
+}
+
+export async function releaseRepositoryTransfer(streamId: string): Promise<void> {
+  assertProductionPersistence();
+  if (sharedRedis) {
+    await sharedRedis.del(transferLockKey(streamId));
+  } else {
+    localTransferLocks.delete(streamId);
+  }
 }

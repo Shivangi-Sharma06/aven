@@ -53,6 +53,24 @@ export async function getIdentity(
 export async function putIdentity(record: GithubIdentityRecord): Promise<void> {
   assertProductionPersistence();
   if (sharedRedis) {
+    const claimed = await sharedRedis.set(
+      userIdIndexKey(record.githubUserId),
+      record.walletAddress,
+      { nx: true },
+    );
+    if (claimed === null) {
+      const owner = await sharedRedis.get<string>(userIdIndexKey(record.githubUserId));
+      if (owner && owner.toLowerCase() !== record.walletAddress.toLowerCase()) {
+        throw new Error("This GitHub account is already linked to a different Aven wallet.");
+      }
+    }
+    const previous = await getIdentity(record.walletAddress);
+    if (previous && previous.githubUserId !== record.githubUserId) {
+      const previousOwner = await sharedRedis.get<string>(userIdIndexKey(previous.githubUserId));
+      if (previousOwner?.toLowerCase() === record.walletAddress.toLowerCase()) {
+        await sharedRedis.del(userIdIndexKey(previous.githubUserId));
+      }
+    }
     await sharedRedis.set(identityKey(record.walletAddress), record);
   } else {
     localIdentities.set(record.walletAddress.toLowerCase(), record);
@@ -62,7 +80,13 @@ export async function putIdentity(record: GithubIdentityRecord): Promise<void> {
 export async function deleteIdentity(walletAddress: string): Promise<void> {
   assertProductionPersistence();
   if (sharedRedis) {
+    const existing = await getIdentity(walletAddress);
+    if (!existing) return;
+    const indexedWallet = await sharedRedis.get<string>(userIdIndexKey(existing.githubUserId));
     await sharedRedis.del(identityKey(walletAddress));
+    if (indexedWallet && indexedWallet.toLowerCase() === walletAddress.toLowerCase()) {
+      await sharedRedis.del(userIdIndexKey(existing.githubUserId));
+    }
   } else {
     localIdentities.delete(walletAddress.toLowerCase());
   }
@@ -73,13 +97,8 @@ export async function findByGithubUserId(
 ): Promise<GithubIdentityRecord | null> {
   assertProductionPersistence();
   if (sharedRedis) {
-    // Redis has no secondary index — scan in application layer.
-    // In practice the identity store is small (one record per linked user).
-    // A future optimisation could maintain a reverse-index key.
-    // This is acceptable for the current scale.
-    return null; // Cannot scan without knowing all wallet addresses.
-    // Callers that need conflict detection must use the local store or
-    // implement a reverse key: ${dataNamespace}:github-userid:{userId} → walletAddress.
+    const walletAddress = await sharedRedis.get<string>(userIdIndexKey(userId));
+    return walletAddress ? getIdentity(walletAddress) : null;
   }
   for (const record of localIdentities.values()) {
     if (record.githubUserId === userId) return record;
@@ -149,28 +168,13 @@ export async function findWalletByGithubUserId(
 }
 
 export async function putIdentityWithIndex(record: GithubIdentityRecord): Promise<void> {
-  assertProductionPersistence();
-  if (sharedRedis) {
-    await Promise.all([
-      sharedRedis.set(identityKey(record.walletAddress), record),
-      sharedRedis.set(userIdIndexKey(record.githubUserId), record.walletAddress),
-    ]);
-  } else {
-    localIdentities.set(record.walletAddress.toLowerCase(), record);
-  }
+  return putIdentity(record);
 }
 
 export async function deleteIdentityWithIndex(
   walletAddress: string,
   githubUserId: number,
 ): Promise<void> {
-  assertProductionPersistence();
-  if (sharedRedis) {
-    await Promise.all([
-      sharedRedis.del(identityKey(walletAddress)),
-      sharedRedis.del(userIdIndexKey(githubUserId)),
-    ]);
-  } else {
-    localIdentities.delete(walletAddress.toLowerCase());
-  }
+  void githubUserId;
+  return deleteIdentity(walletAddress);
 }

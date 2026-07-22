@@ -3,7 +3,8 @@ import { Keypair } from "@stellar/stellar-sdk";
 import { getBrowserSession } from "./browser-session-store";
 import { getCliToken, type CliScope } from "./cli-auth-store";
 import { getStreamClient, STREAM_CONTRACT_ID, USDC_ASSET_ID } from "./contracts";
-import type { WorkSession, WorkSessionEvent, WorkSessionReport } from "./work-session";
+import type { WorkSession, WorkSessionEvent } from "./work-session";
+export { validateWorkSessionReport } from "./work-session-report-validation";
 import { calculateSettlementSecondsForRate } from "./work-session-math";
 
 const ANONYMOUS_ADDRESS = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
@@ -186,54 +187,4 @@ export function addTimelineEvent(
   session.updatedAt = at;
   session.timeline = [...(session.timeline ?? []), { status, at, actor, note }];
   return session;
-}
-
-export function validateWorkSessionReport(value: unknown): asserts value is WorkSessionReport {
-  if (!value || typeof value !== "object") throw new Error("A work-session report is required.");
-  const report = value as Partial<WorkSessionReport>;
-  if (report.schemaVersion !== 1) throw new Error("schemaVersion must be 1.");
-  if (!report.session || !report.repository || !report.changes || !report.paymentRequest || !report.privacy) {
-    throw new Error("The work-session report is incomplete.");
-  }
-  if (!report.session.sessionId?.trim() || !report.session.streamId?.trim()) {
-    throw new Error("Session and stream identifiers are required.");
-  }
-  if (!report.session.workerAddress?.trim()) throw new Error("workerAddress is required.");
-  if (Date.parse(report.session.startedAt) >= Date.parse(report.session.endedAt)) {
-    throw new Error("Session start time must be before its end time.");
-  }
-  if (
-    !Number.isFinite(report.session.totalSeconds) ||
-    !Number.isFinite(report.session.activeSeconds) ||
-    !Number.isFinite(report.session.idleSeconds) ||
-    report.session.totalSeconds < 0 ||
-    report.session.activeSeconds < 0 ||
-    report.session.idleSeconds < 0
-  ) {
-    throw new Error("Session durations must be non-negative numbers.");
-  }
-  if (
-    !Number.isSafeInteger(report.session.activeSeconds) ||
-    !Number.isSafeInteger(report.session.totalSeconds) ||
-    report.session.activeSeconds > report.session.totalSeconds
-  ) {
-    throw new Error("Active session time must be a whole number no greater than total session time.");
-  }
-  if (
-    report.session.projectEnded !== undefined &&
-    typeof report.session.projectEnded !== "boolean"
-  ) {
-    throw new Error("projectEnded must be a boolean when provided.");
-  }
-  if (!Array.isArray(report.changes.changedFiles) || !Array.isArray(report.changes.commits)) {
-    throw new Error("Changed files and commits must be arrays.");
-  }
-  if (report.changes.changedFiles.length > 5_000) throw new Error("The report contains too many files.");
-  parseAmountUnits(report.paymentRequest.requestedAmount);
-  if (report.paymentRequest.asset !== "USDC" && report.paymentRequest.asset !== "XLM") {
-    throw new Error("Unsupported payment asset.");
-  }
-  if (report.privacy.fullFilesIncluded !== false) {
-    throw new Error("Full file contents are not accepted by this endpoint.");
-  }
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { apiError } from "@/lib/api-response";
-import { consumeOAuthState, findWalletByGithubUserId, putIdentityWithIndex } from "@/lib/github-identity-store";
+import { consumeOAuthState, findByGithubUserId, getIdentity, putIdentity } from "@/lib/github-identity-store";
 import { getGithubEnv } from "@/lib/github-env";
 import { authenticateBrowserSession } from "@/lib/work-session-server";
 import { addressesEqual } from "@/lib/work-session-server";
@@ -104,8 +104,11 @@ export async function GET(request: Request) {
     const githubLogin = userData.login;
 
     // Check if another wallet already owns this GitHub account
-    const existingWallet = await findWalletByGithubUserId(githubUserId);
-    if (existingWallet && !addressesEqual(existingWallet, walletAddress)) {
+    const [existingOwner, existingIdentity] = await Promise.all([
+      findByGithubUserId(githubUserId),
+      getIdentity(walletAddress),
+    ]);
+    if (existingOwner && !addressesEqual(existingOwner.walletAddress, walletAddress)) {
       return apiError(
         `This GitHub account (@${githubLogin}) is already linked to a different Aven wallet.`,
         409,
@@ -114,12 +117,12 @@ export async function GET(request: Request) {
 
     // Store the identity record (access token is NOT stored — used only above)
     const now = new Date().toISOString();
-    await putIdentityWithIndex({
+    await putIdentity({
       walletAddress,
       githubUserId,
       githubLogin,
       avatarUrl: userData.avatar_url,
-      linkedAt: existingWallet ? now : now, // preserve original linkedAt in a real update
+      linkedAt: existingIdentity?.linkedAt ?? now,
       updatedAt: now,
     });
 

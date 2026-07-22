@@ -29,25 +29,27 @@ async function waitForOwnedSession(repositoryRoot: string) {
 export async function runActivityWatcher(repositoryRoot: string) {
   const excluded = await createPrivacyFilter(repositoryRoot);
   let queue = Promise.resolve();
-  const watcher = chokidar.watch(repositoryRoot, {
-    ignoreInitial: true,
-    persistent: true,
-    ignored: (path) => {
-      const relative = relativeRepositoryPath(repositoryRoot, path);
-      return Boolean(relative && excluded(relative));
-    },
-  });
-
   const initialSession = await waitForOwnedSession(repositoryRoot);
   if (
     !initialSession ||
     initialSession.status !== "active" ||
     initialSession.watcherPid !== process.pid
   ) {
-    await watcher.close();
     throw new Error("Watcher session ownership could not be verified.");
   }
   const sessionId = initialSession.sessionId;
+  const watcher = chokidar.watch(repositoryRoot, {
+    ignoreInitial: true,
+    persistent: true,
+    // Polling is available for constrained/container environments where the
+    // native watcher limit is unavailable. Normal CLI sessions retain native
+    // filesystem events unless explicitly opted in.
+    usePolling: process.env.AVEN_WATCH_USE_POLLING === "1",
+    ignored: (path) => {
+      const relative = relativeRepositoryPath(repositoryRoot, path);
+      return Boolean(relative && excluded(relative));
+    },
+  });
 
   const heartbeat = async () => {
     const heartbeatAt = new Date().toISOString();
@@ -106,15 +108,12 @@ export async function runActivityWatcher(repositoryRoot: string) {
     }).catch(() => undefined);
   });
 
-  const heartbeatTimer = setInterval(() => {
-    queue = queue.then(heartbeat).catch(() => undefined);
-  }, WATCHER_HEARTBEAT_INTERVAL_MS);
-
   let stopping = false;
+  let heartbeatTimer: NodeJS.Timeout | undefined;
   const stop = async () => {
     if (stopping) return;
     stopping = true;
-    clearInterval(heartbeatTimer);
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
     try {
       await queue;
       await watcher.close();
@@ -126,6 +125,10 @@ export async function runActivityWatcher(repositoryRoot: string) {
       process.exit(0);
     }
   };
+  heartbeatTimer = setInterval(() => {
+    queue = queue.then(heartbeat).catch(() => void stop());
+  }, WATCHER_HEARTBEAT_INTERVAL_MS);
+  watcher.once("error", () => void stop());
   process.once("SIGTERM", () => void stop());
   process.once("SIGINT", () => void stop());
   await new Promise(() => undefined);

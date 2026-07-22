@@ -3,7 +3,7 @@ import { apiError } from "@/lib/api-response";
 import { getIdentity } from "@/lib/github-identity-store";
 import { getRepository, putRepository } from "@/lib/github-repository-store";
 import { createRepository, addCollaborator } from "@/lib/github-service";
-import { authenticateBrowserSession, addressesEqual, getOnchainStream } from "@/lib/work-session-server";
+import { authenticateBrowserSession, authenticateCliRequest, addressesEqual, getOnchainStream } from "@/lib/work-session-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,13 +39,14 @@ export async function POST(request: Request, context: Params) {
     if (!addressesEqual(stream.sender, walletAddress)) {
       return apiError("Only the stream sender can create a project repository.", 403);
     }
-    if (stream.status !== "active" && stream.status !== "paused") {
+    if (stream.status !== "active") {
       return apiError(`Stream is ${stream.status} — cannot create repository.`, 409);
     }
 
-    // Idempotency check
+    // Idempotency check. A CREATING record represents a repository that was
+    // created successfully but whose collaborator setup was interrupted.
     const existing = await getRepository(streamId);
-    if (existing) {
+    if (existing && existing.status !== "CREATING") {
       return NextResponse.json(existing);
     }
 
@@ -74,6 +75,30 @@ export async function POST(request: Request, context: Params) {
       );
     }
 
+    if (existing) {
+      try {
+        await Promise.all([
+          addCollaborator(existing.fullName, workerIdentity.githubLogin, "push"),
+          addCollaborator(existing.fullName, clientIdentity.githubLogin, "pull"),
+        ]);
+        const active = {
+          ...existing,
+          status: "ACTIVE" as const,
+          lastError: undefined,
+          updatedAt: new Date().toISOString(),
+        };
+        await putRepository(active);
+        return NextResponse.json(active);
+      } catch (error) {
+        await putRepository({
+          ...existing,
+          lastError: error instanceof Error ? error.message : String(error),
+          updatedAt: new Date().toISOString(),
+        });
+        throw error;
+      }
+    }
+
     // Parse optional project title from body
     let projectTitle = `stream-${streamId}`;
     try {
@@ -93,12 +118,6 @@ export async function POST(request: Request, context: Params) {
     // Create the repository
     const repo = await createRepository({ name: repoName, description });
 
-    // Add collaborators
-    await Promise.all([
-      addCollaborator(repo.fullName, workerIdentity.githubLogin, "push"),
-      addCollaborator(repo.fullName, clientIdentity.githubLogin, "pull"),
-    ]);
-
     const record = {
       streamId,
       githubRepositoryId: repo.id,
@@ -114,13 +133,32 @@ export async function POST(request: Request, context: Params) {
       clientGithubUserId: clientIdentity.githubUserId,
       workerPermission: "push" as const,
       clientPermission: "pull" as const,
-      status: "ACTIVE" as const,
+      status: "CREATING" as const,
       createdAt: now,
       updatedAt: now,
     };
 
     await putRepository(record);
-    return NextResponse.json(record, { status: 201 });
+    try {
+      await Promise.all([
+        addCollaborator(repo.fullName, workerIdentity.githubLogin, "push"),
+        addCollaborator(repo.fullName, clientIdentity.githubLogin, "pull"),
+      ]);
+    } catch (error) {
+      await putRepository({
+        ...record,
+        lastError: error instanceof Error ? error.message : String(error),
+        updatedAt: new Date().toISOString(),
+      });
+      throw error;
+    }
+    const activeRecord = {
+      ...record,
+      status: "ACTIVE" as const,
+      updatedAt: new Date().toISOString(),
+    };
+    await putRepository(activeRecord);
+    return NextResponse.json(activeRecord, { status: 201 });
   } catch (error) {
     return apiError(error);
   }
@@ -135,7 +173,9 @@ export async function POST(request: Request, context: Params) {
 export async function GET(request: Request, context: Params) {
   const { streamId } = await context.params;
   try {
-    const walletAddress = await authenticateBrowserSession(request);
+    const browserWallet = await authenticateBrowserSession(request);
+    const cliToken = browserWallet ? null : await authenticateCliRequest(request, "read_streams");
+    const walletAddress = browserWallet ?? cliToken?.walletAddress ?? null;
     if (!walletAddress) return apiError("Authentication required.", 401);
 
     const stream = await getOnchainStream(streamId);

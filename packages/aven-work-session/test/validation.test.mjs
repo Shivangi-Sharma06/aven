@@ -33,6 +33,16 @@ const validSession = {
 
 test("config validation accepts a complete config", () => {
   assert.equal(isAvenConfig(validConfig), true);
+  assert.equal(isAvenConfig({
+    ...validConfig,
+    github: {
+      repositoryId: 123,
+      fullName: "Aven-Stellar/aven-1-project",
+      htmlUrl: "https://github.com/Aven-Stellar/aven-1-project",
+      cloneUrl: "https://github.com/Aven-Stellar/aven-1-project.git",
+      sshUrl: "git@github.com:Aven-Stellar/aven-1-project.git",
+    },
+  }), true);
 });
 
 test("config validation rejects invalid URLs, streams, assets, and rates", () => {
@@ -40,6 +50,7 @@ test("config validation rejects invalid URLs, streams, assets, and rates", () =>
   assert.equal(isAvenConfig({ ...validConfig, streamId: "stream-1" }), false);
   assert.equal(isAvenConfig({ ...validConfig, asset: "BTC" }), false);
   assert.equal(isAvenConfig({ ...validConfig, ratePerSecond: "NaN" }), false);
+  assert.equal(isAvenConfig({ ...validConfig, github: { fullName: "missing-fields" } }), false);
 });
 
 test("session validation accepts a complete active session", () => {

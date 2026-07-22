@@ -102,6 +102,16 @@ export type AvenConfig = {
   tokenExpiresAt?: string;
   /** Seven-decimal Stellar amount, cached for local recorded-payment estimates. */
   ratePerSecond?: string;
+  /** Managed GitHub repository metadata returned by the Aven dashboard. */
+  github?: GithubRepoConfig;
+};
+
+export type GithubRepoConfig = {
+  repositoryId: number;
+  fullName: string;
+  htmlUrl: string;
+  cloneUrl: string;
+  sshUrl: string;
 };
 
 export type LocalSession = {

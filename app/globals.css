@@ -1710,6 +1710,11 @@ h1, h2, h3, h4, h5, h6, .display-text {
   opacity: 1;
 }
 
+.app-layout .attestation-meta {
+  flex-direction: column;
+  gap: 4px;
+}
+
 .app-layout .attestation-verified-badge {
   color: #1a7a1a;
   font-weight: 500;
@@ -1794,7 +1799,8 @@ h1, h2, h3, h4, h5, h6, .display-text {
 .app-layout .score-bar-fill { border-radius: 0; background: #000 !important; }
 
 .app-layout .stream-action-btn--danger {
-  border-color: #9b1c1c;
+  border: 1.5px solid #9b1c1c;
+  background: transparent;
   color: #9b1c1c;
 }
 

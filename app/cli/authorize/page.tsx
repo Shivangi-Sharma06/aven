@@ -72,11 +72,6 @@ export default function CliAuthorizePage() {
           This grants a short-lived worker token. It cannot create streams, approve payments, or act as a client.
         </p>
 
-        <span className={styles.deviceCodeLabel}>Device code</span>
-        <code className={`${styles.deviceCode}${deviceCode ? "" : ` ${styles["deviceCode--missing"]}`}`}>
-          {deviceCode || "Missing device code"}
-        </code>
-
         {error && <div className={styles.error}>{error}</div>}
 
         {status === "authorized" ? (
@@ -86,18 +81,24 @@ export default function CliAuthorizePage() {
             <p className={styles.successMessage}>You can return to the terminal.</p>
           </div>
         ) : (
-          <button
-            id="cli-authorize-btn"
-            className={styles.btn}
-            onClick={authorize}
-            disabled={connecting || status === "signing"}
-          >
-            {!connected
-              ? "Connect Freighter"
-              : status === "signing"
-                ? "Waiting for signature…"
-                : "Authorize Aven CLI"}
-          </button>
+          <>
+            <span className={styles.deviceCodeLabel}>Device code</span>
+            <code className={`${styles.deviceCode}${deviceCode ? "" : ` ${styles["deviceCode--missing"]}`}`}>
+              {deviceCode || "Missing device code"}
+            </code>
+            <button
+              id="cli-authorize-btn"
+              className={styles.btn}
+              onClick={authorize}
+              disabled={connecting || status === "signing"}
+            >
+              {!connected
+                ? "Connect Freighter"
+                : status === "signing"
+                  ? "Waiting for signature…"
+                  : "Authorize Aven CLI"}
+            </button>
+          </>
         )}
       </div>
     </div>

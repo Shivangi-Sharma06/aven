@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { apiError } from "@/lib/api-response";
-import { getSession } from "@/lib/session-store";
-import { getRepository } from "@/lib/github-repository-store";
-import { authenticateBrowserSession, addressesEqual, getOnchainStream } from "@/lib/work-session-server";
+import { checkTransferEligibility } from "@/lib/github-transfer";
+import { authenticateBrowserSession } from "@/lib/work-session-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,32 +25,14 @@ export async function POST(request: Request, context: Params) {
     const destination = typeof body?.destination === "string" ? body.destination.trim() : "";
     if (!destination) return apiError("destination is required.", 400);
 
-    const stream = await getOnchainStream(streamId);
-    if (!stream) return apiError("Stream not found.", 404);
-
-    // Condition 6: Caller must be stream sender (client)
-    if (!addressesEqual(stream.sender, walletAddress)) {
+    const eligibility = await checkTransferEligibility({ streamId, walletAddress, destination });
+    if (!eligibility.eligible) {
       return NextResponse.json(
-        { eligible: false, reason: "Only the stream sender can request a transfer." },
-        { status: 403 },
+        { eligible: false, reason: eligibility.reason },
+        { status: eligibility.status },
       );
     }
-
-    const repository = await getRepository(streamId);
-    if (!repository) {
-      return NextResponse.json({ eligible: false, reason: "No repository found for this stream." });
-    }
-
-    // Find the latest RELEASED session for this stream
-    // We'll check at the repository record level for simplicity
-    // Condition 4: repository.status must be ACTIVE
-    if (repository.status !== "ACTIVE") {
-      return NextResponse.json(
-        { eligible: false, reason: `Repository status is ${repository.status}. Only ACTIVE repositories can be transferred.` },
-      );
-    }
-
-    return NextResponse.json({ eligible: true, destination });
+    return NextResponse.json({ eligible: true });
   } catch (error) {
     return apiError(error);
   }

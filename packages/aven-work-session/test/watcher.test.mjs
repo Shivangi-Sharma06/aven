@@ -157,24 +157,35 @@ test("the watcher handshakes, heartbeats, and removes its sentinel on stop", asy
     const child = spawn(
       process.execPath,
       [new URL("../dist/cli.js", import.meta.url).pathname, "__watch", repositoryRoot],
-      { stdio: "ignore" },
+      {
+        stdio: ["ignore", "ignore", "pipe"],
+        env: { ...process.env, AVEN_WATCH_USE_POLLING: "1" },
+      },
     );
+    let childError = "";
+    child.stderr.on("data", (chunk) => { childError += chunk.toString(); });
     assert.ok(child.pid);
     session.watcherPid = child.pid;
     await writeSession(repositoryRoot, session);
 
-    await waitUntil(async () => {
-      const sentinel = await readWatcherSentinel(repositoryRoot);
-      return sentinel?.pid === child.pid &&
-        sentinel.sessionId === session.sessionId &&
-        isRecentHeartbeat(sentinel.heartbeatAt);
-    });
-
-    child.kill("SIGTERM");
-    await new Promise((resolve, reject) => {
-      child.once("exit", resolve);
-      child.once("error", reject);
-    });
+    try {
+      await waitUntil(async () => {
+        if (child.exitCode !== null) {
+          throw new Error(`Watcher exited with code ${child.exitCode}: ${childError.trim()}`);
+        }
+        const sentinel = await readWatcherSentinel(repositoryRoot);
+        return sentinel?.pid === child.pid &&
+          sentinel.sessionId === session.sessionId &&
+          isRecentHeartbeat(sentinel.heartbeatAt);
+      });
+    } finally {
+      if (child.exitCode === null) child.kill("SIGTERM");
+      await new Promise((resolve, reject) => {
+        if (child.exitCode !== null) return resolve();
+        child.once("exit", resolve);
+        child.once("error", reject);
+      });
+    }
     assert.equal(await readWatcherSentinel(repositoryRoot), null);
   });
 });

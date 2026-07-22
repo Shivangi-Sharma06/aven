@@ -92,6 +92,7 @@ export async function collectChanges(
     if (isExcluded) {
       excludedFileCount += 1;
       if (/secret|credential|password|\.env|\.pem|\.key/i.test(path)) secretWarnings += 1;
+      continue;
     }
     const stat = stats.get(path);
     const additions = stat && "insertions" in stat ? stat.insertions : 0;
@@ -103,8 +104,7 @@ export async function collectChanges(
       additions,
       deletions,
       category: categoryForPath(path),
-      includedInVerification: !isExcluded,
-      excludedReason: isExcluded ? "Excluded by Git/Aven privacy rules." : undefined,
+      includedInVerification: true,
     });
   }
 

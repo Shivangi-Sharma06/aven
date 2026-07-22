@@ -47,6 +47,14 @@ function sumRequested(sessions: WorkSession[], statuses: WorkSession["status"][]
     .reduce((total, session) => total + Number(session.requestedAmount ?? "0"), 0);
 }
 
+type ManagedRepository = {
+  fullName: string;
+  htmlUrl: string;
+  status: "CREATING" | "ACTIVE" | "TRANSFER_PENDING" | "TRANSFERRED" | "TRANSFER_FAILED";
+  transferDestination?: string;
+  lastError?: string;
+};
+
 export default function StreamDetailPage() {
   const params = useParams();
   const id = params.id as string;
@@ -66,6 +74,9 @@ export default function StreamDetailPage() {
   const [approveSession, setApproveSession] = useState<WorkSession | null>(null);
   const [disputeSession, setDisputeSession] = useState<string | null>(null);
   const [disputeReason, setDisputeReason] = useState("");
+  const [repository, setRepository] = useState<ManagedRepository | null>(null);
+  const [repositoryBusy, setRepositoryBusy] = useState(false);
+  const [transferDestination, setTransferDestination] = useState("");
   async function load() {
     setLoading(true);
     try {
@@ -91,7 +102,16 @@ export default function StreamDetailPage() {
     try {
       await ensureBrowserSession();
       const sessionsPath = `/api/streams/${encodeURIComponent(id)}/work-sessions`;
-      const response = await fetch(sessionsPath, { cache: "no-store" });
+      const repositoryPath = `/api/streams/${encodeURIComponent(id)}/repository`;
+      const [response, repositoryResponse] = await Promise.all([
+        fetch(sessionsPath, { cache: "no-store" }),
+        fetch(repositoryPath, { cache: "no-store" }),
+      ]);
+      if (repositoryResponse.ok) {
+        setRepository(await repositoryResponse.json() as ManagedRepository);
+      } else if (repositoryResponse.status === 404) {
+        setRepository(null);
+      }
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Failed to load work sessions.");
       const loaded = data as WorkSession[];
@@ -211,6 +231,79 @@ export default function StreamDetailPage() {
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
       setSessionAction(null);
+    }
+  }
+
+  async function createManagedRepository() {
+    setRepositoryBusy(true);
+    setError(null);
+    try {
+      await ensureBrowserSession();
+      const response = await fetch(`/api/streams/${encodeURIComponent(id)}/repository`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ projectTitle: stream?.title ?? `stream-${id}` }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Could not create the managed repository.");
+      setRepository(data as ManagedRepository);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setRepositoryBusy(false);
+    }
+  }
+
+  async function transferManagedRepository() {
+    setRepositoryBusy(true);
+    setError(null);
+    try {
+      await ensureBrowserSession();
+      const base = `/api/streams/${encodeURIComponent(id)}/repository/transfer`;
+      const preflight = await fetch(`${base}/preflight`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ destination: transferDestination }),
+      });
+      const preflightData = await preflight.json();
+      if (!preflight.ok || preflightData.eligible !== true) {
+        throw new Error(preflightData.reason ?? preflightData.error ?? "Repository transfer is not eligible.");
+      }
+      const response = await fetch(base, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ destination: transferDestination }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Repository transfer failed.");
+      setRepository((current) => current ? {
+        ...current,
+        status: "TRANSFER_PENDING",
+        transferDestination,
+        lastError: undefined,
+      } : current);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+      await loadSessions();
+    } finally {
+      setRepositoryBusy(false);
+    }
+  }
+
+  async function reconcileManagedRepository() {
+    setRepositoryBusy(true);
+    try {
+      await ensureBrowserSession();
+      const response = await fetch(`/api/streams/${encodeURIComponent(id)}/repository/transfer`, {
+        cache: "no-store",
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Could not refresh the repository transfer.");
+      setRepository(data as ManagedRepository);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setRepositoryBusy(false);
     }
   }
 
@@ -391,6 +484,58 @@ export default function StreamDetailPage() {
           </div>
         </div>
 
+        {address && (isSender || isRecipient) && (
+          <section className={styles["repository-panel"]}>
+            <div>
+              <span>Managed GitHub repository</span>
+              {repository ? (
+                <a href={repository.htmlUrl} target="_blank" rel="noopener noreferrer">
+                  {repository.fullName} ↗
+                </a>
+              ) : (
+                <strong>Not created</strong>
+              )}
+              <small>Status: {repository?.status.replaceAll("_", " ") ?? "AWAITING SETUP"}</small>
+              {repository?.lastError && <p>{repository.lastError}</p>}
+            </div>
+            <div className={styles["repository-actions"]}>
+              {!repository && isSender && (
+                <button type="button" disabled={repositoryBusy} onClick={createManagedRepository}>
+                  {repositoryBusy ? "Creating…" : "Create repository"}
+                </button>
+              )}
+              {!repository && isRecipient && <small>The stream sender creates the managed repository.</small>}
+              {repository && isSender && (repository.status === "ACTIVE" || repository.status === "TRANSFER_FAILED") && (
+                <>
+                  <input
+                    aria-label="GitHub transfer destination"
+                    value={transferDestination}
+                    onChange={(event) => setTransferDestination(event.target.value)}
+                    placeholder="Linked GitHub username"
+                  />
+                  <button
+                    type="button"
+                    disabled={repositoryBusy || !transferDestination.trim()}
+                    onClick={transferManagedRepository}
+                  >
+                    {repositoryBusy
+                      ? "Checking…"
+                      : repository.status === "TRANSFER_FAILED"
+                        ? "Retry transfer"
+                        : "Transfer after final payment"}
+                  </button>
+                </>
+              )}
+              {repository?.status === "TRANSFER_PENDING" && (
+                <button type="button" disabled={repositoryBusy} onClick={reconcileManagedRepository}>
+                  {repositoryBusy ? "Refreshing…" : "Refresh transfer status"}
+                </button>
+              )}
+              <a href="/api/github/connect">Connect or update GitHub account</a>
+            </div>
+          </section>
+        )}
+
         <section className={styles["work-session-section"]}>
           <div className={styles["work-session-heading"]}>
             <div>
@@ -545,8 +690,8 @@ export default function StreamDetailPage() {
                       )}
                       {isSender && session.status === "PENDING_CLIENT_REVIEW" && (
                         <>
-                          <button type="button" disabled={actionBusy} onClick={() => setApproveSession(session)}>Approve</button>
-                          <button type="button" disabled={actionBusy} onClick={() => setDisputeSession(disputeSession === session.id ? null : session.id)}>Dispute</button>
+                          <button data-action="approve" type="button" disabled={actionBusy} onClick={() => setApproveSession(session)}>Approve</button>
+                          <button data-action="dispute" type="button" disabled={actionBusy} onClick={() => setDisputeSession(disputeSession === session.id ? null : session.id)}>Dispute</button>
                         </>
                       )}
                     </div>

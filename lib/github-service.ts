@@ -183,6 +183,18 @@ export async function branchExists(fullName: string, branch: string): Promise<bo
   }
 }
 
+export async function getBranchHead(fullName: string, branch: string): Promise<string | null> {
+  const octokit = await getInstallationOctokit();
+  const [owner, repo] = fullName.split("/");
+  try {
+    const { data } = await octokit.repos.getBranch({ owner, repo, branch });
+    return data.commit.sha;
+  } catch (err: any) {
+    if (err?.status === 404) return null;
+    throw err;
+  }
+}
+
 export async function compareCommits(
   fullName: string,
   base: string,

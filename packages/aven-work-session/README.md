@@ -64,14 +64,17 @@ The submitted report appears under `WORK SESSIONS` on the matching stream page. 
 ```bash
 npx aven-stellar start --stream <stream-id> --dashboard <url>
 npx aven-stellar stop --message <summary>
+npx aven-stellar stop --ended
 ```
 
 - `start --non-interactive` skips the collection confirmation.
 - `stop --submit` submits the previewed report without another prompt.
-- `stop --ended` marks the report as the final project session. The dashboard
-  calculates the remaining unreserved escrow and converts it into
-  contract-equivalent seconds before calling the existing `verify_work`
-  entrypoint. The real npm-tracked active seconds remain in the report.
+- `stop --ended` marks the report as the final project session, prompts for the
+  delivery branches, and verifies their head commits against the connected
+  GitHub repository. The dashboard calculates the remaining unreserved escrow
+  and converts it into contract-equivalent seconds before calling the existing
+  `verify_work` entrypoint. The real npm-tracked active seconds remain in the
+  report.
 - `--message` supplies the worker's summary of the session.
 - The payment amount is calculated automatically from tracked active seconds and the stream's on-chain rate, capped by the unreserved escrow remaining.
 

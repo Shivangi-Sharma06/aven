@@ -81,8 +81,9 @@ export default function ProfilePage() {
           {address.slice(0, 2)}
         </div>
         <div className="profile-header-info">
+          <span className="profile-eyebrow">Wallet-owned work identity</span>
           <code className="profile-address">{truncate(address)}</code>
-          <div className="profile-network-badge">Stellar Testnet</div>
+          <div className="profile-network-badge">Stellar Testnet · Public profile</div>
           {isOwn && (
             <button
               className="profile-copy-btn"
@@ -96,7 +97,7 @@ export default function ProfilePage() {
         {score && (
           <div className="profile-score-ring">
             <div className="profile-score-value">{score.total.toFixed(0)}</div>
-            <div className="profile-score-label">Reputation Score</div>
+            <div className="profile-score-label">Trust score</div>
           </div>
         )}
       </div>
@@ -113,7 +114,13 @@ export default function ProfilePage() {
           {/* Score breakdown */}
           {score && (
             <div className="profile-section">
-              <h3 className="profile-section-title">Reputation Breakdown</h3>
+              <div className="profile-section-heading">
+                <div>
+                  <span>01 / Signals</span>
+                  <h3 className="profile-section-title">Reputation breakdown</h3>
+                </div>
+                <p>Verified delivery grouped by the type of funded work.</p>
+              </div>
               <div className="score-breakdown">
                 {breakdown.map((b) => (
                   <div key={b.label} className="score-row">
@@ -141,9 +148,13 @@ export default function ProfilePage() {
 
           {/* Attestations */}
           <div className="profile-section">
-            <h3 className="profile-section-title">
-              Work Attestations ({attestations.length})
-            </h3>
+            <div className="profile-section-heading">
+              <div>
+                <span>02 / Proof</span>
+                <h3 className="profile-section-title">Work attestations</h3>
+              </div>
+              <p>{attestations.length} on-chain record{attestations.length === 1 ? "" : "s"}</p>
+            </div>
             {attestations.length === 0 ? (
               <div className="profile-empty">
                 <p>No attestations minted yet. Complete a stream to earn one.</p>
@@ -192,7 +203,7 @@ function AttestationCard({ attestation, onView }: { attestation: AttestationObje
     : attestation.kind === "StreamCompletion" ? "Project Completion"
     : "Checkpoint";
   return (
-    <div className="attestation-card" onClick={onView}>
+    <button type="button" className="attestation-card" onClick={onView}>
       <div className="attestation-card-header">
         <span
           className="stream-cat-badge"
@@ -218,6 +229,6 @@ function AttestationCard({ attestation, onView }: { attestation: AttestationObje
         </span>
       </div>
       <div className="attestation-verified-badge">✓ On-Chain Verified</div>
-    </div>
+    </button>
   );
 }

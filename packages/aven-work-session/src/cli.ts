@@ -51,6 +51,18 @@ async function main() {
     .description("List work sessions for the configured stream.")
     .action(sessionsCommand);
 
+  program.addHelpText(
+    "after",
+    `
+Final project delivery:
+  $ aven stop --ended
+    Mark the session as final, choose the delivery branches, verify their
+    remote GitHub heads, and request settlement of the remaining escrow.
+
+Run "aven stop --help" for all stop options.
+`,
+  );
+
   await program.parseAsync(process.argv);
 }
 

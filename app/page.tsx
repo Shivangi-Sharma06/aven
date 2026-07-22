@@ -15,7 +15,18 @@ import Developers from '../components/sections/Developers';
 import AIAgents from '../components/sections/AIAgents';
 import FinalCTA from '../components/sections/FinalCTA';
 import AvenFooter from '../components/sections/AvenFooter';
-import InfinitePageLoop from '../components/sections/InfinitePageLoop';
+import SmoothScroll from '../components/SmoothScroll';
+
+const landingSections = [
+  { id: 'hero', content: <AvenHero />, theme: 'light' },
+  { id: 'how', content: <HowItWorks />, theme: 'dark' },
+  { id: 'stream', content: <LiveStreamDemo />, theme: 'light' },
+  { id: 'attestations', content: <WorkAttestations />, theme: 'dark' },
+  { id: 'reputation', content: <Reputation />, theme: 'light' },
+  { id: 'protocol', content: <Protocol />, theme: 'dark' },
+  { id: 'developers', content: <Developers />, theme: 'light' },
+  { id: 'agents', content: <AIAgents />, theme: 'dark' },
+] as const;
 
 export default function LandingPage() {
   const appRef = useRef<HTMLDivElement>(null);
@@ -82,27 +93,23 @@ export default function LandingPage() {
   return (
     <div ref={appRef} className="app">
       <AvenNavigation />
-        <InfinitePageLoop
-          panels={[
-            { id: 'hero', content: <AvenHero /> },
-            { id: 'how', content: <HowItWorks />, dense: true },
-            { id: 'stream', content: <LiveStreamDemo /> },
-            { id: 'attestations', content: <WorkAttestations />, dense: true },
-            { id: 'reputation', content: <Reputation />, dense: true },
-            { id: 'protocol', content: <Protocol />, dense: true },
-            { id: 'developers', content: <Developers />, dense: true },
-            { id: 'agents', content: <AIAgents /> },
-            {
-              id: 'cta',
-              content: (
-                <>
-                  <FinalCTA />
-                  <AvenFooter />
-                </>
-              ),
-            },
-          ]}
-        />
+      <SmoothScroll>
+        <main className="aven-scroll-flow">
+          {landingSections.map((section) => (
+            <div
+              className={`aven-scroll-section aven-scroll-section--${section.id}`}
+              data-theme={section.theme}
+              key={section.id}
+            >
+              {section.content}
+            </div>
+          ))}
+          <div className="aven-scroll-section aven-scroll-section--cta" data-theme="light">
+            <FinalCTA />
+            <AvenFooter />
+          </div>
+        </main>
+      </SmoothScroll>
     </div>
   );
 }

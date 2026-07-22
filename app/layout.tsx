@@ -38,6 +38,14 @@ import { AppShell } from "@/components/AppShell";
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              'if ("scrollRestoration" in history) history.scrollRestoration = "manual"; window.scrollTo(0, 0);',
+          }}
+        />
+      </head>
       <body className={`${inter.variable} ${spaceGrotesk.variable} ${jetbrains.variable}`}>
         <MantineProvider defaultColorScheme="light">
           <ModalsProvider>

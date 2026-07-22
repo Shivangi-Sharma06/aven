@@ -106,8 +106,7 @@ export default function DashboardPage() {
         <h1>Payment Streams</h1>
         <p>Manage funded work, verified session payments, and on-chain records.</p>
       </header>
-      {/* Stats bar */}
-      <div className="dash-stats">
+      <section className="dash-stats" aria-label="Stream overview">
         <div className="dash-stat">
           <div className="dash-stat-value">{activeCount}</div>
           <div className="dash-stat-label">Active Streams</div>
@@ -120,9 +119,8 @@ export default function DashboardPage() {
           <div className="dash-stat-value">{attestationCount}</div>
           <div className="dash-stat-label">Attestations</div>
         </div>
-      </div>
+      </section>
 
-      {/* Header row */}
       <div className="dash-header">
         <div className="dash-tabs">
           <button
@@ -203,7 +201,7 @@ function StreamCard({
     : 0;
 
   return (
-    <div className={`stream-card stream-card--${stream.status}`} onClick={onView}>
+    <article className={`stream-card stream-card--${stream.status}`} onClick={onView}>
       <div className="stream-card-header">
         <div>
           <div className="stream-card-title">{stream.title}</div>
@@ -214,17 +212,20 @@ function StreamCard({
             <span className="stream-asset-badge">{stream.asset}</span>
           </div>
         </div>
-        <div
-          className="stream-status-dot"
-          style={{ background: STATUS_COLOR[stream.status] }}
-          title={stream.status}
-        />
+        <div className="stream-card-status" title={stream.status}>
+          <i style={{ background: STATUS_COLOR[stream.status] }} aria-hidden="true" />
+          <span>{stream.status}</span>
+        </div>
       </div>
 
-      <div className="stream-card-amounts">
-        <span className="stream-amount-withdrawn">{stream.totalWithdrawn.toFixed(4)}</span>
-        <span className="stream-amount-sep"> / </span>
-        <span className="stream-amount-total">{stream.totalDeposited.toFixed(2)} {stream.asset}</span>
+      <div className="stream-card-amounts" aria-label="Stream payment progress">
+        <span className="stream-amount-withdrawn">
+          {stream.totalWithdrawn.toFixed(4)} {stream.asset}
+        </span>
+        <span className="stream-amount-total">
+          of {stream.totalDeposited.toFixed(2)} {stream.asset}
+        </span>
+        <span className="stream-amount-percent">{pct.toFixed(0)}%</span>
       </div>
 
       <div className="stream-progress-bar">
@@ -267,6 +268,6 @@ function StreamCard({
           View →
         </button>
       </div>
-    </div>
+    </article>
   );
 }

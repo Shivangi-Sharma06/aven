@@ -30,9 +30,6 @@ export default function LiveStreamDemo() {
           <div className="stream-receipt__earnings">
             <LiveStreamCounter compact />
           </div>
-          <div className="stream-receipt__rail" aria-hidden="true">
-            <span />
-          </div>
           <div className="stream-receipt__metrics">
             <div>
               <span>ACTIVE TIME</span>

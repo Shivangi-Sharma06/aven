@@ -1,14 +1,14 @@
 /* Aven — Global Design System */
 
 :root {
-  --bg: #fff;
-  --fg: #000;
-  --muted: #555;
-  --soft: #777;
-  --line: #d8d8d8;
-  --line-dark: #000;
-  --grid: rgba(0, 0, 0, 0.055);
-  --panel: #f7f7f7;
+  --bg: #000;
+  --fg: #fff;
+  --muted: rgba(255, 255, 255, 0.68);
+  --soft: rgba(255, 255, 255, 0.52);
+  --line: rgba(255, 255, 255, 0.2);
+  --line-dark: #fff;
+  --grid: rgba(255, 255, 255, 0.055);
+  --panel: #080808;
   --font-sans: "Helvetica Neue", Arial, sans-serif;
 }
 
@@ -192,6 +192,13 @@ a {
   transform-box: fill-box;
   transform-origin: center;
   will-change: transform, opacity;
+}
+
+/* Preserve the subtle grid without the decorative network motif. */
+.network-link,
+.network-node,
+.payment-packet {
+  display: none;
 }
 
 .network-node__core,
@@ -2253,4 +2260,311 @@ a {
   .live-counter strong {
     font-size: clamp(34px, 9vw, 42px);
   }
+}
+
+/* ─── Monochrome dark theme ─────────────────────────────────────────────── */
+.app {
+  --bg: #000;
+  --fg: #fff;
+  --muted: rgba(255, 255, 255, 0.68);
+  --soft: rgba(255, 255, 255, 0.52);
+  --line: rgba(255, 255, 255, 0.2);
+  --line-dark: #fff;
+  --grid: rgba(255, 255, 255, 0.055);
+  --panel: #080808;
+  background: #000;
+  color: #fff;
+}
+
+.app ::selection {
+  background: #fff;
+  color: #000;
+}
+
+.app .aven-nav {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.92);
+  color: #fff;
+}
+
+.app .stage,
+.app .aven-network-wrap,
+.app .aven-scroll-flow,
+.app .aven-scroll-section,
+.app .aven-scroll-section[data-theme="light"],
+.app .aven-scroll-section[data-theme="dark"],
+.app .aven-layered-loop,
+.app .aven-layered-panel,
+.app .aven-layered-panel[data-theme="light"],
+.app .aven-layered-panel[data-theme="dark"],
+.app .final-cta,
+.app .aven-footer {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: #000;
+  color: #fff;
+}
+
+.app .aven-section,
+.app .aven-scroll-section[data-theme="light"] > .aven-section,
+.app .aven-scroll-section[data-theme="dark"] > .aven-section,
+.app .aven-layered-panel[data-theme="light"] > .aven-section,
+.app .aven-layered-panel[data-theme="dark"] > .aven-section {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+    #000;
+  color: #fff;
+}
+
+.app .aven-network > rect:first-of-type {
+  fill: #000;
+}
+
+.app .aven-grid-line {
+  stroke: #fff;
+  opacity: 0.07;
+}
+
+.app .aven-network-vignette {
+  background:
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.1), transparent 20%),
+    radial-gradient(circle at center, transparent 42%, rgba(0, 0, 0, 0.34) 100%);
+}
+
+.app .aven-morph-logo path,
+.app .aven-morph-logo text {
+  fill: #fff !important;
+}
+
+.app .section-kicker,
+.app .section-copy,
+.app .hero-copy__body,
+.app .step-panel span,
+.app .attestation-card > span,
+.app .protocol-stack span,
+.app .data-list dt,
+.app small,
+.app .stream-receipt__project span,
+.app .stream-receipt__metrics span,
+.app .stream-receipt__note,
+.app .trust-passport__eyebrow,
+.app .developer-terminal span,
+.app .aven-footer {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.app .step-panel,
+.app .stream-terminal,
+.app .attestation-card,
+.app .reputation-document-card,
+.app .protocol-stack article,
+.app .developer-terminal,
+.app .agent-rails > article,
+.app .stream-receipt,
+.app .trust-passport {
+  border-color: rgba(255, 255, 255, 0.32);
+  background: #000;
+  color: #fff;
+}
+
+.app .step-panel p,
+.app .protocol-stack p,
+.app .agent-rails p,
+.app .reputation-document-card p,
+.app .trust-passport p {
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.app .data-list div,
+.app .proof-stack strong,
+.app .protocol-stack code,
+.app .agent-rails code,
+.app .reputation-document-row,
+.app .trust-passport__signals > div,
+.app .trust-passport__proofs > div {
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.app .stream-receipt__header,
+.app .trust-passport__header,
+.app .developer-terminal__bar {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: #000;
+  color: #fff;
+}
+
+.app .stream-receipt__project,
+.app .stream-receipt__metrics,
+.app .stream-receipt__project > div,
+.app .stream-receipt__metrics > div {
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.app .stream-line div,
+.app .wide-payment-line {
+  background: #fff;
+}
+
+.app .stream-line div::before,
+.app .stream-line div::after {
+  border-color: #fff;
+}
+
+.app .stream-line div::before {
+  background: #000;
+}
+
+.app .stream-line div::after,
+.app .stream-line i,
+.app .wide-payment-line span {
+  background: #fff;
+}
+
+.app .attestation-path path,
+.app [data-strengthen-path] {
+  stroke: rgba(255, 255, 255, 0.7);
+}
+
+.app .attestation-seal,
+.app .attestation-seal::after,
+.app .attestation-status__dot,
+.app .attestation-card__track,
+.app .trust-passport__live {
+  border-color: rgba(255, 255, 255, 0.34);
+  background: #000;
+  color: #fff;
+}
+
+.app .hero-actions button,
+.app .aven-scroll-section button,
+.app .aven-layered-panel button,
+.app .final-cta button {
+  border-color: #fff;
+  background: #000;
+  color: #fff;
+}
+
+.app .hero-actions button:first-child,
+.app .final-cta .hero-actions button:first-child,
+.app .aven-scroll-section button:hover,
+.app .aven-layered-panel button:hover,
+.app .hero-actions button:hover,
+.app .final-cta button:hover {
+  border-color: #fff;
+  background: #fff;
+  color: #000;
+}
+
+/* ─── Pixel-tech treatment ──────────────────────────────────────────────── */
+.app {
+  --font-sans: var(--font-mono), "Courier New", monospace;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: none;
+  text-rendering: geometricPrecision;
+}
+
+.app *,
+.app *::before,
+.app *::after {
+  border-radius: 0 !important;
+}
+
+.app .stage,
+.app .aven-section,
+.app .aven-scroll-section[data-theme="light"] > .aven-section,
+.app .aven-scroll-section[data-theme="dark"] > .aven-section {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    #000;
+  background-size: 24px 24px;
+}
+
+.app .aven-nav {
+  border-bottom-width: 2px;
+  font-family: var(--font-mono), "Courier New", monospace;
+  font-size: 11px;
+}
+
+.app .hero-copy h1,
+.app .aven-section h2,
+.app .final-cta h2,
+.app .step-panel h3,
+.app .attestation-title,
+.app .reputation-document-card h3,
+.app .trust-passport h3 {
+  font-family: var(--font-mono), "Courier New", monospace;
+  font-weight: 800;
+  letter-spacing: -0.075em;
+}
+
+.app .hero-copy h1,
+.app .aven-section h2,
+.app .final-cta h2 {
+  text-shadow: 3px 3px 0 rgba(255, 255, 255, 0.12);
+}
+
+.app .hero-copy__eyebrow,
+.app .section-kicker,
+.app .live-counter,
+.app .aven-footer,
+.app .stream-receipt,
+.app .developer-terminal,
+.app .trust-passport {
+  font-family: var(--font-mono), "Courier New", monospace;
+}
+
+.app .section-kicker::before,
+.app .hero-copy__eyebrow::before {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 9px;
+  background: #fff;
+  content: "";
+}
+
+.app .step-panel,
+.app .stream-terminal,
+.app .attestation-card,
+.app .reputation-document-card,
+.app .protocol-stack article,
+.app .developer-terminal,
+.app .agent-rails > article,
+.app .stream-receipt,
+.app .trust-passport {
+  border-width: 2px;
+  box-shadow: 5px 5px 0 rgba(255, 255, 255, 0.12);
+}
+
+.app .hero-actions button,
+.app .aven-scroll-section button,
+.app .aven-layered-panel button,
+.app .final-cta button {
+  border-width: 2px;
+  box-shadow: 4px 4px 0 rgba(255, 255, 255, 0.3);
+  font-family: var(--font-mono), "Courier New", monospace;
+  font-weight: 800;
+  transition: transform 90ms steps(2, end), box-shadow 90ms steps(2, end);
+}
+
+.app .hero-actions button:hover,
+.app .aven-scroll-section button:hover,
+.app .aven-layered-panel button:hover,
+.app .final-cta button:hover {
+  box-shadow: 2px 2px 0 rgba(255, 255, 255, 0.3);
+  transform: translate(2px, 2px);
+}
+
+.app .attestation-status__dot,
+.app .stream-line div::before,
+.app .stream-line div::after,
+.app .stream-line i,
+.app .wide-payment-line span {
+  border-radius: 0 !important;
+}
+
+.app .attestation-seal,
+.app .attestation-seal::after {
+  border-radius: 0 !important;
 }

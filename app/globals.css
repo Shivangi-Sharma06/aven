@@ -3734,3 +3734,478 @@ h1, h2, h3, h4, h5, h6, .display-text {
     font-size: clamp(38px, 12vw, 54px);
   }
 }
+
+/* ─── Unified black app theme ───────────────────────────────────────────── */
+body {
+  background: #000;
+  color: #fff;
+}
+
+.app-layout {
+  --app-ink: #fff;
+  --app-muted: rgba(255, 255, 255, 0.58);
+  --app-line: rgba(255, 255, 255, 0.2);
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    #000;
+  background-size: 72px 72px;
+  color: #fff;
+}
+
+.app-layout ::selection {
+  background: #fff;
+  color: #000;
+}
+
+.app-layout h1,
+.app-layout h2,
+.app-layout h3,
+.app-layout h4,
+.app-layout .app-page-header h1,
+.app-layout .create-stream-title,
+.app-layout .agents-title,
+.app-layout .verify-title,
+.app-layout .stream-detail-title,
+.app-layout .profile-section-title,
+.app-layout .stream-card-title,
+.app-layout .attestation-title,
+.app-layout .profile-address,
+.app-layout .verify-record-value,
+.app-layout .form-detail-value,
+.app-layout .stream-detail-item-value,
+.app-layout .stream-addr-value {
+  color: #fff;
+}
+
+.app-layout .app-page-header,
+.app-layout .create-stream-header,
+.app-layout .agents-header,
+.app-layout .verify-header,
+.app-layout .dashboard-wrap .app-page-header,
+.app-layout .profile-header,
+.app-layout .profile-section,
+.app-layout .dash-header,
+.app-layout .stream-card,
+.app-layout .stream-detail-nav,
+.app-layout .stream-detail-header,
+.app-layout .stream-detail-progress-wrap,
+.app-layout .stream-detail-addresses,
+.app-layout .create-connect-banner,
+.app-layout .create-step-progress,
+.app-layout .create-wizard-layout,
+.app-layout .create-wizard-stage__header,
+.app-layout .create-wizard-actions,
+.app-layout .agents-search-form,
+.app-layout .verify-form,
+.app-layout .verify-howto,
+.app-layout .agents-result-card,
+.app-layout .verify-result-card {
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.app-layout .dash-stat,
+.app-layout .stream-card,
+.app-layout .create-stream-form,
+.app-layout .create-connect-banner,
+.app-layout .agents-own-banner,
+.app-layout .agents-search-form,
+.app-layout .agents-result-card,
+.app-layout .verify-form,
+.app-layout .verify-result-card,
+.app-layout .verify-howto,
+.app-layout .profile-header,
+.app-layout .profile-section,
+.app-layout .profile-empty,
+.app-layout .attestation-card,
+.app-layout .stream-detail-card,
+.app-layout .stream-detail-item,
+.app-layout .stream-detail-earned-wrap,
+.app-layout .create-wizard-layout,
+.app-layout .create-wizard-stage,
+.app-layout .create-step-content,
+.app-layout .form-success-detail {
+  background: transparent;
+  color: #fff;
+}
+
+.app-layout .app-page-kicker,
+.app-layout .create-stream-kicker,
+.app-layout .app-page-header p,
+.app-layout .create-stream-sub,
+.app-layout .agents-sub,
+.app-layout .verify-sub,
+.app-layout .dash-stat-label,
+.app-layout .stream-card-meta,
+.app-layout .stream-card-amounts,
+.app-layout .stream-amount-total,
+.app-layout .stream-detail-id,
+.app-layout .stream-detail-status,
+.app-layout .stream-detail-progress-labels,
+.app-layout .stream-detail-earned-label,
+.app-layout .stream-detail-earned-asset,
+.app-layout .stream-detail-item-label,
+.app-layout .stream-addr-label,
+.app-layout .profile-eyebrow,
+.app-layout .profile-network-badge,
+.app-layout .profile-section-heading span,
+.app-layout .profile-section-heading > p,
+.app-layout .attestation-meta,
+.app-layout .attestation-id,
+.app-layout .form-label,
+.app-layout .form-label-hint,
+.app-layout .form-detail-label,
+.app-layout .verify-record-label,
+.app-layout .agents-score-label {
+  color: rgba(255, 255, 255, 0.58);
+}
+
+.app-layout .dash-stats,
+.app-layout .stream-detail-grid,
+.app-layout .stream-detail-item,
+.app-layout .verify-record-grid,
+.app-layout .verify-record-item,
+.app-layout .agents-claim-section,
+.app-layout .attestation-list,
+.app-layout .attestation-card,
+.app-layout .create-review__terms,
+.app-layout .create-review__terms > div,
+.app-layout .create-verification-intro,
+.app-layout .create-step-content .form-cat-btn,
+.app-layout .create-trustline-card,
+.app-layout .create-trustline-row,
+.app-layout .create-rate-output {
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
+.app-layout .dash-stat-value,
+.app-layout .stream-amount-withdrawn,
+.app-layout .stream-detail-earned-value,
+.app-layout .stream-detail-earned-asset,
+.app-layout .profile-score-value,
+.app-layout .agents-score-num {
+  color: #fff;
+}
+
+.app-layout .stream-progress-bar,
+.app-layout .score-bar-track,
+.app-layout .stream-detail-progress-bar {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.app-layout .stream-progress-fill,
+.app-layout .score-bar-fill {
+  background: #fff !important;
+}
+
+.app-layout .form-input,
+.app-layout .form-select,
+.app-layout textarea {
+  border-color: rgba(255, 255, 255, 0.48);
+  background: #000;
+  color: #fff;
+  color-scheme: dark;
+}
+
+.app-layout .form-input::placeholder,
+.app-layout textarea::placeholder {
+  color: rgba(255, 255, 255, 0.34);
+}
+
+.app-layout .form-input:focus,
+.app-layout .form-select:focus,
+.app-layout textarea:focus {
+  border-color: #fff;
+  outline-color: #fff;
+}
+
+.app-layout .wallet-btn,
+.app-layout .wallet-badge,
+.app-layout .wallet-disconnect-btn,
+.app-layout .form-btn-secondary,
+.app-layout .stream-action-btn,
+.app-layout .stream-view-btn,
+.app-layout .profile-copy-btn,
+.app-layout .dash-tab,
+.app-layout .stream-back-btn,
+.app-layout .create-wizard-back,
+.app-layout .create-step-content .form-cat-btn,
+.app-layout .create-trustline-row button {
+  border-color: rgba(255, 255, 255, 0.58);
+  background: #000;
+  color: #fff;
+}
+
+.app-layout .form-btn,
+.app-layout .form-submit-btn,
+.app-layout .dash-create-btn,
+.app-layout .dash-connect-btn,
+.app-layout .create-wizard-next,
+.app-layout .dash-tab.active,
+.app-layout .create-step-content .form-cat-btn.selected {
+  border-color: #fff;
+  background: #fff;
+  color: #000;
+}
+
+.app-layout .form-btn:hover,
+.app-layout .form-submit-btn:hover:not(:disabled),
+.app-layout .dash-create-btn:hover,
+.app-layout .dash-connect-btn:hover,
+.app-layout .form-btn-secondary:hover,
+.app-layout .stream-action-btn:hover,
+.app-layout .stream-view-btn:hover,
+.app-layout .profile-copy-btn:hover,
+.app-layout .dash-tab:hover,
+.app-layout .stream-back-btn:hover,
+.app-layout .create-wizard-back:hover:not(:disabled),
+.app-layout .create-wizard-next:hover,
+.app-layout .create-trustline-row button:hover:not(:disabled) {
+  border-color: #fff;
+  background: #fff;
+  color: #000;
+}
+
+.app-layout .create-form-bar,
+.app-layout .create-trustline-card__header,
+.app-layout .bottom-nav {
+  border-color: rgba(255, 255, 255, 0.34);
+  background: #050505;
+  color: #fff;
+}
+
+.app-layout .create-step-progress button,
+.app-layout .create-step-progress li.is-complete button {
+  color: rgba(255, 255, 255, 0.52);
+}
+
+.app-layout .create-step-progress li.is-current button,
+.app-layout .create-step-progress li.is-complete button:hover {
+  color: #fff;
+}
+
+.app-layout .create-wizard-stage__header > span,
+.app-layout .profile-avatar,
+.app-layout .verify-step-num,
+.app-layout .agents-score-chip {
+  border-color: #fff;
+  background: #fff;
+  color: #000;
+}
+
+.app-layout .create-rate-output,
+.app-layout .agents-claim-section,
+.app-layout .verify-record-item,
+.app-layout .form-success-banner {
+  background: #080808;
+  color: #fff;
+}
+
+.app-layout .form-error {
+  background: #120000;
+  color: #ff8d8d;
+}
+
+.app-layout .dash-empty-state,
+.app-layout .dash-no-streams,
+.app-layout .dash-loading {
+  border-color: rgba(255, 255, 255, 0.3);
+  background: transparent;
+  color: #fff;
+}
+
+.app-layout .stream-created,
+.app-layout .stream-created__receipt,
+.app-layout .stream-created__intro,
+.app-layout .stream-created__receipt-bar,
+.app-layout .stream-created__facts,
+.app-layout .stream-created__transaction,
+.app-layout .stream-created__flow,
+.app-layout .stream-created__footer {
+  border-color: rgba(255, 255, 255, 0.34);
+  background: #000;
+  color: #fff;
+}
+
+.app-layout .stream-created__secondary {
+  border-color: #fff;
+  background: #000;
+  color: #fff;
+}
+
+.wallet-modal-card,
+.mantine-Modal-content,
+.mantine-Modal-header {
+  border-color: rgba(255, 255, 255, 0.42);
+  background: #000;
+  color: #fff;
+}
+
+.wallet-modal-title,
+.wallet-modal-address {
+  color: #fff;
+}
+
+.wallet-modal-address {
+  border-color: rgba(255, 255, 255, 0.42);
+  background: #000;
+}
+
+/* ─── Pixel-tech treatment ──────────────────────────────────────────────── */
+.app-layout {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    #000;
+  background-size: 24px 24px;
+  font-family: var(--font-mono), "Courier New", monospace;
+  -webkit-font-smoothing: none;
+  text-rendering: geometricPrecision;
+}
+
+.app-layout *,
+.app-layout *::before,
+.app-layout *::after,
+.wallet-modal-card,
+.mantine-Modal-content,
+.mantine-Modal-header {
+  border-radius: 0 !important;
+}
+
+.app-layout h1,
+.app-layout h2,
+.app-layout h3,
+.app-layout h4,
+.app-layout .app-page-header h1,
+.app-layout .create-stream-title,
+.app-layout .agents-title,
+.app-layout .verify-title,
+.app-layout .stream-detail-title,
+.app-layout .profile-section-title,
+.app-layout .stream-card-title,
+.app-layout .attestation-title {
+  font-family: var(--font-mono), "Courier New", monospace;
+  font-weight: 800;
+  letter-spacing: -0.075em;
+}
+
+.app-layout .app-page-header h1,
+.app-layout .create-stream-title,
+.app-layout .agents-title,
+.app-layout .verify-title,
+.app-layout .stream-detail-title {
+  text-shadow: 3px 3px 0 rgba(255, 255, 255, 0.12);
+}
+
+.app-layout .app-page-kicker::before,
+.app-layout .create-stream-kicker::before,
+.app-layout .profile-section-heading > div > span::before {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 9px;
+  background: #fff;
+  content: "";
+}
+
+.app-layout .dash-stats,
+.app-layout .stream-detail-grid,
+.app-layout .create-step-progress,
+.app-layout .create-wizard-layout,
+.app-layout .profile-header,
+.app-layout .profile-section,
+.app-layout .agents-search-form,
+.app-layout .verify-form,
+.app-layout .verify-howto,
+.app-layout .dash-empty-state,
+.app-layout .dash-no-streams,
+.app-layout .dash-loading {
+  border-width: 2px;
+}
+
+.app-layout .dash-stat-value,
+.app-layout .profile-score-value,
+.app-layout .stream-detail-earned-value,
+.app-layout .agents-score-num {
+  font-family: var(--font-mono), "Courier New", monospace;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 3px 3px 0 rgba(255, 255, 255, 0.14);
+}
+
+.app-layout .stream-progress-bar,
+.app-layout .score-bar-track,
+.app-layout .stream-detail-progress-bar {
+  height: 8px;
+}
+
+.app-layout .stream-card-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 0;
+}
+
+.app-layout .form-input,
+.app-layout .form-select,
+.app-layout textarea,
+.app-layout button,
+.app-layout .wallet-btn,
+.app-layout .wallet-badge,
+.app-layout .wallet-disconnect-btn {
+  font-family: var(--font-mono), "Courier New", monospace;
+}
+
+.app-layout .form-input,
+.app-layout .form-select,
+.app-layout textarea {
+  border-width: 2px;
+}
+
+.app-layout .form-btn,
+.app-layout .form-submit-btn,
+.app-layout .form-btn-secondary,
+.app-layout .dash-create-btn,
+.app-layout .dash-connect-btn,
+.app-layout .stream-action-btn,
+.app-layout .stream-view-btn,
+.app-layout .profile-copy-btn,
+.app-layout .dash-tab,
+.app-layout .stream-back-btn,
+.app-layout .create-wizard-back,
+.app-layout .create-wizard-next,
+.app-layout .create-trustline-row button,
+.app-layout .wallet-btn {
+  border-width: 2px;
+  box-shadow: 4px 4px 0 rgba(255, 255, 255, 0.28);
+  font-weight: 800;
+  transition: transform 90ms steps(2, end), box-shadow 90ms steps(2, end);
+}
+
+.app-layout .form-btn:hover,
+.app-layout .form-submit-btn:hover:not(:disabled),
+.app-layout .form-btn-secondary:hover,
+.app-layout .dash-create-btn:hover,
+.app-layout .dash-connect-btn:hover,
+.app-layout .stream-action-btn:hover,
+.app-layout .stream-view-btn:hover,
+.app-layout .profile-copy-btn:hover,
+.app-layout .dash-tab:hover,
+.app-layout .stream-back-btn:hover,
+.app-layout .create-wizard-back:hover:not(:disabled),
+.app-layout .create-wizard-next:hover,
+.app-layout .create-trustline-row button:hover:not(:disabled),
+.app-layout .wallet-btn:hover {
+  box-shadow: 2px 2px 0 rgba(255, 255, 255, 0.28);
+  transform: translate(2px, 2px);
+}
+
+.app-layout .profile-avatar,
+.app-layout .create-wizard-stage__header > span,
+.app-layout .verify-step-num,
+.app-layout .agents-score-chip {
+  box-shadow: 3px 3px 0 rgba(255, 255, 255, 0.18);
+}
+
+.app-layout .bottom-nav {
+  border-width: 2px;
+  box-shadow: 5px 5px 0 rgba(255, 255, 255, 0.12);
+}

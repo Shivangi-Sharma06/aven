@@ -85,7 +85,7 @@
 }
 
 .activeMono {
-  color: var(--stream-active);
+  color: #fff;
   font-family: var(--font-mono), monospace;
 }
 

@@ -13,7 +13,7 @@
 .eyebrow {
   display: block;
   margin-bottom: 13px;
-  color: rgba(255, 255, 255, 0.54);
+  color: rgba(255, 255, 255, 0.68);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.14em;
@@ -32,7 +32,7 @@
 .explainer p {
   max-width: 52ch;
   margin: 14px 0 0;
-  color: rgba(255, 255, 255, 0.68);
+  color: rgba(255, 255, 255, 0.8);
   font-size: 12px;
   line-height: 1.7;
 }
@@ -76,7 +76,7 @@
 }
 
 .field input::placeholder {
-  color: rgba(255, 255, 255, 0.38);
+  color: rgba(255, 255, 255, 0.54);
 }
 
 .field input:focus,

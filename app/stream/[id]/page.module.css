@@ -113,7 +113,7 @@
 }
 
 .activeMono {
-  color: var(--stream-active);
+  color: #fff;
   font-family: var(--font-mono), monospace;
 }
 
@@ -141,7 +141,7 @@
 }
 
 .actionCard strong {
-  color: var(--stream-active);
+  color: #fff;
   font-family: var(--font-mono), monospace;
   font-size: 28px;
 }

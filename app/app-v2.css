@@ -8,8 +8,8 @@
   --app-v2-panel-hover: rgba(255, 255, 255, 0.055);
   --app-v2-line: rgba(255, 255, 255, 0.09);
   --app-v2-line-strong: rgba(255, 255, 255, 0.16);
-  --app-v2-copy: rgba(255, 255, 255, 0.68);
-  --app-v2-muted: rgba(255, 255, 255, 0.54);
+  --app-v2-copy: rgba(255, 255, 255, 0.8);
+  --app-v2-muted: rgba(255, 255, 255, 0.68);
   min-height: 100vh;
   padding-bottom: 104px;
   background:
@@ -163,7 +163,7 @@
 .app-layout .verify-record code {
   display: block;
   overflow-wrap: anywhere;
-  color: rgba(255, 255, 255, 0.58);
+  color: rgba(255, 255, 255, 0.72);
   font-size: 11px;
   line-height: 1.7;
 }
@@ -187,7 +187,7 @@
 
 .app-layout .form-input::placeholder,
 .app-layout textarea::placeholder {
-  color: rgba(255, 255, 255, 0.38);
+  color: rgba(255, 255, 255, 0.54);
 }
 
 .app-layout .form-input:focus,
@@ -392,7 +392,7 @@
   border-radius: 6px !important;
   background: transparent;
   box-shadow: none !important;
-  color: rgba(255, 255, 255, 0.44);
+  color: rgba(255, 255, 255, 0.58);
   font-size: 10px;
   letter-spacing: 0.04em;
   text-align: left;
@@ -700,6 +700,15 @@
   background: var(--app-v2-panel-hover);
 }
 
+.app-layout .stream-card-status i {
+  background: #fff !important;
+}
+
+.app-layout .stream-amount-withdrawn,
+.app-layout .stream-detail-earned-value {
+  color: #fff;
+}
+
 .app-layout .attestation-title {
   font-size: 17px;
 }
@@ -843,7 +852,7 @@
 
 .app-layout .score-row-label,
 .app-layout .score-row-value {
-  color: rgba(255, 255, 255, 0.66) !important;
+  color: rgba(255, 255, 255, 0.78) !important;
   font-size: 10px;
 }
 
@@ -996,7 +1005,7 @@
 
 .app-layout .nav-item {
   min-width: 52px;
-  color: rgba(255, 255, 255, 0.54);
+  color: rgba(255, 255, 255, 0.68);
   font-size: 10px;
 }
 

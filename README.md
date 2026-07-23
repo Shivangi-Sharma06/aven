@@ -6,6 +6,8 @@
 [Documentation](https://heyaven09.mintlify.site/) ·
 [`aven-stellar` on npm](https://www.npmjs.com/package/aven-stellar)
 
+**Milestone:** `aven-stellar` has crossed **1,300 npm installs**.
+
 Aven is a Stellar-based protocol for funding work, measuring active delivery,
 releasing exact payments, and building portable on-chain reputation.
 

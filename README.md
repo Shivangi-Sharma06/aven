@@ -1,105 +1,276 @@
 # Aven
 
-**A protocol for verified work payments, portable attestations, and on-chain reputation on Stellar.**
+**Pay for verified work. Keep the proof.**
 
-Aven turns measured work into verifiable work history. Clients fund escrow, the `aven-stellar` npm package measures active work time, and the contract releases only the amount justified by that session.
+[Live application](https://aven-chi.vercel.app/) ·
+[Documentation](https://heyaven09.mintlify.site/) ·
+[`aven-stellar` on npm](https://www.npmjs.com/package/aven-stellar)
 
-The repository contains the Aven web app, its editorial GSAP-powered landing page, the Aven protocol contracts, generated TypeScript bindings, and the `aven-stellar` work-session package. The enhanced stream build is ready for its first testnet deployment.
+Aven is a Stellar-based protocol for funding work, measuring active delivery,
+releasing exact payments, and building portable on-chain reputation.
+
+Clients lock a project budget in a smart contract. Workers track privacy-conscious
+Git work sessions with the `aven-stellar` CLI. Each approved session releases the
+amount justified by the recorded active time and leaves a verifiable attestation.
+
+> **Project status:** feature-complete for the current Stellar testnet scope. The
+> repository is in maintenance mode; future changes are focused on fixes and
+> operational improvements.
+
+## What Aven includes
+
+- Funded XLM and USDC work agreements on Stellar testnet
+- Exact payment reservation based on verified active seconds and the stream rate
+- Worker submission, client review, approval, dispute, and release flows
+- Final-project sessions with connected GitHub branch and commit verification
+- Portable work attestations and address-based reputation
+- Freighter wallet authentication without storing wallet secret keys
+- A privacy-conscious npm CLI that never uploads complete source files
+- Shared production persistence through Upstash Redis
 
 ## How it works
 
 ```mermaid
 flowchart LR
-  A["npm work session<br/>Measures active seconds"] --> B["Stream contract<br/>Reserves exact payment"]
-  B --> C["Attestation contract<br/>Records released work"]
-  C --> D["Reputation contract<br/>Scores completed projects once"]
+  A["Client funds an agreement"] --> B["Worker tracks an active Git session"]
+  B --> C["Aven verifies time and delivery metadata"]
+  C --> D["Client reviews the work record"]
+  D --> E["Contract releases the exact payment"]
+  E --> F["Attestation becomes portable reputation"]
 ```
 
-- **Stream** — escrows USDC or XLM and validates `active seconds × rate` for each npm session.
-- **Verified releases** — ties exact session payments to verifier records, client review, and timeout release.
-- **Attestation** — mints permanent records for released work sessions and final project completion.
-- **Reputation** — calculates one stable score from each completed project; ledger time cannot change it.
+1. A client creates a stream with a recipient, asset, budget, duration, and work
+   verification type.
+2. The recipient authorizes the local CLI by signing a short-lived device request
+   with Freighter.
+3. `aven-stellar` records active time and Git change statistics inside the selected
+   repository.
+4. The worker submits a reviewable work-session report to the matching stream.
+5. The configured verifier reserves the contract-enforced payment amount.
+6. The client approves or disputes the session. Approved work releases payment and
+   creates a permanent proof record.
 
 ## Product surfaces
 
-- `/` — monochrome editorial landing page with a GSAP layered-pinning scroll loop
-- `/dashboard` — sent and received payment streams
-- `/stream/create` — create a new stream
-- `/stream/[id]` — inspect and manage a stream
-- `/profile/[address]` — public work history and reputation
-- `/verify` — verify an attestation or reputation claim
-- `/agents` — on-chain reputation lookup for human and AI workers
-- `/cli/authorize` — wallet-signed authorization for the local work-session CLI
-- `/stream/[id]` — also contains the client/worker work-session review ledger
+| Route | Purpose |
+| --- | --- |
+| `/` | Aven landing page and protocol overview |
+| `/dashboard` | Sent and received payment streams |
+| `/stream/create` | Guided four-step agreement creation |
+| `/stream/[id]` | Stream funding, work sessions, review, and release |
+| `/profile/[address]` | Public work attestations and reputation |
+| `/verify` | Independent on-chain attestation verification |
+| `/agents` | Reputation lookup for human or automated workers |
+| `/cli/authorize` | Wallet-signed local CLI authorization |
+| `/register-sender` | Sender identity registration |
 
 ## Tech stack
 
 - Next.js 15, React 19, and TypeScript
-- GSAP, ScrollTrigger, and `@gsap/react`
-- Stellar SDK and Freighter wallet
-- Soroban smart contracts written in Rust
-- Generated TypeScript clients for each contract
-- Upstash Redis for shared production work-session and CLI authorization state
+- Stellar SDK, Freighter, and generated Soroban clients
+- Rust smart contracts using the Soroban SDK
+- GSAP and `@gsap/react` for focused landing-page motion
+- Upstash Redis for production session and authorization state
+- GitHub App and OAuth integrations for delivery verification
 - Mantine primitives and Lucide icons
 
-## Run locally
+## Quick start
 
-### Prerequisites
+### Requirements
 
 - Node.js 20 or newer
 - npm
-- [Freighter](https://www.freighter.app/) configured for Stellar testnet to use wallet features
-- Rust and the `wasm32v1-none` target only if you plan to build or test the contracts
+- [Freighter](https://www.freighter.app/) configured for Stellar testnet
+- Rust and the `wasm32v1-none` target only when working on contracts
 
-### Start the web app
+### Run the web application
 
 ```bash
+git clone https://github.com/kartikeywastaken/aven-ste.git
+cd aven-ste
 npm install
+cp .env.example .env.local
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
 
-The testnet RPC endpoint, network passphrase, and asset contract IDs are defined in `lib/contracts.ts`. Contract deployment IDs come from `NEXT_PUBLIC_STREAM_CONTRACT_ID`, `NEXT_PUBLIC_ATTESTATION_CONTRACT_ID`, and `NEXT_PUBLIC_REPUTATION_CONTRACT_ID`.
+The application will render without a connected wallet, but stream, attestation,
+reputation, and verifier operations require the corresponding testnet contract IDs
+and server signer.
 
-Local development can use file-backed session state. Production requires `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` so sessions and CLI authorizations are shared across devices and serverless instances.
+## Environment variables
 
-## Validation
+Never commit `.env.local`, wallet secret keys, GitHub secrets, or Redis tokens.
 
-```bash
-npm run typecheck
-npm run build
+### Stellar contracts
+
+| Variable | Scope | Purpose |
+| --- | --- | --- |
+| `NEXT_PUBLIC_STREAM_CONTRACT_ID` | Public | Deployed stream contract |
+| `NEXT_PUBLIC_ATTESTATION_CONTRACT_ID` | Public | Deployed attestation contract |
+| `NEXT_PUBLIC_REPUTATION_CONTRACT_ID` | Public | Deployed reputation contract |
+| `AVEN_VERIFIER_SECRET` | Server only | Signs verified work claims |
+
+The application currently uses Stellar testnet RPC, Horizon, network passphrase,
+native XLM SAC, and testnet USDC configuration from
+[`lib/contracts.ts`](./lib/contracts.ts).
+
+### Persistence
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `UPSTASH_REDIS_REST_URL` | Production | Shared Redis REST endpoint |
+| `UPSTASH_REDIS_REST_TOKEN` | Production | Shared Redis credential |
+| `AVEN_DATA_NAMESPACE` | Optional | Explicit deployment data namespace |
+| `AVEN_SESSION_STORE` | Local only | File-backed work-session store |
+| `AVEN_CLI_TOKEN_STORE` | Local only | File-backed CLI authorization store |
+
+Local development can use the file-backed stores under `data/`. Production should
+use Redis so work sessions and CLI authorizations remain available across devices
+and serverless instances. When `AVEN_DATA_NAMESPACE` is omitted, the stream contract
+ID is used so a fresh deployment starts with a clean data set.
+
+### GitHub integration
+
+| Variable | Purpose |
+| --- | --- |
+| `GITHUB_APP_ID` | GitHub App numeric ID |
+| `GITHUB_APP_PRIVATE_KEY` | GitHub App RSA private key |
+| `GITHUB_APP_INSTALLATION_ID` | Installed Aven organization instance |
+| `GITHUB_WEBHOOK_SECRET` | Validates GitHub webhook requests |
+| `GITHUB_AVEN_ORG` | Organization that owns connected repositories |
+| `GITHUB_OAUTH_CLIENT_ID` | Worker account linking |
+| `GITHUB_OAUTH_CLIENT_SECRET` | OAuth server credential |
+| `GITHUB_OAUTH_REDIRECT_URI` | Registered callback URL |
+
+For Vercel or another single-line environment editor, store the private key in one
+value and replace its literal line breaks with `\n`. The server normalizes escaped
+newlines before creating the GitHub App client.
+
+Use this callback in production:
+
+```text
+https://your-domain.example/api/github/callback
 ```
 
-Contract tests run from the Rust workspace:
+Use this callback locally:
 
-```bash
-cd contracts
-cargo test
+```text
+http://localhost:3000/api/github/callback
 ```
 
-## Work sessions
+## Work-session CLI
 
-[`aven-stellar`](https://www.npmjs.com/package/aven-stellar) is the published CLI that connects Git activity to an existing Aven stream without executing project code or collecting full file contents. It requires Node.js 20 or newer and must be run inside a Git repository:
+[`aven-stellar`](https://www.npmjs.com/package/aven-stellar) is the published
+Node.js CLI. The current package version in this repository is `0.3.0`, and it
+installs both `aven` and `aven-stellar` command aliases.
+
+Run it without a global installation:
 
 ```bash
 npx aven-stellar start
 
-# After working in the connected repository:
+# Work normally in the connected Git repository.
+
 npx aven-stellar stop
 ```
 
-For a global installation, run `npm install --global aven-stellar` and use `aven start` / `aven stop`. Both `aven` and `aven-stellar` are installed as command aliases.
+Or install it globally:
 
-On first use, `start` asks for the Aven dashboard URL and stream ID, opens `/cli/authorize`, and asks the stream recipient to sign a short-lived device authorization with Freighter. For local development, use `http://localhost:3000` as the dashboard URL. The resulting token can read that worker's streams, submit sessions, and request review; it cannot create streams or approve the worker's own request.
+```bash
+npm install --global aven-stellar
+aven start
+aven stop
+```
 
-The CLI creates `.avenignore` with private-file defaults, records relative paths and Git statistics, and stores recoverable local state under `.aven/`. `stop` calculates the session report and previews it before submission. Submitted sessions appear in the `WORK SESSIONS` section on `/stream/[id]`, where the worker can request review and the stream sender can approve or dispute the request.
+### Useful options
 
-The report contains session timing, branch and commit metadata, file-level change statistics, and the worker's statement. Its payment amount is calculated automatically from tracked active seconds and the stream's on-chain rate, capped by unreserved escrow; workers do not enter their own amount. The contract independently checks the same calculation before reserving funds. The report does not contain complete source files, keystrokes, screenshots, environment files, wallet secret keys, or excluded paths. The CLI never executes the tracked project or installs its dependencies.
+```bash
+npx aven-stellar start --stream <stream-id> --dashboard <url>
+npx aven-stellar start --non-interactive
+npx aven-stellar stop --message "Implemented the assigned changes"
+npx aven-stellar stop --submit
+npx aven-stellar stop --ended
+```
 
-Checkpoint and ledger-time unlocking are intentionally disabled. The configured verifier records the npm session's exact amount and report hash before the approval/dispute/timeout flow begins. The dashboard uses `NEXT_PUBLIC_STREAM_CONTRACT_ID`, while the server signs verification with `AVEN_VERIFIER_SECRET`.
+- `start --non-interactive` skips the collection confirmation.
+- `stop --message` includes a worker-written delivery summary.
+- `stop --submit` submits the previewed report without a second prompt.
+- `stop --ended` marks the session as final, verifies selected delivery branches
+  against the connected GitHub repository, and prepares the remaining unreserved
+  escrow for client-approved release.
 
-To build the contract WASM artifacts:
+On first use, `start` asks for the dashboard URL and stream ID, opens
+`/cli/authorize`, and asks the stream recipient to sign with Freighter. The resulting
+token can read that worker's streams, submit sessions, and request review. It cannot
+create streams or approve the worker's own request.
+
+If a stopped session fails to submit, run `stop` again. The CLI keeps the original
+stop time and retries the same report instead of counting the delay as work.
+
+### Privacy boundary
+
+The CLI records:
+
+- session start, stop, and active time;
+- branch and commit metadata;
+- relative changed paths;
+- additions, deletions, and Git status; and
+- the worker's delivery statement.
+
+It does **not**:
+
+- request or store Stellar secret keys;
+- execute the tracked project, tests, or scripts;
+- install project dependencies;
+- record keystrokes or screenshots;
+- upload complete source files; or
+- read paths excluded by `.gitignore` or `.avenignore`.
+
+Recoverable local state is stored under `.aven/`. Do not commit that directory.
+
+## Payment enforcement
+
+For a normal session, the verifier reserves:
+
+```text
+verified active seconds × stream rate
+```
+
+The amount is capped by the stream's unreserved escrow, and the smart contract
+independently checks the calculation. Workers never enter their own payment amount.
+
+For `--ended`, the server converts the remaining escrow into a
+contract-compatible duration while preserving the real npm-tracked active seconds
+in the report. Pending or reserved payments must be resolved before a final session
+can be submitted. Final release still requires explicit client review in the web
+application.
+
+## Validation
+
+Run the application checks:
+
+```bash
+npm run typecheck
+npm test
+npm run build
+```
+
+Run the CLI package tests:
+
+```bash
+npm --prefix packages/aven-work-session test
+```
+
+Run the contract tests:
+
+```bash
+cd contracts
+cargo test --workspace
+```
+
+Build the stream contract:
 
 ```bash
 rustup target add wasm32v1-none
@@ -110,40 +281,44 @@ stellar contract build --package stream_contract
 ## Repository structure
 
 ```text
-app/                    Next.js routes and global styles
-components/             Wallet, navigation, app shell, and landing sections
-components/sections/    Aven protocol panels and infinite layered loop
-contracts/              Soroban Rust workspace
-  bindings/             Generated TypeScript clients for deployed contracts
-  contracts/stream_contract/
+app/                            Next.js routes, APIs, and product styles
+components/                     Wallet, navigation, shell, and landing UI
+contracts/                      Soroban Rust workspace
+  bindings/                     Generated TypeScript contract clients
+  contracts/stream_contract/    Escrow and verified-release logic
   contracts/attestation_contract/
   contracts/reputation_contract/
   contracts/shared/
-lib/contracts.ts        Testnet config and contract client factories
-lib/stellar.ts          Wallet and on-chain application operations
-packages/aven-work-session/ Source for the published `aven-stellar` CLI
+lib/                            Stellar clients, persistence, GitHub, and verification
+packages/aven-work-session/     Published aven-stellar CLI source and tests
+scripts/                        Data migration utilities
 ```
 
-## Testnet deployment
+## Deployment
 
-The frontend is currently wired to Stellar testnet:
+The web application is designed for Vercel or another Next.js-compatible platform.
 
-| Contract | Address |
-| --- | --- |
-| Stream | `CAZ53PKMFJOJCK2GC6MZI3TID35UL6B4X5OJ5HV4U5VQ2MLIJUK34NXD` |
-| Attestation | `CC34BWDMECEJ3XI5ZY7KRYYLIEC5Y2HKOKRCG4GGEKG7LAPH6AN7VLV4` |
-| Reputation | `CAUU3K3JMUQZCPEQAM34X5UX3OVV6RVKOQLAC4BG4MTBMXMSYLBLZHJ2` |
+1. Deploy the contracts and configure all three public contract IDs.
+2. Add `AVEN_VERIFIER_SECRET` as a protected server-only variable.
+3. Configure Upstash Redis for shared production state.
+4. Add the GitHub App, OAuth, and webhook variables when delivery verification is
+   enabled.
+5. Register the production GitHub OAuth callback URL.
+6. Run `npm run build` before promoting the deployment.
 
-Amounts use Stellar's seven-decimal fixed-point representation. The frontend converts human-readable values at the client boundary in `lib/contracts.ts`.
+Amounts use Stellar's seven-decimal fixed-point representation. Human-readable
+values are converted at the client boundary in `lib/contracts.ts`.
 
-## Development notes
+## Security notes
 
-- The landing-page loop is desktop-only. Mobile renders the same content as a normal stacked document flow.
-- The duplicate final panel is an internal loop bridge and is excluded from pin and snap calculations.
-- Freighter signs transactions in the browser; secret keys are never stored by the app.
-- AI agents participate as workers: their wallet address is the recipient of an ordinary Aven payment stream.
-- Contract bindings must be regenerated or updated after deploying a new contract version or changing a contract interface.
+- Freighter signs browser transactions; the app never stores a user's wallet secret.
+- `AVEN_VERIFIER_SECRET`, Redis credentials, and GitHub secrets must remain
+  server-only.
+- CLI device authorization is wallet-signed, scoped, and short-lived.
+- Contract bindings must be regenerated after changing or redeploying a contract
+  interface.
+- Testnet balances, attestations, and reputation records are not production assets.
 
-## Status
+## License
 
-Aven is under active development and currently targets Stellar testnet. Do not treat testnet balances, attestations, or reputation scores as production records.
+No license has been declared for this repository.

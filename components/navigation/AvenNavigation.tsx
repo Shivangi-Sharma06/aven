@@ -1,11 +1,12 @@
 'use client'
 
-import { Menu } from 'lucide-react'
+import { ArrowDown } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { ScrollSmoother } from '../../lib/gsap'
 
 const navItems = [
   ['HOW IT WORKS', 'how-it-works'],
+  ['PROOF', 'proof'],
   ['PROTOCOL', 'protocol'],
   ['DEVELOPERS', 'developers'],
 ] as const
@@ -49,8 +50,8 @@ export default function AvenNavigation() {
         LAUNCH APP
       </button>
 
-      <button className="aven-nav__menu" aria-label="Open navigation">
-        <Menu aria-hidden="true" size={22} strokeWidth={1.7} />
+      <button className="aven-nav__menu" aria-label="Go to start" onClick={() => scrollToTarget('start')}>
+        <ArrowDown aria-hidden="true" size={18} strokeWidth={1.7} />
       </button>
     </nav>
   )

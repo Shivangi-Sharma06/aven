@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useWallet } from "@/components/WalletProvider";
 import { getSenderStreams, getRecipientStreams, StreamObject, getWorkerAttestations } from "@/lib/stellar";
 import { pauseStream, resumeStream, cancelStream } from "@/lib/stellar";
+import "./dashboard-v2.css";
 
 type Tab = "sending" | "receiving";
 
@@ -88,13 +89,15 @@ export default function DashboardPage() {
 
   if (!connected) {
     return (
-      <div className="dash-empty-state">
-        <div className="dash-empty-icon">💎</div>
-        <h2>Connect Your Wallet</h2>
-        <p>Connect your Freighter wallet to view and manage your payment streams.</p>
-        <button className="dash-connect-btn" onClick={openConnectModal} id="dashboard-connect-wallet">
-          Connect Freighter
-        </button>
+      <div className="dashboard-wrap dashboard-wrap--empty">
+        <div className="dash-empty-state">
+          <div className="dash-empty-icon">◇</div>
+          <h2>Connect Your Wallet</h2>
+          <p>Connect your Freighter wallet to view and manage your payment streams.</p>
+          <button className="dash-connect-btn" onClick={openConnectModal} id="dashboard-connect-wallet">
+            Connect Freighter
+          </button>
+        </div>
       </div>
     );
   }

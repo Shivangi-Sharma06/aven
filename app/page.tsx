@@ -1,115 +1,177 @@
-"use client";
+import Link from 'next/link'
+import './landing.css'
+import './landing-v2.css'
 
-import { useRef } from 'react';
-import './landing.css';
-import { gsap, useGSAP } from '../lib/gsap';
+import AvenNavigation from '../components/navigation/AvenNavigation'
+import AvenHero from '../components/hero/AvenHero'
+import LiveStreamCounter from '../components/hero/LiveStreamCounter'
 
-import AvenNavigation from '../components/navigation/AvenNavigation';
-import AvenHero from '../components/hero/AvenHero';
-import HowItWorks from '../components/sections/HowItWorks';
-import LiveStreamDemo from '../components/sections/LiveStreamDemo';
-import WorkAttestations from '../components/sections/WorkAttestations';
-import Reputation from '../components/sections/Reputation';
-import Protocol from '../components/sections/Protocol';
-import Developers from '../components/sections/Developers';
-import AIAgents from '../components/sections/AIAgents';
-import FinalCTA from '../components/sections/FinalCTA';
-import AvenFooter from '../components/sections/AvenFooter';
-import SmoothScroll from '../components/SmoothScroll';
+const workFlow = [
+  {
+    number: '01',
+    title: 'Fund',
+    copy: 'Lock the work budget before delivery begins. Terms stay visible to both sides.',
+    meta: 'ESCROW READY',
+  },
+  {
+    number: '02',
+    title: 'Track',
+    copy: 'The Aven npm package records active work sessions without paying for idle time.',
+    meta: 'ACTIVE TIME',
+  },
+  {
+    number: '03',
+    title: 'Verify',
+    copy: 'Each session becomes a reviewable proof record tied to the funded agreement.',
+    meta: 'CLIENT REVIEW',
+  },
+  {
+    number: '04',
+    title: 'Release',
+    copy: 'Approved work releases payment and leaves a portable attestation on Stellar.',
+    meta: 'ON-CHAIN PROOF',
+  },
+] as const
 
-const landingSections = [
-  { id: 'hero', content: <AvenHero />, theme: 'light' },
-  { id: 'how', content: <HowItWorks />, theme: 'dark' },
-  { id: 'stream', content: <LiveStreamDemo />, theme: 'light' },
-  { id: 'attestations', content: <WorkAttestations />, theme: 'dark' },
-  { id: 'reputation', content: <Reputation />, theme: 'light' },
-  { id: 'protocol', content: <Protocol />, theme: 'dark' },
-  { id: 'developers', content: <Developers />, theme: 'light' },
-  { id: 'agents', content: <AIAgents />, theme: 'dark' },
-] as const;
+const protocolRows = [
+  {
+    title: 'Funded agreements',
+    copy: 'A stream defines the recipient, asset, budget, duration, and verification route before work begins.',
+    tag: 'STELLAR ESCROW',
+  },
+  {
+    title: 'Measured work sessions',
+    copy: 'Workers run Aven from the repository. Tracked active seconds are submitted against the agreement.',
+    tag: 'NPM WORK LAYER',
+  },
+  {
+    title: 'Payment attestations',
+    copy: 'Approved sessions produce a payment record that can be checked independently and carried into reputation.',
+    tag: 'PORTABLE PROOF',
+  },
+] as const
 
 export default function LandingPage() {
-  const appRef = useRef<HTMLDivElement>(null);
-
-  useGSAP(
-    () => {
-      const media = gsap.matchMedia();
-
-      media.add('(min-width: 769px)', () => {
-      gsap.utils.toArray<HTMLElement>('.aven-section').forEach((section) => {
-        const sectionHeader = section.querySelector('.section-kicker');
-        const sectionVisual = section.querySelector('.section-visual');
-
-        gsap.fromTo(
-          [sectionHeader, sectionVisual].filter(Boolean) as Element[],
-          { autoAlpha: 0, y: 28 },
-          {
-            autoAlpha: 1,
-            y: 0,
-            duration: 0.8,
-            stagger: 0.12,
-            scrollTrigger: {
-              trigger: section,
-              start: 'top 72%',
-              once: true,
-            },
-          }
-        );
-      });
-
-      gsap.utils.toArray<HTMLElement>('.aven-section [data-strengthen-path]').forEach((path) => {
-        gsap.fromTo(
-          path,
-          { strokeDasharray: '0 18', opacity: 0.16 },
-          {
-            strokeDasharray: '9 10',
-            opacity: 0.48,
-            duration: 1.2,
-            ease: 'power2.inOut',
-            scrollTrigger: {
-              trigger: path.closest('.aven-section'),
-              start: 'top 58%',
-              once: true,
-            },
-          }
-        );
-      });
-      });
-
-      media.add('(max-width: 768px)', () => {
-        gsap.set(
-          gsap.utils.toArray<HTMLElement>(
-            '.aven-section .section-kicker, .aven-section .section-visual',
-          ),
-          { autoAlpha: 1, y: 0 },
-        );
-      });
-
-      return () => media.revert();
-    },
-    { scope: appRef }
-  );
-
   return (
-    <div ref={appRef} className="app">
+    <div className="app aven-home">
       <AvenNavigation />
-      <SmoothScroll>
-        <main className="aven-scroll-flow">
-          {landingSections.map((section) => (
-            <div
-              className={`aven-scroll-section aven-scroll-section--${section.id}`}
-              data-theme={section.theme}
-              key={section.id}
-            >
-              {section.content}
+
+      <main>
+        <AvenHero />
+
+        <div className="aven-home__content">
+          <section className="hub-section" id="how-it-works">
+            <header className="hub-section__header">
+              <span>01</span>
+              <h2>How it works</h2>
+              <i aria-hidden="true" />
+            </header>
+
+            <div className="workflow-grid">
+              {workFlow.map((step) => (
+                <article className="workflow-card" key={step.number}>
+                  <div className="workflow-card__top">
+                    <span>{step.number}</span>
+                    <small>{step.meta}</small>
+                  </div>
+                  <h3>{step.title}</h3>
+                  <p>{step.copy}</p>
+                </article>
+              ))}
             </div>
-          ))}
-          <div className="aven-scroll-section aven-scroll-section--cta" data-theme="light">
-            <FinalCTA />
-            <AvenFooter />
-          </div>
-        </main>
-      </SmoothScroll>
+          </section>
+
+          <section className="hub-section" id="proof">
+            <header className="hub-section__header">
+              <span>02</span>
+              <h2>Proof in motion</h2>
+              <i aria-hidden="true" />
+            </header>
+
+            <div className="proof-grid">
+              <article className="proof-card proof-card--counter">
+                <div className="proof-card__status">
+                  <span><i aria-hidden="true" /> LIVE AGREEMENT</span>
+                  <span>USDC / TESTNET</span>
+                </div>
+                <LiveStreamCounter compact />
+              </article>
+
+              <article className="proof-card proof-card--summary">
+                <span className="proof-card__eyebrow">THE OUTPUT</span>
+                <h3>One session.<br />Three durable records.</h3>
+                <ul>
+                  <li><span>01</span> measured active time</li>
+                  <li><span>02</span> released payment</li>
+                  <li><span>03</span> portable reputation</li>
+                </ul>
+              </article>
+            </div>
+          </section>
+
+          <section className="hub-section" id="protocol">
+            <header className="hub-section__header">
+              <span>03</span>
+              <h2>Protocol</h2>
+              <i aria-hidden="true" />
+            </header>
+
+            <div className="protocol-list">
+              {protocolRows.map((row, index) => (
+                <details key={row.title}>
+                  <summary>
+                    <span className="protocol-list__number">0{index + 1}</span>
+                    <strong>{row.title}</strong>
+                    <small>{row.tag}</small>
+                    <span className="protocol-list__toggle" aria-hidden="true">+</span>
+                  </summary>
+                  <p>{row.copy}</p>
+                </details>
+              ))}
+            </div>
+          </section>
+
+          <section className="hub-section" id="developers">
+            <header className="hub-section__header">
+              <span>04</span>
+              <h2>For developers</h2>
+              <i aria-hidden="true" />
+            </header>
+
+            <div className="developer-hub">
+              <div className="developer-hub__copy">
+                <span>AVEN WORK LAYER</span>
+                <h3>Proof belongs inside the workflow.</h3>
+                <p>
+                  Add session tracking to a repository, submit verified work, and
+                  connect delivery to settlement without rebuilding your product.
+                </p>
+                <div className="developer-hub__actions">
+                  <a href="https://heyaven09.mintlify.site/" target="_blank" rel="noopener noreferrer">
+                    READ THE DOCS ↗
+                  </a>
+                  <Link href="/dashboard">OPEN APP →</Link>
+                </div>
+              </div>
+
+              <pre className="developer-hub__code" aria-label="Aven command example"><code><span>$</span> npm install aven-work-session{'\n'}<span>$</span> npx aven start{'\n'}<span>$</span> npx aven submit --ended</code></pre>
+            </div>
+          </section>
+
+          <section className="home-cta" id="start">
+            <span>05 / START</span>
+            <h2>Fund the work.<br />Keep the proof.</h2>
+            <p>Create a funded agreement and let payment move with verified delivery.</p>
+            <Link href="/stream/create">START A STREAM →</Link>
+          </section>
+        </div>
+      </main>
+
+      <footer className="home-footer">
+        <span>AVEN / STELLAR</span>
+        <span>PAY FOR PROGRESS · KEEP THE PROOF</span>
+        <a href="https://heyaven09.mintlify.site/" target="_blank" rel="noopener noreferrer">DOCS ↗</a>
+      </footer>
     </div>
-  );
+  )
 }

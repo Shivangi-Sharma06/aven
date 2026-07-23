@@ -83,30 +83,34 @@ export default function AvenHero() {
       <RevealLayer image={REVEAL_IMAGE} cursor={cursor} />
       <div className="aven-spotlight-hero__shade" aria-hidden="true" />
 
-      <div className="aven-spotlight-hero__heading">
-        <span className="aven-hero-anim aven-hero-reveal aven-spotlight-hero__kicker">
-          PAY FOR PROGRESS · KEEP THE PROOF
-        </span>
-        <h1 className="aven-hero-anim aven-hero-reveal">AVEN</h1>
-      </div>
+      <div className="aven-spotlight-hero__content">
+        <div className="aven-spotlight-hero__heading">
+          <span className="aven-hero-anim aven-hero-reveal aven-spotlight-hero__kicker">
+            PAY FOR PROGRESS · KEEP THE PROOF
+          </span>
+          <h1 className="aven-hero-anim aven-hero-reveal">AVEN</h1>
+        </div>
 
-      <div className="aven-spotlight-hero__left aven-hero-anim aven-hero-fade">
-        <p>
+        <p className="aven-spotlight-hero__intro aven-hero-anim aven-hero-fade">
           Fund work upfront, pay for verified active time, and leave every released
           session with a portable record on Stellar.
         </p>
+
+        <div className="aven-spotlight-hero__actions aven-hero-anim aven-hero-fade">
+          <button onClick={() => router.push('/stream/create')}>START A STREAM →</button>
+          <button
+            className="is-secondary"
+            onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}
+          >
+            SEE HOW IT WORKS
+          </button>
+        </div>
       </div>
 
-      <div className="aven-spotlight-hero__right aven-hero-anim aven-hero-fade">
-        <p>
-          Aven connects funded agreements to npm-tracked work, giving clients clear
-          proof and workers payment that keeps pace with delivery.
-        </p>
-        <button onClick={() => router.push('/stream/create')}>START A STREAM</button>
-      </div>
-
-      <div className="aven-spotlight-hero__hint" aria-hidden="true">
-        MOVE TO REVEAL THE WORK LAYER
+      <div className="aven-spotlight-hero__meta aven-hero-anim aven-hero-fade">
+        <div><span>NETWORK</span><strong>STELLAR</strong></div>
+        <div><span>SETTLEMENT</span><strong>XLM / USDC</strong></div>
+        <div><span>PROOF</span><strong>ACTIVE WORK</strong></div>
       </div>
     </section>
   )

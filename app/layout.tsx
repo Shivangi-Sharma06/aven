@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Epilogue, Inter, JetBrains_Mono, Playfair_Display, Space_Grotesk } from "next/font/google";
 import "./globals.css";
+import "./app-v2.css";
 import "@mantine/core/styles.css";
 import "@mantine/notifications/styles.css";
 import { MantineProvider } from "@mantine/core";

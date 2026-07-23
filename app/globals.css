@@ -4209,3 +4209,17 @@ body {
   border-width: 2px;
   box-shadow: 5px 5px 0 rgba(255, 255, 255, 0.12);
 }
+
+/* SF Mono across the product; the landing wordmark owns its Hoover override. */
+body,
+body *,
+body *::before,
+body *::after,
+button,
+input,
+textarea,
+select,
+code,
+pre {
+  font-family: "SFMono-Regular", "SF Mono", var(--font-mono), monospace !important;
+}

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Space_Grotesk, JetBrains_Mono } from "next/font/google";
+import { Epilogue, Inter, JetBrains_Mono, Playfair_Display, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import "@mantine/core/styles.css";
 import "@mantine/notifications/styles.css";
@@ -13,6 +13,8 @@ import { Analytics } from "@vercel/analytics/next";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-space" });
 const jetbrains = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono" });
+const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-playfair" });
+const epilogue = Epilogue({ subsets: ["latin"], variable: "--font-epilogue" });
 
 export const metadata: Metadata = {
   title: "Aven",
@@ -46,7 +48,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           }}
         />
       </head>
-      <body className={`${inter.variable} ${spaceGrotesk.variable} ${jetbrains.variable}`}>
+      <body className={`${inter.variable} ${spaceGrotesk.variable} ${jetbrains.variable} ${playfair.variable} ${epilogue.variable}`}>
         <MantineProvider defaultColorScheme="light">
           <ModalsProvider>
             <Notifications />

@@ -1,108 +1,112 @@
-import { useRef } from 'react'
+'use client'
+
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import AvenNetwork from './AvenNetwork'
-import AvenMorphLogo from './AvenMorphLogo'
-import LiveStreamCounter from './LiveStreamCounter'
-import { gsap, ScrollSmoother, useGSAP } from '../../lib/gsap'
 
+const BASE_IMAGE = '/images/hero/aven-flow-base.webp'
+const REVEAL_IMAGE = '/images/hero/aven-flow-reveal.webp'
+const SPOTLIGHT_RADIUS = 260
 
-function scrollToTarget(id: string) {
-  const target = document.getElementById(id)
-  const smoother = ScrollSmoother.get()
+type CursorPosition = { x: number; y: number }
 
-  if (smoother && target) {
-    smoother.scrollTo(target, true, 'top top')
-    return
-  }
+function RevealLayer({ image, cursor }: { image: string; cursor: CursorPosition }) {
+  const mask = `radial-gradient(circle ${SPOTLIGHT_RADIUS}px at ${cursor.x}px ${cursor.y}px,
+    rgba(255,255,255,1) 0%,
+    rgba(255,255,255,1) 40%,
+    rgba(255,255,255,.75) 60%,
+    rgba(255,255,255,.4) 75%,
+    rgba(255,255,255,.12) 88%,
+    rgba(255,255,255,0) 100%)`
 
-  target?.scrollIntoView({ behavior: 'smooth' })
+  return (
+    <div
+      aria-hidden="true"
+      className="aven-spotlight-hero__reveal"
+      style={{
+        backgroundImage: `url(${image})`,
+        maskImage: mask,
+        WebkitMaskImage: mask,
+      }}
+    />
+  )
 }
-
-
 
 export default function AvenHero() {
   const heroRef = useRef<HTMLElement>(null)
+  const mouse = useRef<CursorPosition>({ x: -999, y: -999 })
+  const smooth = useRef<CursorPosition>({ x: -999, y: -999 })
+  const animationFrame = useRef<number | null>(null)
+  const [cursor, setCursor] = useState<CursorPosition>({ x: -999, y: -999 })
   const router = useRouter()
 
-  useGSAP(
-    () => {
-      if (!heroRef.current) return
-      const items = gsap.utils.toArray('[data-hero-reveal]', heroRef.current)
-      const logo = heroRef.current.querySelector('.aven-morph-logo')
-      const network = heroRef.current.querySelector('.aven-network-wrap')
+  useEffect(() => {
+    const hero = heroRef.current
+    if (!hero) return
 
-      if (!logo || !network) return
-
-      gsap.set(items, { autoAlpha: 0, y: 18 })
-      gsap.set(network, { autoAlpha: 0 })
-
-      const shapeA = logo.querySelector('#aven-shape-a') as any
-      const shapeV = logo.querySelector('#aven-shape-v') as any
-      const shapeE = logo.querySelector('#aven-shape-e') as any
-      const shapeN = logo.querySelector('#aven-shape-n') as any
-
-      const targetA = logo.querySelector('#aven-letter-a') as any
-      const targetV = logo.querySelector('#aven-letter-v') as any
-      const targetE = logo.querySelector('#aven-letter-e') as any
-      const targetN = logo.querySelector('#aven-letter-n') as any
-
-      if (!shapeA || !shapeV || !shapeE || !shapeN || !targetA || !targetV || !targetE || !targetN) return
-
-      // Intro animation for page entry (run once)
-      const tlIntro = gsap.timeline({ defaults: { ease: 'power3.out' } })
-      tlIntro
-        .to(network, { autoAlpha: 1, duration: 0.8 }, 0.1)
-        .to(items, { autoAlpha: 1, y: 0, duration: 0.58, stagger: 0.14 }, 0.7)
-
-      const tlMorph = gsap.timeline({
-        delay: 0.3,
-        defaults: {
-          duration: 1.4,
-          ease: 'power3.inOut',
-        },
-      })
-
-      tlMorph
-        .to(shapeA, { morphSVG: { shape: targetA } })
-        .to(shapeV, { morphSVG: { shape: targetV } }, '<')
-        .to(shapeE, { morphSVG: { shape: targetE } }, '<')
-        .to(shapeN, { morphSVG: { shape: targetN } }, '<')
-
-      return () => {
-        tlIntro.kill()
-        tlMorph.kill()
+    const onPointerMove = (event: PointerEvent) => {
+      const bounds = hero.getBoundingClientRect()
+      mouse.current = {
+        x: event.clientX - bounds.left,
+        y: event.clientY - bounds.top,
       }
-    },
-    { scope: heroRef }
-  )
+    }
+
+    const onPointerLeave = () => {
+      mouse.current = { x: -999, y: -999 }
+    }
+
+    const updateSpotlight = () => {
+      smooth.current.x += (mouse.current.x - smooth.current.x) * 0.1
+      smooth.current.y += (mouse.current.y - smooth.current.y) * 0.1
+      setCursor({ ...smooth.current })
+      animationFrame.current = requestAnimationFrame(updateSpotlight)
+    }
+
+    hero.addEventListener('pointermove', onPointerMove, { passive: true })
+    hero.addEventListener('pointerleave', onPointerLeave)
+    animationFrame.current = requestAnimationFrame(updateSpotlight)
+
+    return () => {
+      hero.removeEventListener('pointermove', onPointerMove)
+      hero.removeEventListener('pointerleave', onPointerLeave)
+      if (animationFrame.current !== null) cancelAnimationFrame(animationFrame.current)
+    }
+  }, [])
 
   return (
-    <section ref={heroRef} className="stage" id="hero">
-      <AvenNetwork />
-      <div className="hero-copy">
-        <div className="hero-brand">
-          <AvenMorphLogo />
-        </div>
-        <p className="hero-copy__eyebrow" data-hero-reveal>
-          PAY FOR PROGRESS.
-          <br />
-          KEEP THE PROOF.
+    <section ref={heroRef} className="aven-spotlight-hero" id="hero">
+      <div
+        aria-hidden="true"
+        className="aven-spotlight-hero__base aven-hero-zoom"
+        style={{ backgroundImage: `url(${BASE_IMAGE})` }}
+      />
+      <RevealLayer image={REVEAL_IMAGE} cursor={cursor} />
+      <div className="aven-spotlight-hero__shade" aria-hidden="true" />
+
+      <div className="aven-spotlight-hero__heading">
+        <span className="aven-hero-anim aven-hero-reveal aven-spotlight-hero__kicker">
+          PAY FOR PROGRESS · KEEP THE PROOF
+        </span>
+        <h1 className="aven-hero-anim aven-hero-reveal">AVEN</h1>
+      </div>
+
+      <div className="aven-spotlight-hero__left aven-hero-anim aven-hero-fade">
+        <p>
+          Fund work upfront, pay for verified active time, and leave every released
+          session with a portable record on Stellar.
         </p>
-        <h1 data-hero-reveal>
-          <span>WORK MOVES FORWARD.</span>
-          <span>PAYMENT SHOULD KEEP UP.</span>
-        </h1>
-        <p className="hero-copy__body" data-hero-reveal>
-          Aven lets clients fund work upfront, workers get paid for npm-tracked active
-          time, and every released session becomes verifiable history on Stellar.
+      </div>
+
+      <div className="aven-spotlight-hero__right aven-hero-anim aven-hero-fade">
+        <p>
+          Aven connects funded agreements to npm-tracked work, giving clients clear
+          proof and workers payment that keeps pace with delivery.
         </p>
-        <div data-hero-reveal>
-          <LiveStreamCounter />
-        </div>
-        <div className="hero-actions" data-hero-reveal>
-          <button onClick={() => router.push('/stream/create')}>START A STREAM</button>
-          <button onClick={() => scrollToTarget('protocol')}>EXPLORE PROTOCOL</button>
-        </div>
+        <button onClick={() => router.push('/stream/create')}>START A STREAM</button>
+      </div>
+
+      <div className="aven-spotlight-hero__hint" aria-hidden="true">
+        MOVE TO REVEAL THE WORK LAYER
       </div>
     </section>
   )

@@ -6,7 +6,7 @@ import { signMessage } from "@stellar/freighter-api";
 import { useWallet } from "@/components/WalletProvider";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import type { WorkSession } from "@/lib/work-session";
-import { STREAM_CONTRACT_ID } from "@/lib/contracts";
+import { STREAM_CONTRACT_ID, STELLAR_EXPLORER } from "@/lib/contracts";
 import {
   getStream,
   computeAvailable,
@@ -853,7 +853,7 @@ export default function StreamDetailPage() {
         {/* Explorer link */}
         <a
           className="stream-explorer-link"
-          href={`https://stellar.expert/explorer/testnet/contract/${STREAM_CONTRACT_ID}`}
+          href={`${STELLAR_EXPLORER}/contract/${STREAM_CONTRACT_ID}`}
           target="_blank"
           rel="noopener noreferrer"
         >

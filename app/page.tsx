@@ -161,16 +161,29 @@ export default function LandingPage() {
           <section className="home-cta" id="start">
             <span>05 / START</span>
             <h2>Fund the work.<br />Keep the proof.</h2>
-            <p>Create a funded agreement and let payment move with verified delivery.</p>
-            <Link href="/stream/create">START A STREAM →</Link>
+            <p>Add session tracking to any repository with the Aven npm package.</p>
+            <pre className="home-cta__code"><code><span>$</span> npm install aven-work-session{'\n'}<span>$</span> npx aven start{'\n'}<span>$</span> npx aven submit --ended</code></pre>
           </section>
         </div>
       </main>
 
       <footer className="home-footer">
-        <span>AVEN / STELLAR</span>
-        <span>PAY FOR PROGRESS · KEEP THE PROOF</span>
-        <a href="https://heyaven09.mintlify.site/" target="_blank" rel="noopener noreferrer">DOCS ↗</a>
+        <div className="home-footer__brand">
+          <svg viewBox="0 0 256 256" aria-hidden="true">
+            <path d="M256 256H128L0 128h128ZM256 128H128L0 0h128Z" />
+          </svg>
+          AVEN
+        </div>
+        <div className="home-footer__tagline">PAY FOR PROGRESS · KEEP THE PROOF</div>
+        <div className="home-footer__divider" />
+        <div className="home-footer__links">
+          <a href="https://x.com/avenprotocol" target="_blank" rel="noopener noreferrer">𝕏 / TWITTER</a>
+          <a href="https://github.com/Shivangi-Sharma06/aven" target="_blank" rel="noopener noreferrer">GITHUB REPO</a>
+          <a href="https://heyaven09.mintlify.site/" target="_blank" rel="noopener noreferrer">DOCS ↗</a>
+        </div>
+        <div className="home-footer__devs">
+          Built by Shivangi Sharma & Kartikey Juyal
+        </div>
       </footer>
     </div>
   )

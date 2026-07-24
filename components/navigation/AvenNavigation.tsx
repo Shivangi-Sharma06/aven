@@ -41,14 +41,11 @@ export default function AvenNavigation() {
             {label}
           </button>
         ))}
-        <a href="https://heyaven09.mintlify.site/" target="_blank" rel="noopener noreferrer">
-          DOCS ↗
-        </a>
       </div>
 
-      <button className="aven-nav__launch" onClick={() => router.push('/dashboard')}>
-        LAUNCH APP
-      </button>
+      <a href="https://heyaven09.mintlify.site/" target="_blank" rel="noopener noreferrer" className="aven-nav__launch">
+        DOCS ↗
+      </a>
 
       <button className="aven-nav__menu" aria-label="Go to start" onClick={() => scrollToTarget('start')}>
         <ArrowDown aria-hidden="true" size={18} strokeWidth={1.7} />

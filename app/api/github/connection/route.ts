@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { apiError } from "@/lib/api-response";
+import { getGithubOAuthEnv } from "@/lib/github-env";
 import { getIdentity } from "@/lib/github-identity-store";
 import { authenticateBrowserSession } from "@/lib/work-session-server";
 
@@ -17,13 +18,21 @@ export async function GET(request: Request) {
     const walletAddress = await authenticateBrowserSession(request);
     if (!walletAddress) return apiError("Authentication required.", 401);
 
+    let oauthConfigured = true;
+    try {
+      getGithubOAuthEnv();
+    } catch {
+      oauthConfigured = false;
+    }
+
     const identity = await getIdentity(walletAddress);
     if (!identity) {
-      return NextResponse.json({ connected: false });
+      return NextResponse.json({ connected: false, oauthConfigured });
     }
 
     return NextResponse.json({
       connected: true,
+      oauthConfigured,
       githubLogin: identity.githubLogin,
       githubUserId: identity.githubUserId,
       avatarUrl: identity.avatarUrl,

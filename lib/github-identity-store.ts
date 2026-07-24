@@ -17,6 +17,7 @@ export type GithubIdentityRecord = {
 type OAuthStateValue = {
   walletAddress: string;
   issuedAt: string;
+  returnTo?: string;
 };
 
 // ─── In-memory local fallbacks (when Redis is not configured) ─────────────────
@@ -108,12 +109,16 @@ export async function findByGithubUserId(
 
 // ─── OAuth state (temporary, 10-minute TTL, atomic GETDEL on consume) ─────────
 
-export async function createOAuthState(walletAddress: string): Promise<string> {
+export async function createOAuthState(
+  walletAddress: string,
+  returnTo?: string,
+): Promise<string> {
   assertProductionPersistence();
   const state = randomBytes(32).toString("hex");
   const value: OAuthStateValue = {
     walletAddress,
     issuedAt: new Date().toISOString(),
+    returnTo,
   };
   if (sharedRedis) {
     await sharedRedis.set(oauthStateKey(state), value, { ex: OAUTH_STATE_TTL_SECONDS });

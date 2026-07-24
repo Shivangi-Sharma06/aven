@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { apiError } from "@/lib/api-response";
 import { consumeOAuthState, findByGithubUserId, getIdentity, putIdentity } from "@/lib/github-identity-store";
-import { getGithubEnv } from "@/lib/github-env";
+import { getGithubOAuthEnv } from "@/lib/github-env";
 import { authenticateBrowserSession } from "@/lib/work-session-server";
 import { addressesEqual } from "@/lib/work-session-server";
 
@@ -14,7 +14,8 @@ export const dynamic = "force-dynamic";
  * Handles the GitHub OAuth callback:
  * 1. Reads `code` and `state` from query params
  * 2. Atomically consumes the state (GETDEL) — rejects if missing/expired
- * 3. Verifies browser session wallet matches state's wallet
+ * 3. Uses the wallet bound to the single-use server-side state
+ *    (and rejects a different active browser wallet, if present)
  * 4. Exchanges code for access token
  * 5. Fetches GitHub user identity
  * 6. Checks for conflicting wallet ownership
@@ -37,16 +38,19 @@ export async function GET(request: Request) {
       return apiError("Invalid or expired OAuth state. Please try connecting again.", 400);
     }
 
-    // Authenticate browser session and verify wallet matches state
-    const walletAddress = await authenticateBrowserSession(request);
-    if (!walletAddress) {
-      return apiError("Authentication required. Please sign in and try again.", 401);
-    }
-    if (!addressesEqual(walletAddress, stateValue.walletAddress)) {
+    // The state was created only after wallet authentication, is stored
+    // server-side, contains 256 bits of randomness, expires after 10 minutes,
+    // and was atomically consumed above. It is therefore the authoritative
+    // wallet binding for this OAuth round trip. A SameSite/browser policy may
+    // omit the Aven cookie on GitHub's cross-site callback, so do not require
+    // that cookie to be present. If it is present, it must still agree.
+    const browserWallet = await authenticateBrowserSession(request);
+    if (browserWallet && !addressesEqual(browserWallet, stateValue.walletAddress)) {
       return apiError("Session wallet does not match OAuth state. Please try again.", 403);
     }
+    const walletAddress = stateValue.walletAddress;
 
-    const env = getGithubEnv();
+    const env = getGithubOAuthEnv();
 
     // Exchange authorization code for access token
     const tokenResponse = await fetch("https://github.com/login/oauth/access_token", {
@@ -126,10 +130,15 @@ export async function GET(request: Request) {
       updatedAt: now,
     });
 
-    // Redirect to user profile
-    return NextResponse.redirect(
-      new URL(`/profile/${walletAddress}`, request.url).toString(),
+    // Return users to the page that initiated OAuth. This is especially
+    // important for repository setup, where both stream participants link
+    // their accounts independently.
+    const destination = new URL(
+      stateValue.returnTo ?? `/profile/${walletAddress}`,
+      request.url,
     );
+    destination.searchParams.set("github", "connected");
+    return NextResponse.redirect(destination);
   } catch (error) {
     return apiError(error);
   }

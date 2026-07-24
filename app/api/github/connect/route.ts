@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
 import { apiError } from "@/lib/api-response";
 import { createOAuthState } from "@/lib/github-identity-store";
-import { getGithubEnv } from "@/lib/github-env";
+import { getGithubOAuthEnv } from "@/lib/github-env";
 import { authenticateBrowserSession } from "@/lib/work-session-server";
 
 export const runtime = "nodejs";
@@ -20,8 +20,17 @@ export async function GET(request: Request) {
     const walletAddress = await authenticateBrowserSession(request);
     if (!walletAddress) return apiError("Authentication required.", 401);
 
-    const env = getGithubEnv();
-    const state = await createOAuthState(walletAddress);
+    const requestUrl = new URL(request.url);
+    const requestedReturnTo = requestUrl.searchParams.get("returnTo");
+    const returnTo =
+      requestedReturnTo &&
+      requestedReturnTo.startsWith("/") &&
+      !requestedReturnTo.startsWith("//") &&
+      requestedReturnTo.length <= 2_048
+        ? requestedReturnTo
+        : undefined;
+    const env = getGithubOAuthEnv();
+    const state = await createOAuthState(walletAddress, returnTo);
 
     const params = new URLSearchParams({
       client_id: env.oauthClientId,

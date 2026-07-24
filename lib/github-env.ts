@@ -1,11 +1,21 @@
 import "server-only";
 
 /**
- * GitHub App environment variables loader.
- * Call getGithubEnv() lazily — only when GitHub functionality is actually used.
+ * GitHub environment variable loaders.
+ *
+ * OAuth account linking and GitHub App repository management are separate
+ * integrations. Keep their validation separate so a developer can link an
+ * identity locally without configuring repository automation first.
+ *
  * Never prefetch or cache globally; env vars are validated on every call to
  * surface misconfiguration clearly.
  */
+
+export type GithubOAuthEnv = {
+  oauthClientId: string;
+  oauthClientSecret: string;
+  oauthRedirectUri: string;
+};
 
 export type GithubEnv = {
   appId: string;
@@ -18,13 +28,21 @@ export type GithubEnv = {
   oauthRedirectUri: string;
 };
 
-export function getGithubEnv(): GithubEnv {
-  function required(name: string): string {
-    const value = process.env[name]?.trim();
-    if (!value) throw new Error(`Missing required environment variable: ${name}`);
-    return value;
-  }
+function required(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) throw new Error(`Missing required environment variable: ${name}`);
+  return value;
+}
 
+export function getGithubOAuthEnv(): GithubOAuthEnv {
+  return {
+    oauthClientId: required("GITHUB_OAUTH_CLIENT_ID"),
+    oauthClientSecret: required("GITHUB_OAUTH_CLIENT_SECRET"),
+    oauthRedirectUri: required("GITHUB_OAUTH_REDIRECT_URI"),
+  };
+}
+
+export function getGithubEnv(): GithubEnv {
   const appId = required("GITHUB_APP_ID");
   // Normalise escaped newlines — common when setting multi-line values via
   // shell exports or CI secrets that stringify the key as a single line.
@@ -38,9 +56,7 @@ export function getGithubEnv(): GithubEnv {
   }
   const webhookSecret = required("GITHUB_WEBHOOK_SECRET");
   const avenOrg = required("GITHUB_AVEN_ORG");
-  const oauthClientId = required("GITHUB_OAUTH_CLIENT_ID");
-  const oauthClientSecret = required("GITHUB_OAUTH_CLIENT_SECRET");
-  const oauthRedirectUri = required("GITHUB_OAUTH_REDIRECT_URI");
+  const oauth = getGithubOAuthEnv();
 
   return {
     appId,
@@ -48,8 +64,6 @@ export function getGithubEnv(): GithubEnv {
     installationId,
     webhookSecret,
     avenOrg,
-    oauthClientId,
-    oauthClientSecret,
-    oauthRedirectUri,
+    ...oauth,
   };
 }

@@ -55,6 +55,13 @@ type ManagedRepository = {
   lastError?: string;
 };
 
+type GithubConnection = {
+  connected: boolean;
+  oauthConfigured?: boolean;
+  githubLogin?: string;
+  avatarUrl?: string;
+};
+
 export default function StreamDetailPage() {
   const params = useParams();
   const id = params.id as string;
@@ -76,6 +83,8 @@ export default function StreamDetailPage() {
   const [disputeReason, setDisputeReason] = useState("");
   const [repository, setRepository] = useState<ManagedRepository | null>(null);
   const [repositoryBusy, setRepositoryBusy] = useState(false);
+  const [githubConnection, setGithubConnection] = useState<GithubConnection | null>(null);
+  const [repositoryError, setRepositoryError] = useState<string | null>(null);
   const [transferDestination, setTransferDestination] = useState("");
   async function load() {
     setLoading(true);
@@ -103,14 +112,18 @@ export default function StreamDetailPage() {
       await ensureBrowserSession();
       const sessionsPath = `/api/streams/${encodeURIComponent(id)}/work-sessions`;
       const repositoryPath = `/api/streams/${encodeURIComponent(id)}/repository`;
-      const [response, repositoryResponse] = await Promise.all([
+      const [response, repositoryResponse, connectionResponse] = await Promise.all([
         fetch(sessionsPath, { cache: "no-store" }),
         fetch(repositoryPath, { cache: "no-store" }),
+        fetch("/api/github/connection", { cache: "no-store" }),
       ]);
       if (repositoryResponse.ok) {
         setRepository(await repositoryResponse.json() as ManagedRepository);
       } else if (repositoryResponse.status === 404) {
         setRepository(null);
+      }
+      if (connectionResponse.ok) {
+        setGithubConnection(await connectionResponse.json() as GithubConnection);
       }
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Failed to load work sessions.");
@@ -236,7 +249,7 @@ export default function StreamDetailPage() {
 
   async function createManagedRepository() {
     setRepositoryBusy(true);
-    setError(null);
+    setRepositoryError(null);
     try {
       await ensureBrowserSession();
       const response = await fetch(`/api/streams/${encodeURIComponent(id)}/repository`, {
@@ -244,12 +257,36 @@ export default function StreamDetailPage() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ projectTitle: stream?.title ?? `stream-${id}` }),
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? "Could not create the managed repository.");
+      const data = await response.json() as ManagedRepository & {
+        error?: string;
+        missingParty?: "sender" | "recipient";
+      };
+      if (!response.ok) {
+        if (data.missingParty === "sender") {
+          throw new Error("Connect the client GitHub account before creating the repository.");
+        }
+        if (data.missingParty === "recipient") {
+          throw new Error("The employee still needs to connect their GitHub account from this stream.");
+        }
+        throw new Error(data.error ?? "Could not create the managed repository.");
+      }
       setRepository(data as ManagedRepository);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : String(caught));
+      setRepositoryError(caught instanceof Error ? caught.message : String(caught));
     } finally {
+      setRepositoryBusy(false);
+    }
+  }
+
+  async function connectGithub() {
+    setRepositoryBusy(true);
+    setRepositoryError(null);
+    try {
+      await ensureBrowserSession();
+      const returnTo = `/stream/${encodeURIComponent(id)}`;
+      window.location.assign(`/api/github/connect?returnTo=${encodeURIComponent(returnTo)}`);
+    } catch (caught) {
+      setRepositoryError(caught instanceof Error ? caught.message : String(caught));
       setRepositoryBusy(false);
     }
   }
@@ -486,25 +523,82 @@ export default function StreamDetailPage() {
 
         {address && (isSender || isRecipient) && (
           <section className={styles["repository-panel"]}>
-            <div>
-              <span>Managed GitHub repository</span>
+            <div className={styles["repository-copy"]}>
+              <div className={styles["repository-heading"]}>
+                <div className={styles["repository-icon"]} aria-hidden="true">GH</div>
+                <div>
+                  <span>Project repository</span>
+                  <h3>Managed GitHub workspace</h3>
+                </div>
+                <small data-status={repository?.status ?? "SETUP"}>
+                  {repository?.status.replaceAll("_", " ") ?? "SETUP REQUIRED"}
+                </small>
+              </div>
               {repository ? (
-                <a href={repository.htmlUrl} target="_blank" rel="noopener noreferrer">
-                  {repository.fullName} ↗
+                <a className={styles["repository-name"]} href={repository.htmlUrl} target="_blank" rel="noopener noreferrer">
+                  {repository.fullName} <span aria-hidden="true">↗</span>
                 </a>
               ) : (
-                <strong>Not created</strong>
+                <p className={styles["repository-description"]}>
+                  The client creates a private workspace after both participants connect GitHub.
+                  The employee receives write access automatically.
+                </p>
               )}
-              <small>Status: {repository?.status.replaceAll("_", " ") ?? "AWAITING SETUP"}</small>
-              {repository?.lastError && <p>{repository.lastError}</p>}
+              <div className={styles["repository-connection"]}>
+                <span className={githubConnection?.connected ? styles["is-connected"] : ""} aria-hidden="true" />
+                <div>
+                  <small>Your GitHub account</small>
+                  <strong>
+                    {githubConnection?.connected
+                      ? `@${githubConnection.githubLogin}`
+                      : "Not connected"}
+                  </strong>
+                </div>
+              </div>
+              {(repositoryError || repository?.lastError) && (
+                <p className={styles["repository-error"]} role="alert">
+                  {repositoryError ?? repository?.lastError}
+                </p>
+              )}
+              {githubConnection?.oauthConfigured === false && (
+                <p className={styles["repository-error"]} role="alert">
+                  GitHub OAuth is not configured for this environment. Add the three
+                  GITHUB_OAUTH_* variables and restart the app.
+                </p>
+              )}
             </div>
             <div className={styles["repository-actions"]}>
+              {!githubConnection?.connected && (
+                <button
+                  type="button"
+                  disabled={repositoryBusy || githubConnection?.oauthConfigured === false}
+                  onClick={connectGithub}
+                >
+                  {repositoryBusy ? "Opening GitHub…" : "Connect GitHub"}
+                </button>
+              )}
+              {githubConnection?.connected && (
+                <button className={styles["repository-secondary"]} type="button" disabled={repositoryBusy} onClick={connectGithub}>
+                  Change account
+                </button>
+              )}
               {!repository && isSender && (
-                <button type="button" disabled={repositoryBusy} onClick={createManagedRepository}>
+                <button
+                  className={styles["repository-primary"]}
+                  type="button"
+                  disabled={repositoryBusy || !githubConnection?.connected}
+                  onClick={createManagedRepository}
+                >
                   {repositoryBusy ? "Creating…" : "Create repository"}
                 </button>
               )}
-              {!repository && isRecipient && <small>The stream sender creates the managed repository.</small>}
+              {!repository && isRecipient && (
+                <small>
+                  {githubConnection?.connected
+                    ? "Connected. The client can now create the repository."
+                    : "Connect the employee account, then ask the client to create the repository."}
+                </small>
+              )}
               {repository && isSender && (repository.status === "ACTIVE" || repository.status === "TRANSFER_FAILED") && (
                 <>
                   <input
@@ -531,7 +625,6 @@ export default function StreamDetailPage() {
                   {repositoryBusy ? "Refreshing…" : "Refresh transfer status"}
                 </button>
               )}
-              <a href="/api/github/connect">Connect or update GitHub account</a>
             </div>
           </section>
         )}

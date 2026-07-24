@@ -61,6 +61,7 @@ export async function POST(request: Request, context: Params) {
         {
           error: "The stream sender has not linked a GitHub account.",
           action: "/api/github/connect",
+          missingParty: "sender",
         },
         { status: 422 },
       );
@@ -70,6 +71,7 @@ export async function POST(request: Request, context: Params) {
         {
           error: "The stream recipient has not linked a GitHub account.",
           action: "/api/github/connect",
+          missingParty: "recipient",
         },
         { status: 422 },
       );

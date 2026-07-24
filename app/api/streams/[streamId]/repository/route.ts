@@ -19,6 +19,22 @@ function slugify(text: string): string {
 
 type Params = { params: Promise<{ streamId: string }> };
 
+async function configureCollaborators(
+  fullName: string,
+  clientLogin: string,
+  workerLogin: string,
+): Promise<void> {
+  if (clientLogin.toLowerCase() === workerLogin.toLowerCase()) {
+    await addCollaborator(fullName, workerLogin, "push");
+    return;
+  }
+
+  await Promise.all([
+    addCollaborator(fullName, workerLogin, "push"),
+    addCollaborator(fullName, clientLogin, "pull"),
+  ]);
+}
+
 /**
  * POST /api/streams/[streamId]/repository
  *
@@ -79,10 +95,11 @@ export async function POST(request: Request, context: Params) {
 
     if (existing) {
       try {
-        await Promise.all([
-          addCollaborator(existing.fullName, workerIdentity.githubLogin, "push"),
-          addCollaborator(existing.fullName, clientIdentity.githubLogin, "pull"),
-        ]);
+        await configureCollaborators(
+          existing.fullName,
+          clientIdentity.githubLogin,
+          workerIdentity.githubLogin,
+        );
         const active = {
           ...existing,
           status: "ACTIVE" as const,
@@ -142,10 +159,11 @@ export async function POST(request: Request, context: Params) {
 
     await putRepository(record);
     try {
-      await Promise.all([
-        addCollaborator(repo.fullName, workerIdentity.githubLogin, "push"),
-        addCollaborator(repo.fullName, clientIdentity.githubLogin, "pull"),
-      ]);
+      await configureCollaborators(
+        repo.fullName,
+        clientIdentity.githubLogin,
+        workerIdentity.githubLogin,
+      );
     } catch (error) {
       await putRepository({
         ...record,

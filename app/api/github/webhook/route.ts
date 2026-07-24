@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { getRepository, putRepository, findStreamIdByRepoId } from "@/lib/github-repository-store";
-import { getGithubEnv } from "@/lib/github-env";
+import { getGithubWebhookEnv } from "@/lib/github-env";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     const event = request.headers.get("x-github-event") ?? "";
 
     // Verify HMAC-SHA256 signature
-    const env = getGithubEnv();
+    const env = getGithubWebhookEnv();
     const expected = `sha256=${createHmac("sha256", env.webhookSecret).update(rawBody).digest("hex")}`;
 
     // Use timing-safe comparison to prevent timing attacks

@@ -16,7 +16,7 @@ import "server-only";
 
 import { App } from "@octokit/app";
 import { Octokit } from "@octokit/rest";
-import { getGithubEnv } from "./github-env";
+import { getGithubAppEnv } from "./github-env";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -56,6 +56,91 @@ export type GithubCompare = {
   };
 };
 
+export class GithubIntegrationError extends Error {
+  readonly httpStatus: number;
+
+  constructor(message: string, httpStatus = 502) {
+    super(message);
+    this.name = "GithubIntegrationError";
+    this.httpStatus = httpStatus;
+  }
+}
+
+function githubStatus(error: unknown): number | undefined {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "status" in error &&
+    typeof error.status === "number"
+  ) {
+    return error.status;
+  }
+  return undefined;
+}
+
+function githubMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function githubFailure(error: unknown, operation: string): GithubIntegrationError {
+  if (error instanceof GithubIntegrationError) return error;
+
+  const message = githubMessage(error);
+  const status = githubStatus(error);
+  const lower = message.toLowerCase();
+
+  if (
+    lower.includes("private key") ||
+    lower.includes("decoder routines") ||
+    lower.includes("openssl") ||
+    lower.includes("pem")
+  ) {
+    return new GithubIntegrationError(message, 503);
+  }
+  if (lower.includes("missing required environment variable") || lower.includes("placeholder")) {
+    return new GithubIntegrationError(`GitHub configuration error: ${message}`, 503);
+  }
+  if (status === 401) {
+    return new GithubIntegrationError(
+      `GitHub App authentication failed while trying to ${operation}. Verify GITHUB_APP_ID and upload a newly generated private key that belongs to the same GitHub App.`,
+      502,
+    );
+  }
+  if (status === 404) {
+    return new GithubIntegrationError(
+      `GitHub could not find the app installation while trying to ${operation}. Verify GITHUB_APP_INSTALLATION_ID belongs to the configured App ID and that the app is still installed on GITHUB_AVEN_ORG.`,
+      502,
+    );
+  }
+  if (status === 403) {
+    return new GithubIntegrationError(
+      `GitHub denied permission to ${operation}. Verify the app installation has Repository administration: read and write, approve any pending permission update, and confirm the organization permits private repository creation and outside collaborators.`,
+      502,
+    );
+  }
+  if (status === 422) {
+    return new GithubIntegrationError(
+      `GitHub rejected the request to ${operation}. Check for an existing repository with the same name, organization repository policies, outside-collaborator restrictions, or invitation limits.`,
+      422,
+    );
+  }
+
+  return new GithubIntegrationError(
+    `GitHub failed to ${operation}${status ? ` (HTTP ${status})` : ""}: ${message}`,
+  );
+}
+
+async function githubOperation<T>(
+  operation: string,
+  run: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    throw githubFailure(error, operation);
+  }
+}
+
 // ─── Installation client factory ─────────────────────────────────────────────
 
 /**
@@ -69,16 +154,18 @@ async function getInstallationOctokit(): Promise<Octokit> {
 }
 
 async function createInstallationToken(): Promise<string> {
-  const env = getGithubEnv();
-  const app = new App({
-    appId: env.appId,
-    privateKey: env.privateKey,
+  return githubOperation("authenticate the configured installation", async () => {
+    const env = getGithubAppEnv();
+    const app = new App({
+      appId: env.appId,
+      privateKey: env.privateKey,
+    });
+    const { data } = await app.octokit.request(
+      "POST /app/installations/{installation_id}/access_tokens",
+      { installation_id: env.installationId },
+    );
+    return data.token;
   });
-  const { data } = await app.octokit.request(
-    "POST /app/installations/{installation_id}/access_tokens",
-    { installation_id: env.installationId },
-  );
-  return data.token;
 }
 
 // ─── Exported service functions ───────────────────────────────────────────────
@@ -91,24 +178,26 @@ export async function createRepository(options: {
   name: string;
   description: string;
 }): Promise<GithubRepo> {
-  const env = getGithubEnv();
+  const env = getGithubAppEnv();
   const octokit = await getInstallationOctokit();
-  const { data } = await octokit.repos.createInOrg({
-    org: env.avenOrg,
-    name: options.name,
-    description: options.description,
-    private: true,
-    auto_init: false,
+  return githubOperation("create the managed organization repository", async () => {
+    const { data } = await octokit.repos.createInOrg({
+      org: env.avenOrg,
+      name: options.name,
+      description: options.description,
+      private: true,
+      auto_init: false,
+    });
+    return {
+      id: data.id,
+      fullName: data.full_name,
+      htmlUrl: data.html_url,
+      cloneUrl: data.clone_url,
+      sshUrl: data.ssh_url,
+      defaultBranch: data.default_branch,
+      private: data.private,
+    };
   });
-  return {
-    id: data.id,
-    fullName: data.full_name,
-    htmlUrl: data.html_url,
-    cloneUrl: data.clone_url,
-    sshUrl: data.ssh_url,
-    defaultBranch: data.default_branch,
-    private: data.private,
-  };
 }
 
 export async function getRepository(fullName: string): Promise<GithubRepo | null> {
@@ -127,7 +216,7 @@ export async function getRepository(fullName: string): Promise<GithubRepo | null
     };
   } catch (err: any) {
     if (err?.status === 404) return null;
-    throw err;
+    throw githubFailure(err, "read the managed repository");
   }
 }
 
@@ -138,7 +227,9 @@ export async function addCollaborator(
 ): Promise<void> {
   const octokit = await getInstallationOctokit();
   const [owner, repo] = fullName.split("/");
-  await octokit.repos.addCollaborator({ owner, repo, username, permission });
+  await githubOperation(`invite @${username} to the managed repository`, () =>
+    octokit.repos.addCollaborator({ owner, repo, username, permission }),
+  );
 }
 
 export async function removeCollaborator(
@@ -147,13 +238,17 @@ export async function removeCollaborator(
 ): Promise<void> {
   const octokit = await getInstallationOctokit();
   const [owner, repo] = fullName.split("/");
-  await octokit.repos.removeCollaborator({ owner, repo, username });
+  await githubOperation(`remove @${username} from the managed repository`, () =>
+    octokit.repos.removeCollaborator({ owner, repo, username }),
+  );
 }
 
 export async function listBranches(fullName: string): Promise<string[]> {
   const octokit = await getInstallationOctokit();
   const [owner, repo] = fullName.split("/");
-  const { data } = await octokit.repos.listBranches({ owner, repo, per_page: 100 });
+  const { data } = await githubOperation("list repository branches", () =>
+    octokit.repos.listBranches({ owner, repo, per_page: 100 }),
+  );
   return data.map((b) => b.name);
 }
 
@@ -165,7 +260,7 @@ export async function commitExists(fullName: string, sha: string): Promise<boole
     return true;
   } catch (err: any) {
     if (err?.status === 404 || err?.status === 422) return false;
-    throw err;
+    throw githubFailure(err, "verify a repository commit");
   }
 }
 
@@ -177,7 +272,7 @@ export async function branchExists(fullName: string, branch: string): Promise<bo
     return true;
   } catch (err: any) {
     if (err?.status === 404) return false;
-    throw err;
+    throw githubFailure(err, "verify a repository branch");
   }
 }
 
@@ -189,7 +284,7 @@ export async function getBranchHead(fullName: string, branch: string): Promise<s
     return data.commit.sha;
   } catch (err: any) {
     if (err?.status === 404) return null;
-    throw err;
+    throw githubFailure(err, "read a repository branch");
   }
 }
 
@@ -200,11 +295,13 @@ export async function compareCommits(
 ): Promise<GithubCompare> {
   const octokit = await getInstallationOctokit();
   const [owner, repo] = fullName.split("/");
-  const { data } = await octokit.repos.compareCommitsWithBasehead({
-    owner,
-    repo,
-    basehead: `${base}...${head}`,
-  });
+  const { data } = await githubOperation("compare repository commits", () =>
+    octokit.repos.compareCommitsWithBasehead({
+      owner,
+      repo,
+      basehead: `${base}...${head}`,
+    }),
+  );
 
   const commits = (data.commits ?? []).map((c) => ({
     sha: c.sha,
@@ -248,15 +345,19 @@ export async function transferRepository(
 ): Promise<void> {
   const octokit = await getInstallationOctokit();
   const [owner, repo] = fullName.split("/");
-  await octokit.repos.transfer({ owner, repo, new_owner: newOwner });
+  await githubOperation(`transfer the repository to ${newOwner}`, () =>
+    octokit.repos.transfer({ owner, repo, new_owner: newOwner }),
+  );
 }
 
 export async function getRepositoryOwner(repoId: number): Promise<string> {
   const octokit = await getInstallationOctokit();
   // Use the /repositories/{id} endpoint which survives transfers.
-  const { data } = await (octokit as any).request("GET /repositories/{repository_id}", {
-    repository_id: repoId,
-  });
+  const { data } = await githubOperation("check repository ownership", () =>
+    octokit.request("GET /repositories/{repository_id}", {
+      repository_id: repoId,
+    }),
+  );
   return data.owner.login as string;
 }
 

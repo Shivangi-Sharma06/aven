@@ -1,5 +1,7 @@
 import "server-only";
 
+import { normalizeGithubPrivateKey } from "./github-private-key";
+
 /**
  * GitHub environment variable loaders.
  *
@@ -17,53 +19,100 @@ export type GithubOAuthEnv = {
   oauthRedirectUri: string;
 };
 
-export type GithubEnv = {
+export type GithubAppEnv = {
   appId: string;
   privateKey: string;
   installationId: number;
-  webhookSecret: string;
   avenOrg: string;
-  oauthClientId: string;
-  oauthClientSecret: string;
-  oauthRedirectUri: string;
 };
+
+export type GithubWebhookEnv = {
+  webhookSecret: string;
+};
+
+export type GithubEnv = GithubAppEnv & GithubWebhookEnv & GithubOAuthEnv;
+
+function rejectPlaceholder(name: string, value: string): string {
+  if (/^(your_|replace_|changeme|todo)/i.test(value)) {
+    throw new Error(`${name} still contains a placeholder value.`);
+  }
+  return value;
+}
 
 function required(name: string): string {
   const value = process.env[name]?.trim();
   if (!value) throw new Error(`Missing required environment variable: ${name}`);
+  return rejectPlaceholder(name, value);
+}
+
+function positiveInteger(name: string): number {
+  const raw = required(name);
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new Error(`${name} must be a positive integer.`);
+  }
   return value;
 }
 
-export function getGithubOAuthEnv(): GithubOAuthEnv {
+function callbackUrl(value: string): string {
+  try {
+    const parsed = new URL(value);
+    if (!["http:", "https:"].includes(parsed.protocol) || parsed.username || parsed.password) {
+      throw new Error();
+    }
+    return parsed.toString();
+  } catch {
+    throw new Error("GITHUB_OAUTH_REDIRECT_URI must be a valid HTTP(S) URL.");
+  }
+}
+
+export function getGithubAppEnv(): GithubAppEnv {
+  const appId = required("GITHUB_APP_ID");
+  if (!/^\d+$/.test(appId)) {
+    throw new Error("GITHUB_APP_ID must be the numeric App ID, not the Client ID.");
+  }
+
+  const avenOrg = required("GITHUB_AVEN_ORG");
+  if (
+    avenOrg.length > 39 ||
+    !/^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$/.test(avenOrg)
+  ) {
+    throw new Error("GITHUB_AVEN_ORG must be the GitHub organization login, not a URL.");
+  }
+
   return {
-    oauthClientId: required("GITHUB_OAUTH_CLIENT_ID"),
+    appId,
+    privateKey: normalizeGithubPrivateKey(required("GITHUB_APP_PRIVATE_KEY")),
+    installationId: positiveInteger("GITHUB_APP_INSTALLATION_ID"),
+    avenOrg,
+  };
+}
+
+export function getGithubWebhookEnv(): GithubWebhookEnv {
+  return {
+    webhookSecret: required("GITHUB_WEBHOOK_SECRET"),
+  };
+}
+
+export function getGithubOAuthEnv(): GithubOAuthEnv {
+  const oauthClientId = required("GITHUB_OAUTH_CLIENT_ID");
+  if (!/^(Iv|Ov)/.test(oauthClientId)) {
+    throw new Error(
+      "GITHUB_OAUTH_CLIENT_ID must be copied exactly from GitHub and normally starts with capital Iv or Ov.",
+    );
+  }
+
+  return {
+    oauthClientId,
     oauthClientSecret: required("GITHUB_OAUTH_CLIENT_SECRET"),
-    oauthRedirectUri: required("GITHUB_OAUTH_REDIRECT_URI"),
+    oauthRedirectUri: callbackUrl(required("GITHUB_OAUTH_REDIRECT_URI")),
   };
 }
 
 export function getGithubEnv(): GithubEnv {
-  const appId = required("GITHUB_APP_ID");
-  // Normalise escaped newlines — common when setting multi-line values via
-  // shell exports or CI secrets that stringify the key as a single line.
-  const privateKey = required("GITHUB_APP_PRIVATE_KEY").replace(/\\n/g, "\n");
-  const installationIdRaw = required("GITHUB_APP_INSTALLATION_ID");
-  const installationId = Number(installationIdRaw);
-  if (!Number.isFinite(installationId) || installationId <= 0) {
-    throw new Error(
-      `GITHUB_APP_INSTALLATION_ID must be a positive integer, got: ${installationIdRaw}`,
-    );
-  }
-  const webhookSecret = required("GITHUB_WEBHOOK_SECRET");
-  const avenOrg = required("GITHUB_AVEN_ORG");
-  const oauth = getGithubOAuthEnv();
-
   return {
-    appId,
-    privateKey,
-    installationId,
-    webhookSecret,
-    avenOrg,
-    ...oauth,
+    ...getGithubAppEnv(),
+    ...getGithubWebhookEnv(),
+    ...getGithubOAuthEnv(),
   };
 }

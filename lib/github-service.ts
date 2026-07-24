@@ -64,19 +64,11 @@ export type GithubCompare = {
  * never persisted anywhere — each call generates a fresh token.
  */
 async function getInstallationOctokit(): Promise<Octokit> {
-  const env = getGithubEnv();
-  const app = new App({
-    appId: env.appId,
-    privateKey: env.privateKey,
-  });
-  const installationOctokit = await app.getInstallationOctokit(env.installationId);
-  // Wrap in a plain Octokit so callers get a stable, typed interface.
-  return installationOctokit as unknown as Octokit;
+  const token = await createInstallationToken();
+  return new Octokit({ auth: token });
 }
 
-// ─── Exported service functions ───────────────────────────────────────────────
-
-export async function getInstallationToken(): Promise<string> {
+async function createInstallationToken(): Promise<string> {
   const env = getGithubEnv();
   const app = new App({
     appId: env.appId,
@@ -87,6 +79,12 @@ export async function getInstallationToken(): Promise<string> {
     { installation_id: env.installationId },
   );
   return data.token;
+}
+
+// ─── Exported service functions ───────────────────────────────────────────────
+
+export async function getInstallationToken(): Promise<string> {
+  return createInstallationToken();
 }
 
 export async function createRepository(options: {

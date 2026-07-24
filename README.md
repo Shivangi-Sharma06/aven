@@ -162,6 +162,61 @@ Use this callback locally:
 http://localhost:3000/api/github/callback
 ```
 
+### Managed repository onboarding
+
+Both stream participants connect their own GitHub identity from the stream page.
+After both accounts are connected, the client creates the private managed
+repository in the configured Aven organization.
+
+- The employee receives write access.
+- The client receives read access while work is in progress.
+- When separate GitHub accounts are used, GitHub sends the employee a collaborator
+  invitation through GitHub notifications or email. The employee must accept it
+  before cloning the private repository.
+- When the same GitHub account is used for both roles during testing, GitHub does
+  not send a second invitation; that account receives the higher write permission.
+
+The employee can open the received stream from the dashboard. Its repository panel
+shows the repository name, GitHub link, HTTPS and SSH clone URLs, and copyable setup
+commands. A browser cannot run `git clone` on the employee's computer, so cloning
+remains an explicit local action:
+
+```bash
+git clone <repository-url>
+cd <repository-name>
+npx aven-stellar start --stream <stream-id> --dashboard <aven-url>
+```
+
+For each work period, the employee commits and pushes the work before stopping the
+session:
+
+```bash
+git add .
+git commit -m "Describe completed work"
+git push
+npx aven-stellar stop
+```
+
+For final delivery, every branch being delivered must exist on the managed GitHub
+repository at the exact local head commit before the final report is submitted:
+
+```bash
+git push
+npx aven-stellar stop --ended
+```
+
+The client reviews the final session, approves it, and the employee signs the
+Stellar withdrawal. The remaining escrow is released and the stream becomes
+completed. Repository transfer eligibility is checked separately and requires the
+released final session, its Stellar transaction hash, and unchanged verified branch
+heads.
+
+The application cannot currently determine whether a collaborator invitation was
+accepted without additional GitHub invitation API support. Invitation instructions
+are therefore advisory. GitHub repository ownership transfer may also require an
+Aven organization administrator to complete the transfer manually in GitHub until
+the transfer-specific user authorization flow is implemented.
+
 ## Work-session CLI
 
 [`aven-stellar`](https://www.npmjs.com/package/aven-stellar) is the published

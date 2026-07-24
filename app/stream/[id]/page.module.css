@@ -692,3 +692,246 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ============================================================
+   Copy button
+   ============================================================ */
+
+.copy-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border: 1px solid #3b3b3b;
+  background: #1a1a1a;
+  color: #aaa;
+  font: 600 10px var(--font-mono), monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.copy-btn:hover {
+  border-color: #666;
+  color: #f5f5f5;
+}
+
+.copy-btn[data-copy-state="copied"] {
+  border-color: #245c40;
+  color: #66d39b;
+}
+
+.copy-btn[data-copy-state="error"] {
+  border-color: #9b1c1c;
+  color: #ff9e9e;
+}
+
+/* ============================================================
+   Employee repository details (inside .repository-copy)
+   ============================================================ */
+
+.repo-employee-details {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+  padding-top: 14px;
+  border-top: 1px solid #292929;
+}
+
+.repo-detail-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.repo-detail-label {
+  color: #888;
+  font: 600 10px var(--font-mono), monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.repo-status-badge {
+  border: 1px solid #3b3b3b;
+  padding: 4px 8px;
+  color: #c7c7c7;
+  font: 600 10px var(--font-mono), monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.repo-status-badge[data-status="ACTIVE"] {
+  border-color: #245c40;
+  color: #66d39b;
+}
+
+.repo-open-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 14px;
+  border: 1px solid #4a4a4a;
+  background: #202020;
+  color: #f5f5f5;
+  font: 600 11px var(--font-mono), monospace;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.repo-open-btn:hover {
+  border-color: #888;
+  background: #2a2a2a;
+}
+
+.repo-clone-row {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.repo-clone-url {
+  overflow-wrap: anywhere;
+  color: #d4d4d4;
+  font: 12px var(--font-mono), monospace;
+}
+
+.repo-invite-note {
+  margin: 4px 0 0;
+  color: #888;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+/* ============================================================
+   Employee onboarding checklist panel
+   ============================================================ */
+
+.onboarding-panel {
+  margin: 28px 0;
+  padding: 22px;
+  border: 1px solid #292929;
+  background: linear-gradient(135deg, #111111 0%, #0a0a0a 100%);
+  color: #f7f7f5;
+}
+
+.onboarding-heading {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+
+.onboarding-eyebrow {
+  color: #666;
+  font: 600 10px var(--font-mono), monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.onboarding-title {
+  margin: 0;
+  font-family: var(--font-space), sans-serif;
+  font-size: 20px;
+  letter-spacing: -0.02em;
+  color: #f5f5f5;
+}
+
+.onboarding-list {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding-left: 22px;
+  counter-reset: onboarding-step;
+  list-style: decimal;
+}
+
+.onboarding-list > li {
+  display: grid;
+  gap: 8px;
+  color: #ccc;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.onboarding-done {
+  color: #66d39b;
+  font: 600 11px var(--font-mono), monospace;
+  letter-spacing: 0.06em;
+}
+
+.onboarding-link-btn {
+  display: inline-flex;
+  padding: 7px 14px;
+  border: 1px solid #4a4a4a;
+  background: #202020;
+  color: #f5f5f5;
+  font: 600 11px var(--font-mono), monospace;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.onboarding-link-btn:hover {
+  border-color: #888;
+  background: #2a2a2a;
+}
+
+.onboarding-step-label {
+  display: block;
+  color: #aaa;
+  font: 600 11px var(--font-mono), monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.onboarding-cmd-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid #2a2a2a;
+  background: #0d0d0d;
+}
+
+.onboarding-cmd {
+  overflow-wrap: anywhere;
+  color: #e8e8e8;
+  font: 12px var(--font-mono), monospace;
+}
+
+.onboarding-final-note {
+  margin: 4px 0 8px;
+  padding: 10px 12px;
+  border-left: 2px solid #7c3aed;
+  background: rgba(124, 58, 237, 0.08);
+  color: #bbb;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.onboarding-final-note code {
+  color: #d4d4d4;
+  font-family: var(--font-mono), monospace;
+}
+
+/* ============================================================
+   Mobile overrides for new panels
+   ============================================================ */
+
+@media (max-width: 767px) {
+  .repo-clone-row {
+    grid-template-columns: 1fr;
+  }
+
+  .onboarding-cmd-row {
+    grid-template-columns: 1fr;
+  }
+
+  .repo-clone-row .copy-btn,
+  .onboarding-cmd-row .copy-btn {
+    justify-self: start;
+  }
+}

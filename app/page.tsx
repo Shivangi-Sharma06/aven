@@ -147,7 +147,7 @@ export default function LandingPage() {
                   connect delivery to settlement without rebuilding your product.
                 </p>
                 <div className="developer-hub__actions">
-                  <a href="https://heyaven09.mintlify.site/" target="_blank" rel="noopener noreferrer">
+                  <a href="https://aven-docs.mintlify.site/" target="_blank" rel="noopener noreferrer">
                     READ THE DOCS ↗
                   </a>
                   <Link href="/dashboard">OPEN APP →</Link>
@@ -169,20 +169,18 @@ export default function LandingPage() {
 
       <footer className="home-footer">
         <div className="home-footer__brand">
-          <svg viewBox="0 0 256 256" aria-hidden="true">
-            <path d="M256 256H128L0 128h128ZM256 128H128L0 0h128Z" />
-          </svg>
+          <img src="/icon.png" alt="Aven logo" className="home-footer__logo" />
           AVEN
         </div>
         <div className="home-footer__tagline">PAY FOR PROGRESS · KEEP THE PROOF</div>
         <div className="home-footer__divider" />
         <div className="home-footer__links">
-          <a href="https://x.com/avenprotocol" target="_blank" rel="noopener noreferrer">𝕏 / TWITTER</a>
+          <a href="https://x.com/heyaven09" target="_blank" rel="noopener noreferrer">𝕏 / TWITTER</a>
           <a href="https://github.com/Shivangi-Sharma06/aven" target="_blank" rel="noopener noreferrer">GITHUB REPO</a>
-          <a href="https://heyaven09.mintlify.site/" target="_blank" rel="noopener noreferrer">DOCS ↗</a>
+          <a href="https://aven-docs.mintlify.site/" target="_blank" rel="noopener noreferrer">DOCS ↗</a>
         </div>
         <div className="home-footer__devs">
-          Built by Shivangi Sharma & Kartikey Juyal
+          Built by <a href="https://x.com/shivangi1181" target="_blank" rel="noopener noreferrer">Shivangi Sharma</a> & <a href="https://x.com/kartikeyelf" target="_blank" rel="noopener noreferrer">Kartikey Juyal</a>
         </div>
       </footer>
     </div>

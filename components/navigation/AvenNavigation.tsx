@@ -29,9 +29,7 @@ export default function AvenNavigation() {
   return (
     <nav className="aven-nav" aria-label="Primary navigation">
       <button className="aven-nav__brand" onClick={() => scrollToTarget('hero')}>
-        <svg viewBox="0 0 256 256" aria-hidden="true">
-          <path d="M256 256H128L0 128h128ZM256 128H128L0 0h128Z" />
-        </svg>
+        <img src="/icon.png" alt="Aven logo" className="aven-nav__logo" />
         <span>AVEN</span>
       </button>
 
@@ -43,7 +41,7 @@ export default function AvenNavigation() {
         ))}
       </div>
 
-      <a href="https://heyaven09.mintlify.site/" target="_blank" rel="noopener noreferrer" className="aven-nav__launch">
+      <a href="https://aven-docs.mintlify.site/" target="_blank" rel="noopener noreferrer" className="aven-nav__launch">
         DOCS ↗
       </a>
 

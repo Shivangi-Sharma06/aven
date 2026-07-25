@@ -146,9 +146,11 @@
   letter-spacing: -0.02em;
 }
 
-.aven-home .aven-nav__brand svg {
-  width: 20px;
-  height: 20px;
+.aven-home .aven-nav__logo {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  object-fit: contain;
 }
 
 .aven-home .aven-nav__links {
@@ -590,10 +592,21 @@
   letter-spacing: -0.02em;
 }
 
-.home-footer__brand svg {
-  width: 22px;
-  height: 22px;
-  fill: currentColor;
+.home-footer__logo {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  object-fit: contain;
+}
+
+.home-footer__devs a {
+  color: rgba(255, 255, 255, 0.5);
+  text-decoration: none;
+  transition: color 180ms ease;
+}
+
+.home-footer__devs a:hover {
+  color: #fff;
 }
 
 .home-footer__tagline {

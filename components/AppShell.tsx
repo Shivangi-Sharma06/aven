@@ -7,7 +7,6 @@ import {
   PlusCircle,
   User,
   ShieldCheck,
-  Award,
   BookOpen,
   Wallet,
   LogOut,
@@ -48,12 +47,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <ShieldCheck size={20} />
           <span>Verify</span>
         </Link>
-        <Link href="/agents" className={`nav-item ${pathname === "/agents" ? "active" : ""}`}>
-          <Award size={20} />
-          <span>Reputation</span>
-        </Link>
         <a
-          href="https://heyaven09.mintlify.site/"
+          href="https://aven-docs.mintlify.site/"
           target="_blank"
           rel="noopener noreferrer"
           className="nav-item"

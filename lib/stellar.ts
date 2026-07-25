@@ -345,6 +345,16 @@ export async function disconnectWallet(): Promise<void> {
 
 // ─── Stream contract ──────────────────────────────────────────────────────────
 
+export async function getXlmBalance(address: string): Promise<number> {
+  try {
+    const account = await horizon.loadAccount(address);
+    const native = account.balances.find((b) => b.asset_type === "native");
+    return native ? parseFloat(native.balance) : 0;
+  } catch {
+    return 0;
+  }
+}
+
 export async function createStream(
   data: CreateStreamInput,
   callerAddress: string
@@ -359,6 +369,17 @@ export async function createStream(
   );
   if (computedRate <= 0) {
     throw new Error("Amount and duration produce a rate below contract precision.");
+  }
+
+  // Check sender has sufficient balance before submitting
+  if (data.asset === "XLM") {
+    const balance = await getXlmBalance(callerAddress);
+    const feeReserve = 2; // ~2 XLM for fees + minimum balance
+    if (balance < data.totalAmount + feeReserve) {
+      throw new Error(
+        `Insufficient XLM balance. You have ${balance.toFixed(2)} XLM but need at least ${(data.totalAmount + feeReserve).toFixed(2)} XLM (${data.totalAmount} for escrow + ~${feeReserve} for fees).`
+      );
+    }
   }
 
   const client = getStreamClient(callerAddress);

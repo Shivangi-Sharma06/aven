@@ -464,6 +464,31 @@ export async function disputeReviewedWithdrawal(
   await tx.signAndSend();
 }
 
+/**
+ * Call the legacy request_withdrawal on the stream contract from the recipient's wallet.
+ * This bypasses the verifier path (which requires a configured verifier on the contract).
+ * The recipient must sign the transaction via Freighter.
+ *
+ * @throws if the contract has a verifier configured (VerificationRequired) or if the
+ *         withdrawal already exists or the amount exceeds the unreserved escrow.
+ */
+export async function requestWithdrawalLegacy(
+  streamId: string,
+  recipientAddress: string,
+  requestId: string,
+  amount: bigint,
+): Promise<{ txHash: string }> {
+  const client = getStreamClient(recipientAddress);
+  const tx = await client.request_withdrawal({
+    stream_id: BigInt(streamId),
+    recipient: recipientAddress,
+    request_id: requestId,
+    amount: amount,
+  });
+  const sent = await tx.signAndSend();
+  return { txHash: transactionHash(sent) };
+}
+
 export async function withdrawReviewed(
   streamId: string,
   recipientAddress: string,

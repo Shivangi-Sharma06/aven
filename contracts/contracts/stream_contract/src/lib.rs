@@ -371,6 +371,9 @@ impl StreamContract {
         }
         log!(&env, "create_stream: approval timeout check passed");
 
+        // Legacy checkpoint parameters — accepted silently for backward compatibility.
+        log!(&env, "create_stream: checkpoint_count={} (ignored), withdrawable_cap_percent={} (ignored)", checkpoint_count, withdrawable_cap_percent);
+
         let rate_per_ledger = rate_per_second
             .checked_mul(LEDGERS_PER_UNIT)
             .ok_or(Error::Overflow)?;
@@ -387,7 +390,6 @@ impl StreamContract {
         }
         log!(&env, "create_stream: deposit >= required, proceeding to token transfer");
 
-        // Attempt the token transfer. If this fails, the error propagates from the SAC.
         log!(&env, "create_stream: calling token.transfer(sender={}, contract={}, amount={})", sender, env.current_contract_address(), total_deposited);
         token::Client::new(&env, &asset).transfer(
             &sender,
@@ -407,10 +409,6 @@ impl StreamContract {
         );
         log!(&env, "create_stream: assigned stream id={}", id);
 
-        // These three legacy fields remain in StreamRecord so existing clients
-        // can decode it, but the npm work-session flow is the only unlock path.
-        let _ = checkpoint_count;
-        let _ = withdrawable_cap_percent;
         let record = StreamRecord {
             id,
             sender: sender.clone(),

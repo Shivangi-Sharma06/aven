@@ -16,8 +16,10 @@ import {
   approveReviewedWithdrawal,
   disputeReviewedWithdrawal,
   withdrawReviewed,
+  requestWithdrawalLegacy,
   StreamObject,
 } from "@/lib/stellar";
+import { toContractAmount } from "@/lib/contracts";
 import styles from "./page.module.css";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -222,17 +224,27 @@ export default function StreamDetailPage() {
     const path = `/api/work-sessions/${encodeURIComponent(sessionId)}/${action}`;
     setSessionAction(`${sessionId}:${action}`);
     setError(null);
+    let txHash: string | undefined;
     try {
       const session = sessions.find((candidate) => candidate.id === sessionId);
       if (address && session) {
         if (action === "approve") await approveReviewedWithdrawal(id, address, session.id);
         if (action === "dispute") await disputeReviewedWithdrawal(id, address, session.id);
+        if (action === "request-withdrawal") {
+          // Call the legacy request_withdrawal on-chain via the recipient's wallet first.
+          // This bypasses the verifier path which requires a configured verifier on the contract.
+          const requestedAmount = session.requestedAmount ?? session.report?.paymentRequest.requestedAmount ?? "0";
+          const amountUnits = toContractAmount(Number(requestedAmount));
+          const result = await requestWithdrawalLegacy(id, address, session.id, amountUnits);
+          txHash = result.txHash;
+          // The body sent to the server will include the txHash.
+        }
       }
       await ensureBrowserSession();
       const response = await fetch(path, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(body ?? {}),
+        body: JSON.stringify(txHash ? { ...(body ?? {}), txHash } : (body ?? {})),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Work-session action failed.");

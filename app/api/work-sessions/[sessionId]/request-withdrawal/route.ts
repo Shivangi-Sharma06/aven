@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { apiError } from "@/lib/api-response";
 import { getSession, putSession } from "@/lib/session-store";
-import { recordVerifiedWork } from "@/lib/work-stream-verifier";
+import { getStreamClient } from "@/lib/contracts";
 import {
   addTimelineEvent,
   addressesEqual,
@@ -10,6 +10,7 @@ import {
   calculateSettlementSeconds,
   formatAmountUnits,
   getAvailableUnits,
+  getOnchainStream,
   getSessionOnchainStream,
   parseAmountUnits,
 } from "@/lib/work-session-server";
@@ -81,20 +82,24 @@ export async function POST(
       };
     }
     session.requestedAmount = formatAmountUnits(requestedUnits);
-    // Create the on-chain withdrawal via the verifier (verify_work).
-    // This uses the server's verifier keypair, so the recipient does not need
-    // to call the legacy request_withdrawal from the frontend.
-    const verification = await recordVerifiedWork({
-      streamId: session.streamId,
-      sessionId: session.id,
-      amountUnits: requestedUnits,
-      report: session.report,
-      onchainActiveSeconds: session.report.session.activeSeconds,
-      workStartLedger: 0,
-    });
-    session.verifierTxHash = verification.transactionHash;
-    session.reportDigest = verification.reportDigest;
-    const reviewDeadlineLedger = verification.reviewDeadlineLedger;
+    // The on-chain withdrawal was already created by the verifier during
+    // session submission (verify_work). Read the existing record to get
+    // the deadline_ledger. Use the anonymous address for read-only simulation.
+    let reviewDeadlineLedger: number;
+    try {
+      const anonAddr = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
+      const client = getStreamClient(anonAddr);
+      const withdrawalRecord = await client.get_withdrawal({
+        stream_id: BigInt(session.streamId),
+        request_id: session.id,
+      });
+      const claim = ((withdrawalRecord.result as any)?.unwrap?.() ?? withdrawalRecord.result) as any;
+      reviewDeadlineLedger = Number(claim?.deadline_ledger ?? 0);
+    } catch {
+      // If we can't read the on-chain record, estimate from the stream's timeout.
+      const fallbackStream = await getOnchainStream(session.streamId);
+      reviewDeadlineLedger = fallbackStream?.approvalTimeoutLedgers ?? 50;
+    }
     session.reviewDeadlineLedger = reviewDeadlineLedger;
     addTimelineEvent(
       session,

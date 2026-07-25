@@ -25,17 +25,20 @@
     "@upstash/redis": "^1.38.0",
     "@vercel/analytics": "^2.0.1",
     "animejs": "^3.2.2",
+    "chokidar": "^5.0.0",
     "gsap": "^3.15.0",
     "lucide-react": "^0.468.0",
     "next": "^15.0.4",
+    "open": "^11.0.0",
     "postcss": "^8.5.16",
     "postcss-preset-mantine": "^1.18.0",
     "postcss-simple-vars": "^7.0.1",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "simple-git": "^3.36.0"
   },
   "devDependencies": {
-    "@types/node": "^22.10.2",
+    "@types/node": "^22.20.1",
     "@types/react": "^19.0.1",
     "@types/react-dom": "^19.0.2",
     "dotenv": "^16.6.1",

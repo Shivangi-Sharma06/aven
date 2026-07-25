@@ -27,13 +27,22 @@
 .aven-home .aven-spotlight-hero__base,
 .aven-home .aven-spotlight-hero__reveal {
   background-position: center center;
-  opacity: 0.4;
+  opacity: 0.35;
 }
 
 .aven-home .aven-spotlight-hero__shade {
   background:
-    radial-gradient(ellipse at center, transparent 30%, rgba(5, 5, 5, 0.8) 100%),
-    linear-gradient(180deg, rgba(0, 0, 0, 0.2), transparent 50%, rgba(0, 0, 0, 0.6));
+    radial-gradient(ellipse at center, transparent 25%, rgba(5, 5, 5, 0.75) 100%),
+    linear-gradient(180deg, rgba(5, 5, 5, 0.15), transparent 50%, rgba(5, 5, 5, 0.7));
+}
+
+.aven-home .aven-spotlight-hero__reveal {
+  filter: grayscale(0.3) brightness(1.2);
+  transition: filter 300ms ease;
+}
+
+.aven-home .aven-spotlight-hero__base {
+  filter: grayscale(0.5) brightness(0.8);
 }
 
 .aven-home .aven-spotlight-hero__content {

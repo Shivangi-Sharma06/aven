@@ -33,6 +33,8 @@ import {
   USDC_ISSUER,
   XLM_ASSET_ID,
   NETWORK_PASSPHRASE,
+  STELLAR_EXPLORER,
+  NETWORK_LABEL,
 } from "./contracts";
 
 // ─── Types ────────────────────────────────────────────────────────────────────

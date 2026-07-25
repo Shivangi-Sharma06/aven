@@ -13,6 +13,7 @@ import {
   getUsdcTrustlineStatus,
   isValidStellarAccountAddress,
 } from "@/lib/stellar";
+import { STELLAR_EXPLORER } from "@/lib/contracts";
 
 type Asset = "USDC" | "XLM";
 type TrustlineState = "idle" | "checking" | "ready" | "missing" | "blocked" | "error";
@@ -302,7 +303,7 @@ export default function CreateStreamPage() {
           <div className="stream-created__transaction">
             <span>Transaction hash</span>
             <a
-              href={`https://stellar.expert/explorer/testnet/tx/${success.txHash}`}
+              href={`${STELLAR_EXPLORER}/tx/${success.txHash}`}
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -548,7 +549,7 @@ export default function CreateStreamPage() {
                     </div>
 
                     {trustlineTxHash && (
-                      <a href={`https://stellar.expert/explorer/testnet/tx/${trustlineTxHash}`} target="_blank" rel="noopener noreferrer">
+                      <a href={`${STELLAR_EXPLORER}/tx/${trustlineTxHash}`} target="_blank" rel="noopener noreferrer">
                         Trustline confirmed · View transaction ↗
                       </a>
                     )}

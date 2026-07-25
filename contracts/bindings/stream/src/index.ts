@@ -31,7 +31,12 @@ if (typeof window !== "undefined") {
 }
 
 
-
+export const networks = {
+  testnet: {
+    networkPassphrase: "Test SDF Network ; September 2015",
+    contractId: "CDCBFICBQX2A6QU4AN4WHWDE2AVNW4UIZAHQKJQGHJAWH2V7GER4UJ77",
+  }
+} as const
 
 export const Errors = {
   1: {message:"AlreadyInitialized"},
@@ -173,7 +178,7 @@ export interface Client {
   /**
    * Construct and simulate a verify_work transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
    * Reserves payment for one npm-tracked work session.
-   *
+   * 
    * The verifier cannot choose an arbitrary amount: the contract recomputes
    * `rate_per_second * active_duration_seconds` and caps it at the unreserved
    * escrow remaining. Ledger time and checkpoints do not unlock funds.

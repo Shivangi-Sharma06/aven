@@ -5,7 +5,7 @@ use shared::{
     MAX_HISTORY_LEN, MAX_TITLE_LEN,
 };
 use soroban_sdk::{
-    contract, contracterror, contractevent, contractimpl, contracttype, token, vec, Address,
+    contract, contracterror, contractevent, contractimpl, contracttype, log, token, vec, Address,
     BytesN, Env, IntoVal, String, Symbol, Vec,
 };
 
@@ -191,6 +191,7 @@ impl StreamContract {
             .set(&DataKey::AttestationContract, &attestation_contract);
         env.storage().instance().set(&DataKey::NextStreamId, &1u64);
         bump_instance(&env);
+        log!(&env, "init: admin={}, attestation={}", admin, attestation_contract);
         Ok(())
     }
 
@@ -206,6 +207,7 @@ impl StreamContract {
         }
         env.storage().instance().set(&DataKey::Verifier, &verifier);
         bump_instance(&env);
+        log!(&env, "set_verifier: verifier={}", verifier);
         Ok(())
     }
 
@@ -324,44 +326,75 @@ impl StreamContract {
         category: Category,
         title: String,
     ) -> Result<u64, Error> {
+        log!(&env, "create_stream: sender={}, recipient={}, rate_per_second={}, asset={}, total_deposited={}, duration_ledgers={}, approval_timeout={}, category={:?}, title={}",
+            sender, recipient, rate_per_second, asset, total_deposited, duration_ledgers, approval_timeout_ledgers, category, title);
+
         sender.require_auth();
+        log!(&env, "create_stream: auth passed");
         bump_instance(&env);
         require_initialized(&env)?;
+        log!(&env, "create_stream: initialized check passed");
 
         if sender == recipient {
+            log!(&env, "create_stream FAILED: sender matches recipient");
             return Err(Error::SenderMatchesRecipient);
         }
+        log!(&env, "create_stream: sender != recipient check passed");
+
         if rate_per_second <= 0 {
+            log!(&env, "create_stream FAILED: invalid rate {}", rate_per_second);
             return Err(Error::InvalidRate);
         }
+        log!(&env, "create_stream: rate check passed");
+
         if total_deposited <= 0 {
+            log!(&env, "create_stream FAILED: invalid deposit {}", total_deposited);
             return Err(Error::InvalidDeposit);
         }
+        log!(&env, "create_stream: deposit check passed");
+
         if duration_ledgers == 0 {
+            log!(&env, "create_stream FAILED: invalid duration {}", duration_ledgers);
             return Err(Error::InvalidDuration);
         }
+        log!(&env, "create_stream: duration check passed");
+
         if title.len() > MAX_TITLE_LEN {
+            log!(&env, "create_stream FAILED: title too long {} > {}", title.len(), MAX_TITLE_LEN);
             return Err(Error::TitleTooLong);
         }
+        log!(&env, "create_stream: title length check passed");
+
         if approval_timeout_ledgers == 0 {
+            log!(&env, "create_stream FAILED: invalid approval_timeout {}", approval_timeout_ledgers);
             return Err(Error::InvalidTimeout);
         }
+        log!(&env, "create_stream: approval timeout check passed");
 
         let rate_per_ledger = rate_per_second
             .checked_mul(LEDGERS_PER_UNIT)
             .ok_or(Error::Overflow)?;
+        log!(&env, "create_stream: rate_per_ledger={}", rate_per_ledger);
+
         let required = rate_per_ledger
             .checked_mul(duration_ledgers as i128)
             .ok_or(Error::Overflow)?;
+        log!(&env, "create_stream: required={}, total_deposited={}", required, total_deposited);
+
         if total_deposited < required {
+            log!(&env, "create_stream FAILED: insufficient deposit {} < {}", total_deposited, required);
             return Err(Error::InsufficientDeposit);
         }
+        log!(&env, "create_stream: deposit >= required, proceeding to token transfer");
 
+        // Attempt the token transfer. If this fails, the error propagates from the SAC.
+        log!(&env, "create_stream: calling token.transfer(sender={}, contract={}, amount={})", sender, env.current_contract_address(), total_deposited);
         token::Client::new(&env, &asset).transfer(
             &sender,
             &env.current_contract_address(),
             &total_deposited,
         );
+        log!(&env, "create_stream: token transfer succeeded");
 
         let id: u64 = env
             .storage()
@@ -372,6 +405,7 @@ impl StreamContract {
             &DataKey::NextStreamId,
             &id.checked_add(1).ok_or(Error::Overflow)?,
         );
+        log!(&env, "create_stream: assigned stream id={}", id);
 
         // These three legacy fields remain in StreamRecord so existing clients
         // can decode it, but the npm work-session flow is the only unlock path.
@@ -410,6 +444,7 @@ impl StreamContract {
             total_deposited,
         }
         .publish(&env);
+        log!(&env, "create_stream: SUCCESS stream_id={}", id);
         Ok(id)
     }
 

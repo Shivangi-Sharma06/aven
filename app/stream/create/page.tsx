@@ -179,6 +179,12 @@ export default function CreateStreamPage() {
     if (raw.includes("User declined") || raw.includes("user rejected")) {
       return "Transaction was cancelled in Freighter.";
     }
+    if (raw.includes("Error(Contract, #15)") || raw.includes("ContractError")) {
+      if (asset === "XLM") {
+        return `Insufficient XLM balance. Your wallet needs at least ${(parseFloat(totalAmount || "0") + 2).toFixed(2)} XLM (${totalAmount || "0"} for escrow + ~2 XLM for fees and minimum balance reserve). Fund your wallet from the Stellar testnet friendbot and try again.`;
+      }
+      return "Transaction simulation failed. This is usually due to insufficient balance. Check your wallet has enough funds to cover the escrow amount plus fees.";
+    }
     return raw;
   }
 

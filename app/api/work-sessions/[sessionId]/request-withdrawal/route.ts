@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { apiError } from "@/lib/api-response";
 import { getSession, putSession } from "@/lib/session-store";
+import { recordVerifiedWork } from "@/lib/work-stream-verifier";
 import {
   addTimelineEvent,
   addressesEqual,
@@ -79,34 +80,21 @@ export async function POST(
         settlementSeconds: settlementSeconds?.toString(),
       };
     }
-    // The on-chain request_withdrawal (legacy, no verifier) must have been called from
-    // the frontend by the recipient before hitting this endpoint. Accept the txHash.
-    const body = await request.json().catch(() => ({})) as { txHash?: string };
-    const { txHash } = body;
-    if (!txHash || !/^[a-f\d]{64}$/i.test(txHash)) {
-      return apiError("A valid on-chain transaction hash from requestWithdrawalLegacy is required. Call requestWithdrawalLegacy from the frontend first.", 400);
-    }
     session.requestedAmount = formatAmountUnits(requestedUnits);
-    session.verifierTxHash = txHash;
-    // Fetch the on-chain withdrawal record to get the deadline_ledger.
-    // Use the anonymous address for read-only simulation.
-    let reviewDeadlineLedger: number;
-    try {
-      const { getStreamClient } = await import("@/lib/contracts");
-      const anonAddr = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
-      const client = getStreamClient(anonAddr);
-      const withdrawalRecord = await client.get_withdrawal({
-        stream_id: BigInt(session.streamId),
-        request_id: session.id,
-      });
-      const claim = ((withdrawalRecord.result as any)?.unwrap?.() ?? withdrawalRecord.result) as any;
-      reviewDeadlineLedger = Number(claim?.deadline_ledger ?? 0);
-    } catch {
-      // If we can't read the on-chain record, estimate from the stream's timeout.
-      const { getOnchainStream } = await import("@/lib/work-session-server");
-      const fallbackStream = await getOnchainStream(session.streamId);
-      reviewDeadlineLedger = fallbackStream?.approvalTimeoutLedgers ?? 50;
-    }
+    // Create the on-chain withdrawal via the verifier (verify_work).
+    // This uses the server's verifier keypair, so the recipient does not need
+    // to call the legacy request_withdrawal from the frontend.
+    const verification = await recordVerifiedWork({
+      streamId: session.streamId,
+      sessionId: session.id,
+      amountUnits: requestedUnits,
+      report: session.report,
+      onchainActiveSeconds: session.report.session.activeSeconds,
+      workStartLedger: 0,
+    });
+    session.verifierTxHash = verification.transactionHash;
+    session.reportDigest = verification.reportDigest;
+    const reviewDeadlineLedger = verification.reviewDeadlineLedger;
     session.reviewDeadlineLedger = reviewDeadlineLedger;
     addTimelineEvent(
       session,

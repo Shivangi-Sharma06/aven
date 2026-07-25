@@ -231,13 +231,8 @@ export default function StreamDetailPage() {
         if (action === "approve") await approveReviewedWithdrawal(id, address, session.id);
         if (action === "dispute") await disputeReviewedWithdrawal(id, address, session.id);
         if (action === "request-withdrawal") {
-          // Call the legacy request_withdrawal on-chain via the recipient's wallet first.
-          // This bypasses the verifier path which requires a configured verifier on the contract.
-          const requestedAmount = session.requestedAmount ?? session.report?.paymentRequest.requestedAmount ?? "0";
-          const amountUnits = toContractAmount(Number(requestedAmount));
-          const result = await requestWithdrawalLegacy(id, address, session.id, amountUnits);
-          txHash = result.txHash;
-          // The body sent to the server will include the txHash.
+          // The server handles the on-chain withdrawal via the verifier (verify_work).
+          // No need to call requestWithdrawalLegacy from the frontend.
         }
       }
       await ensureBrowserSession();

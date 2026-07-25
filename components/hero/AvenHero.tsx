@@ -97,20 +97,14 @@ export default function AvenHero() {
         </p>
 
         <div className="aven-spotlight-hero__actions aven-hero-anim aven-hero-fade">
-          <button onClick={() => router.push('/stream/create')}>START A STREAM →</button>
+          <button onClick={() => router.push('/stream/create')}>I'M AN EMPLOYER →</button>
           <button
             className="is-secondary"
-            onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}
+            onClick={() => router.push('/profile')}
           >
-            SEE HOW IT WORKS
+            I'M A FREELANCER →
           </button>
         </div>
-      </div>
-
-      <div className="aven-spotlight-hero__meta aven-hero-anim aven-hero-fade">
-        <div><span>NETWORK</span><strong>STELLAR</strong></div>
-        <div><span>SETTLEMENT</span><strong>XLM / USDC</strong></div>
-        <div><span>PROOF</span><strong>ACTIVE WORK</strong></div>
       </div>
     </section>
   )

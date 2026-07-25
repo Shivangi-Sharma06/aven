@@ -995,7 +995,10 @@
   height: 58px;
   margin-inline: auto;
   padding: 0 14px;
-  gap: clamp(8px, 2.5vw, 28px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(12px, 3vw, 36px);
   border: 1px solid var(--app-v2-line);
   border-radius: 11px !important;
   background: rgba(8, 8, 8, 0.9);

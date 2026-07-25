@@ -13,6 +13,7 @@ import {
   getUsdcTrustlineStatus,
   isValidStellarAccountAddress,
 } from "@/lib/stellar";
+import { STELLAR_EXPLORER, NETWORK_LABEL } from "@/lib/contracts";
 
 type Asset = "USDC" | "XLM";
 type TrustlineState = "idle" | "checking" | "ready" | "missing" | "blocked" | "error";
@@ -268,7 +269,7 @@ export default function CreateStreamPage() {
             <span className="stream-created__kicker">AVEN / AGREEMENT CONFIRMED</span>
             <h1>Ready for work.</h1>
             <p>
-              Stream #{success.streamId} is funded on Stellar testnet. The recipient
+              Stream #{success.streamId} is funded on {NETWORK_LABEL}. The recipient
               can now connect a project and submit npm-tracked work sessions.
             </p>
           </div>
@@ -281,7 +282,7 @@ export default function CreateStreamPage() {
         <section className="stream-created__receipt" aria-label="Created stream receipt">
           <div className="stream-created__receipt-bar">
             <span>STREAM RECORD / #{success.streamId}</span>
-            <strong>STELLAR TESTNET / ONCHAIN</strong>
+            <strong>{NETWORK_LABEL.toUpperCase()} / ONCHAIN</strong>
           </div>
 
           <div className="stream-created__facts">
@@ -302,7 +303,7 @@ export default function CreateStreamPage() {
           <div className="stream-created__transaction">
             <span>Transaction hash</span>
             <a
-              href={`https://stellar.expert/explorer/testnet/tx/${success.txHash}`}
+              href={`${STELLAR_EXPLORER}/tx/${success.txHash}`}
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -548,7 +549,7 @@ export default function CreateStreamPage() {
                     </div>
 
                     {trustlineTxHash && (
-                      <a href={`https://stellar.expert/explorer/testnet/tx/${trustlineTxHash}`} target="_blank" rel="noopener noreferrer">
+                      <a href={`${STELLAR_EXPLORER}/tx/${trustlineTxHash}`} target="_blank" rel="noopener noreferrer">
                         Trustline confirmed · View transaction ↗
                       </a>
                     )}

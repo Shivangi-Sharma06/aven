@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { apiError } from "@/lib/api-response";
 import { getSession, putSession } from "@/lib/session-store";
 import { verifyReport } from "@/lib/work-verifier";
+import { recordVerifiedWork } from "@/lib/work-stream-verifier";
 import type { WorkSessionReport } from "@/lib/work-session";
 import { STREAM_CONTRACT_ID } from "@/lib/contracts";
 import {
@@ -126,6 +127,20 @@ export async function POST(request: Request) {
     const verification = verifyReport(report);
     session.verificationFlags = verification.flags;
     session.verificationSummary = verification.summary;
+
+    // Create the on-chain WithdrawalRecord via the verifier.
+    // The verifier keypair (AVEN_VERIFIER_SECRET) signs verify_work, which
+    // reserves the payment and stores the evidence hash on-chain.
+    const onchain = await recordVerifiedWork({
+      streamId: stream.id,
+      sessionId: session.id,
+      amountUnits: calculatedUnits,
+      report,
+    });
+    session.verifierTxHash = onchain.transactionHash;
+    session.reportDigest = onchain.reportDigest;
+    session.reviewDeadlineLedger = onchain.reviewDeadlineLedger;
+
     addTimelineEvent(session, "VERIFICATION_COMPLETE", "system", verification.summary);
     await putSession(session);
 

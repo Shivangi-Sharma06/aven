@@ -31,12 +31,7 @@ if (typeof window !== "undefined") {
 }
 
 
-export const networks = {
-  testnet: {
-    networkPassphrase: "Test SDF Network ; September 2015",
-    contractId: "CDRIWRUCTMHX2HDVXEQ56MCCHDKZOS4JB6AXNBYZLWV5OGIV3UCSOWWO",
-  }
-} as const
+
 
 export const Errors = {
   1: {message:"AlreadyInitialized"},
@@ -114,6 +109,7 @@ export interface AttestationRecord {
   sender: string;
   stream_id: u64;
   title: string;
+  verifier: Option<string>;
 }
 
 export interface Client {

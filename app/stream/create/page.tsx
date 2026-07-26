@@ -352,7 +352,7 @@ export default function CreateStreamPage() {
   return (
     <div className="create-stream-wrap">
       <div className="create-stream-header">
-        <span className="create-stream-kicker">NEW AGREEMENT / STELLAR TESTNET</span>
+        <span className="create-stream-kicker">NEW AGREEMENT / {NETWORK_LABEL.toUpperCase()}</span>
         <div className="create-stream-heading">
           <h1 className="create-stream-title">
             Fund verified
@@ -621,7 +621,7 @@ export default function CreateStreamPage() {
                   <div><dt>Duration</dt><dd>{durationDays ? `${durationDays} days` : "—"}</dd></div>
                   <div><dt>Hourly equivalent</dt><dd>{hourlyRate === "—" ? "—" : `${hourlyRate} ${asset}`}</dd></div>
                   <div><dt>Work type</dt><dd>{CATEGORY_DETAILS[category].label}</dd></div>
-                  <div><dt>Network</dt><dd>Stellar testnet</dd></div>
+                  <div><dt>Network</dt><dd>{NETWORK_LABEL}</dd></div>
                 </dl>
                 <div className="create-review__notice">
                   <strong>What happens next</strong>

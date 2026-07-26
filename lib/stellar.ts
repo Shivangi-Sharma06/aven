@@ -193,10 +193,10 @@ export async function createUsdcTrustline(
 
   const current = await getUsdcTrustlineStatus(publicKey);
   if (!current.accountExists) {
-    throw new Error("Fund this Stellar testnet account with XLM before adding a trustline.");
+    throw new Error(`Fund this ${NETWORK_LABEL} account with XLM before adding a trustline.`);
   }
   if (current.exists && current.authorized) {
-    throw new Error("This wallet already has the Circle testnet USDC trustline.");
+    throw new Error(`This wallet already has the Circle ${NETWORK_LABEL} USDC trustline.`);
   }
 
   const account = await horizon.loadAccount(publicKey);
@@ -298,7 +298,7 @@ export async function connectWallet(): Promise<{ address: string; connected: boo
   const network = await getNetwork();
   if (network.error) throw new Error(network.error.message);
   if (network.networkPassphrase !== NETWORK_PASSPHRASE) {
-    throw new Error("Switch Freighter to Stellar Testnet, then try connecting again.");
+    throw new Error(`Switch Freighter to ${NETWORK_LABEL}, then try connecting again.`);
   }
   return { address, connected: true };
 }
@@ -312,7 +312,7 @@ export async function restoreWallet(): Promise<{ address: string; connected: boo
   const network = await getNetwork();
   if (network.error) throw new Error(network.error.message);
   if (network.networkPassphrase !== NETWORK_PASSPHRASE) {
-    throw new Error("Switch Freighter to Stellar Testnet, then try connecting again.");
+    throw new Error(`Switch Freighter to ${NETWORK_LABEL}, then try connecting again.`);
   }
   return { address: addressResult.address, connected: true };
 }
@@ -329,7 +329,7 @@ export function watchWallet(
     if (address && networkPassphrase !== NETWORK_PASSPHRASE) {
       onChange({
         address: null,
-        error: "Switch Freighter to Stellar Testnet, then try connecting again.",
+        error: `Switch Freighter to ${NETWORK_LABEL}, then try connecting again.`,
       });
       return;
     }
@@ -626,7 +626,8 @@ export async function computeScore(address: string): Promise<ScoreBreakdown> {
     const tx = await client.get_score_breakdown({
       recipient: address,
     });
-    const r: any = tx.result;
+    const r: any = (tx.result as any)?.unwrap?.() ?? tx.result;
+    if (!r) return { total: 0, freelance: 0, salary: 0, bounty: 0, grant: 0, agentTask: 0, subscription: 0 };
     return {
       total: Number(toBigInt(r?.total ?? 0n)),
       freelance: Number(toBigInt(r?.freelance ?? 0n)),
@@ -648,7 +649,8 @@ export async function verifyClaim(address: string, minimumScore: number): Promis
       recipient: address,
       minimum_score: BigInt(Math.round(minimumScore)),
     });
-    return Boolean(tx.result);
+    const raw = (tx.result as any)?.unwrap?.() ?? tx.result;
+    return Boolean(raw);
   } catch {
     return false;
   }

@@ -6,7 +6,7 @@ import { signMessage } from "@stellar/freighter-api";
 import { useWallet } from "@/components/WalletProvider";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import type { WorkSession } from "@/lib/work-session";
-import { STREAM_CONTRACT_ID, STELLAR_EXPLORER } from "@/lib/contracts";
+import { STREAM_CONTRACT_ID, STELLAR_EXPLORER, NETWORK_LABEL } from "@/lib/contracts";
 import {
   getStream,
   computeAvailable,

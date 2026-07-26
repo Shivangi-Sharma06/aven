@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getAttestation, verifyAttestation, type AttestationObject } from "@/lib/stellar";
+import { NETWORK_LABEL } from "@/lib/contracts";
 
 export default function VerifyAttestationPage() {
   const params = useParams();
@@ -34,7 +35,7 @@ export default function VerifyAttestationPage() {
     <main className="verify-wrap">
       <div className="verify-header">
         <h1 className="verify-title">Verify Work Attestation</h1>
-        <p className="verify-sub">Attestation #{attestationId} · Stellar Testnet</p>
+        <p className="verify-sub">Attestation #{attestationId} · {NETWORK_LABEL}</p>
       </div>
       {valid === null ? (
         <div className="dash-loading"><div className="dash-spinner" /> Reading contract state…</div>

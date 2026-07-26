@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useWallet } from "@/components/WalletProvider";
 import { computeScore, getWorkerAttestations, ScoreBreakdown, AttestationObject } from "@/lib/stellar";
+import { NETWORK_LABEL } from "@/lib/contracts";
 
 const CATEGORY_COLORS: Record<string, string> = {
   Freelance: "#8b5cf6",
@@ -70,7 +71,7 @@ export default function ProfilePage() {
         <div className="profile-header-info">
           <span className="profile-eyebrow">Wallet-owned work identity</span>
           <code className="profile-address">{truncate(address)}</code>
-          <div className="profile-network-badge">Stellar Testnet · Public profile</div>
+          <div className="profile-network-badge">{NETWORK_LABEL} · Public profile</div>
           {isOwn && (
             <button
               className="profile-copy-btn"

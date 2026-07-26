@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { apiError } from "@/lib/api-response";
 import { getSession, putSession } from "@/lib/session-store";
 import { verifyReport } from "@/lib/work-verifier";
-import { recordVerifiedWork } from "@/lib/work-stream-verifier";
 import type { WorkSession, WorkSessionReport } from "@/lib/work-session";
 import { STREAM_CONTRACT_ID } from "@/lib/contracts";
 import {
@@ -39,13 +38,19 @@ export async function POST(request: Request) {
       if (!addressesEqual(existing.workerAddress, token.walletAddress)) {
         return apiError("This session belongs to another worker.", 403);
       }
-      // Allow retry for sessions that never completed the full flow.
-      // This includes VERIFYING (on-chain timed out), SUBMITTED (reverted),
-      // and VERIFICATION_COMPLETE (already done — return it).
-      if (existing.status === "VERIFICATION_COMPLETE") {
+      // Return the existing session if it already completed verification.
+      if (existing.status === "VERIFICATION_COMPLETE"
+        || existing.status === "WITHDRAWAL_REQUESTED"
+        || existing.status === "PENDING_CLIENT_REVIEW"
+        || existing.status === "APPROVED"
+        || existing.status === "RELEASE_ELIGIBLE"
+        || existing.status === "RELEASED"
+        || existing.status === "RELEASING"
+        || existing.status === "DISPUTED"
+        || existing.status === "RESPONSE_SUBMITTED") {
         return NextResponse.json({ sessionId: existing.id, status: existing.status, session: existing });
       }
-      // Fall through to re-run verification for VERIFYING or SUBMITTED.
+      // For SUBMITTED or VERIFYING — fall through to retry.
     }
 
     const stream = await getOnchainStream(report.session.streamId);
@@ -141,42 +146,10 @@ export async function POST(request: Request) {
       session = existing;
     }
 
-    // Static verification (always runs, fast/safe).
+    // Static verification only (no on-chain call).
     const verification = verifyReport(report);
     session.verificationFlags = verification.flags;
     session.verificationSummary = verification.summary;
-
-    // On-chain verify_work via the verifier keypair. This creates the
-    // WithdrawalRecord with "Pending" status, which is required because the
-    // deployed contract blocks the legacy request_withdrawal when a verifier
-    // is configured (Error #32 = VerificationRequired).
-    addTimelineEvent(session, "VERIFYING", "system", "Calling verify_work on-chain via verifier.");
-    await putSession(session);
-
-    let onchain;
-    try {
-      onchain = await recordVerifiedWork({
-        streamId: stream.id,
-        sessionId: session.id,
-        amountUnits: calculatedUnits,
-        report,
-      });
-    } catch (onchainError: any) {
-      const errorMessage = onchainError?.message ?? String(onchainError);
-      addTimelineEvent(
-        session,
-        "SUBMITTED",
-        "system",
-        `On-chain verification failed: ${errorMessage}. Resubmit to retry.`,
-      );
-      session.verificationError = errorMessage;
-      await putSession(session);
-      return apiError(`On-chain verification failed: ${errorMessage}`, 502);
-    }
-
-    session.verifierTxHash = onchain.transactionHash;
-    session.reportDigest = onchain.reportDigest;
-    session.reviewDeadlineLedger = onchain.reviewDeadlineLedger;
 
     addTimelineEvent(session, "VERIFICATION_COMPLETE", "system", verification.summary);
     await putSession(session);

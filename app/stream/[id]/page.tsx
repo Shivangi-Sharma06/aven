@@ -370,6 +370,7 @@ export default function StreamDetailPage() {
     setError(null);
     setTxResult(null);
     const preparePath = `/api/work-sessions/${encodeURIComponent(session.id)}/release/prepare`;
+    const cancelPath = `/api/work-sessions/${encodeURIComponent(session.id)}/release/cancel`;
     try {
       await ensureBrowserSession();
       const prepared = await fetch(preparePath, {
@@ -382,27 +383,27 @@ export default function StreamDetailPage() {
       let withdrawalResult: { amount: number; txHash: string } | undefined;
       try {
         withdrawalResult = await withdrawReviewed(id, address, session.id);
-      } catch {
-        // On-chain withdraw_approved may fail (no WithdrawalRecord exists
+      } catch (caught) {
+        // On-chain withdraw_approved failed (no WithdrawalRecord exists
         // because the verifier keypair doesn't match the deployed contract).
-        // The server-side release route still transitions the status.
-        // The user can retry the on-chain withdrawal later if needed.
+        // Cancel the prepare so the session goes back to RELEASE_ELIGIBLE
+        // for retry, and show the error to the user.
+        await fetch(cancelPath, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+        setError(`On-chain withdrawal failed. ${caught instanceof Error ? caught.message : String(caught)}. The client must retry from the dashboard.`);
+        await loadSessions();
+        return;
       }
       const path = `/api/work-sessions/${encodeURIComponent(session.id)}/release`;
       const response = await fetch(path, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ txHash: withdrawalResult?.txHash ?? "" }),
+        body: JSON.stringify({ txHash: withdrawalResult.txHash }),
       });
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error ?? "The record could not be updated. Release may need to be retried.");
+        throw new Error(data.error ?? "The transaction succeeded but its record could not be updated. Do not submit another withdrawal.");
       }
-      if (withdrawalResult) {
-        setTxResult(`Released ${withdrawalResult.amount.toFixed(7)} ${stream?.asset} · tx: ${withdrawalResult.txHash.slice(0, 10)}…`);
-      } else {
-        setTxResult("Release submitted (on-chain step may need to be retried).");
-      }
+      setTxResult(`Released ${withdrawalResult.amount.toFixed(7)} ${stream?.asset} · tx: ${withdrawalResult.txHash.slice(0, 10)}…`);
       await Promise.all([load(), loadSessions()]);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));

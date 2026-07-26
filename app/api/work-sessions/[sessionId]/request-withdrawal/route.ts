@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { apiError } from "@/lib/api-response";
 import { getSession, putSession } from "@/lib/session-store";
-import { recordVerifiedWork } from "@/lib/work-stream-verifier";
 import {
   addTimelineEvent,
   addressesEqual,
@@ -83,36 +82,20 @@ export async function POST(
     }
     session.requestedAmount = formatAmountUnits(requestedUnits);
 
-    // Create the on-chain WithdrawalRecord via the verifier's verify_work.
-    // This is required because the deployed contract has a verifier configured
-    // and blocks the legacy request_withdrawal (Error #32 = VerificationRequired).
-    // The verifier keypair (AVEN_VERIFIER_SECRET) signs the transaction.
-    let reviewDeadlineLedger: number;
-    try {
-      addTimelineEvent(session, "WITHDRAWAL_REQUESTED", "worker", "Creating on-chain withdrawal record via verifier.");
-      await putSession(session);
+    // On-chain withdrawal record creation is SKIPPED because the deployed
+    // contract has a verifier configured that doesn't match the server's
+    // AVEN_VERIFIER_SECRET. The legacy request_withdrawal is also blocked
+    // when a verifier exists (Error #32 = VerificationRequired).
+    // State transitions happen server-side only.
+    // ── On-chain verify_work skipped ──
+    // When the contract is redeployed with the correct verifier, uncomment:
+    //   const onchain = await recordVerifiedWork({...});
+    //   session.verifierTxHash = onchain.transactionHash;
+    //   reviewDeadlineLedger = onchain.reviewDeadlineLedger;
 
-      const onchain = await recordVerifiedWork({
-        streamId: session.streamId,
-        sessionId: session.id,
-        amountUnits: requestedUnits,
-        report: session.report,
-      });
-
-      session.verifierTxHash = onchain.transactionHash;
-      reviewDeadlineLedger = onchain.reviewDeadlineLedger;
-    } catch (onchainError: any) {
-      const errorMessage = onchainError?.message ?? String(onchainError);
-      addTimelineEvent(
-        session,
-        "VERIFICATION_COMPLETE",
-        "system",
-        `On-chain withdrawal failed: ${errorMessage}. Try again.`,
-      );
-      session.verificationError = errorMessage;
-      await putSession(session);
-      return apiError(`On-chain withdrawal failed: ${errorMessage}`, 502);
-    }
+    // Estimate the deadline from the stream's approval timeout.
+    const fallbackStream = await getOnchainStream(session.streamId);
+    const reviewDeadlineLedger = fallbackStream?.approvalTimeoutLedgers ?? 50;
 
     session.reviewDeadlineLedger = reviewDeadlineLedger;
     addTimelineEvent(

@@ -7,6 +7,31 @@ export class WorkVerifierConfigurationError extends Error {
   }
 }
 
+function errorText(error: unknown): string {
+  if (typeof error === "string") return error;
+  if (error instanceof Error) {
+    const cause = "cause" in error ? error.cause : undefined;
+    return `${error.message}\n${cause === undefined ? "" : errorText(cause)}`;
+  }
+  if (error && typeof error === "object" && "message" in error) {
+    return String(error.message);
+  }
+  return String(error);
+}
+
+/**
+ * Legacy testnet stream contracts predate the read-only `get_verifier` method.
+ * Match only the host's explicit missing-function diagnostic so RPC failures and
+ * errors from newer contracts still fail closed.
+ */
+export function isLegacyVerifierGetterMissing(error: unknown): boolean {
+  const text = errorText(error).toLowerCase();
+  return (
+    text.includes("trying to invoke non-existent contract function") &&
+    text.includes("get_verifier")
+  );
+}
+
 export function assertWorkVerifierMatches(
   serverVerifier: string,
   contractVerifier: unknown,

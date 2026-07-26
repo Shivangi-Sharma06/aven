@@ -9,7 +9,10 @@ import {
   STREAM_CONTRACT_ID,
 } from "./contracts";
 import type { WorkSessionReport } from "./work-session";
-import { assertWorkVerifierMatches } from "./work-stream-verifier-config";
+import {
+  assertWorkVerifierMatches,
+  isLegacyVerifierGetterMissing,
+} from "./work-stream-verifier-config";
 
 function unwrap<T>(value: unknown): T {
   return ((value as { unwrap?: () => T })?.unwrap?.() ?? value) as T;
@@ -50,8 +53,15 @@ async function verifierClient() {
       return { signedTxXdr: transaction.toXDR(), signerAddress: keypair.publicKey() };
     },
   });
-  const configured = await client.get_verifier();
-  assertWorkVerifierMatches(keypair.publicKey(), configured.result);
+  try {
+    const configured = await client.get_verifier();
+    assertWorkVerifierMatches(keypair.publicKey(), configured.result);
+  } catch (error) {
+    if (!isLegacyVerifierGetterMissing(error)) throw error;
+    // Legacy testnet contracts still enforce the configured verifier through
+    // require_auth() in verify_work. A mismatched server key therefore fails
+    // during simulation instead of being able to reserve any escrow.
+  }
   return client;
 }
 

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   assertWorkVerifierMatches,
+  isLegacyVerifierGetterMissing,
   WorkVerifierConfigurationError,
 } from "../work-stream-verifier-config.ts";
 
@@ -30,5 +31,30 @@ test("reports a service configuration error when no verifier is configured", () 
       assert.match(error.message, /no verifier configured/i);
       return true;
     },
+  );
+});
+
+test("recognizes the missing getter on legacy testnet contracts", () => {
+  const error = new Error(
+    'HostError: Error(WasmVm, MissingValue), data:["trying to invoke non-existent contract function", get_verifier]',
+  );
+
+  assert.equal(isLegacyVerifierGetterMissing(error), true);
+});
+
+test("does not hide unrelated contract or RPC failures", () => {
+  assert.equal(
+    isLegacyVerifierGetterMissing(
+      new Error("HostError: Error(WasmVm, MissingValue) while calling get_verifier"),
+    ),
+    false,
+  );
+  assert.equal(
+    isLegacyVerifierGetterMissing(
+      new Error(
+        'data:["trying to invoke non-existent contract function", get_stream]',
+      ),
+    ),
+    false,
   );
 });

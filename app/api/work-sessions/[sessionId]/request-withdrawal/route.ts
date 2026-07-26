@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { apiError } from "@/lib/api-response";
 import { getSession, putSession } from "@/lib/session-store";
-import { recordVerifiedWork } from "@/lib/work-stream-verifier";
 import {
   addTimelineEvent,
   addressesEqual,
@@ -89,25 +88,21 @@ export async function POST(
     addTimelineEvent(session, "WITHDRAWAL_REQUESTED", "worker", "Creating on-chain withdrawal record.");
     await putSession(session);
 
-    // ─── Path 1: Frontend already submitted request_withdrawal on-chain ────
-    // The frontend sends txHash when it called request_withdrawal via Freighter
-    // (the legacy/direct path that works when no verifier is configured).
+    // ─── The frontend must call request_withdrawal on-chain via Freighter ──
+    // The frontend sends txHash when it called request_withdrawal via Freighter.
     const frontendTxHash = body.txHash?.trim();
     if (frontendTxHash && /^[a-f\d]{64}$/i.test(frontendTxHash)) {
-      session.verifierTxHash = frontendTxHash.toLowerCase();
-      // Use a reasonable review deadline based on stream's approval timeout
-      session.reviewDeadlineLedger = 0; // will rely on reviewDeadlineAt
+      session.reviewDeadlineAt = new Date(
+        Date.now() + Math.max(stream.approvalTimeoutLedgers, 1) * 5_000,
+      ).toISOString();
       addTimelineEvent(
         session,
         "WITHDRAWAL_REQUESTED",
         "worker",
         projectEnded
-          ? `Reserved the final ${session.requestedAmount} ${stream.asset} settlement via direct on-chain request.`
-          : `Reserved ${session.requestedAmount} ${stream.asset} via direct on-chain request.`,
+          ? `Reserved the final ${session.requestedAmount} ${stream.asset} settlement via on-chain request.`
+          : `Reserved ${session.requestedAmount} ${stream.asset} via on-chain request.`,
       );
-      session.reviewDeadlineAt = new Date(
-        Date.now() + Math.max(stream.approvalTimeoutLedgers, 1) * 5_000,
-      ).toISOString();
       addTimelineEvent(
         session,
         "PENDING_CLIENT_REVIEW",
@@ -120,71 +115,18 @@ export async function POST(
       return NextResponse.json(session);
     }
 
-    // ─── Path 2: Server-side verify_work via the verifier keypair ──────────
-    let reviewDeadlineLedger: number;
-    try {
-      const onchain = await recordVerifiedWork({
-        streamId: session.streamId,
-        sessionId: session.id,
-        amountUnits: requestedUnits,
-        report: session.report,
-      });
-      session.verifierTxHash = onchain.transactionHash;
-      reviewDeadlineLedger = onchain.reviewDeadlineLedger;
-    } catch (onchainError: any) {
-      const errorMessage = onchainError?.message ?? String(onchainError);
-      const isVerifierMismatch =
-        errorMessage.includes("verifier") ||
-        errorMessage.includes("set_verifier") ||
-        errorMessage.includes("AVEN_VERIFIER_SECRET") ||
-        errorMessage.includes("VerifierNotConfigured") ||
-        errorMessage.includes("needsNonInvokerSigningBy");
-
-      if (isVerifierMismatch) {
-        // Revert to VERIFICATION_COMPLETE so the frontend can retry via
-        // the legacy request_withdrawal path (Freighter-signed).
-        addTimelineEvent(session, "VERIFICATION_COMPLETE", "system",
-          `Server verifier path unavailable. Falling back to direct on-chain request.`);
-        await putSession(session);
-        return NextResponse.json(
-          {
-            error: "VERIFIER_UNAVAILABLE",
-            message: "The server verifier is not registered on this contract. The withdrawal will be submitted directly from your wallet.",
-            requestedUnits: requestedUnits.toString(),
-          },
-          { status: 422 },
-        );
-      }
-      // Non-verifier error — revert and report
-      addTimelineEvent(session, "VERIFICATION_COMPLETE", "system",
-        `On-chain withdrawal failed: ${errorMessage}.`);
-      session.verificationError = errorMessage;
-      await putSession(session);
-      return apiError(`On-chain withdrawal failed: ${errorMessage}`, 502);
-    }
-
-    session.reviewDeadlineLedger = reviewDeadlineLedger;
-    addTimelineEvent(
-      session,
-      "WITHDRAWAL_REQUESTED",
-      "worker",
-      projectEnded
-        ? `Reserved the final ${session.requestedAmount} ${stream.asset} settlement using ${settlementSeconds} contract-equivalent seconds.`
-        : `Reserved ${session.requestedAmount} ${stream.asset} against the verified session.`,
-    );
-    session.reviewDeadlineAt = new Date(
-      Date.now() + Math.max(stream.approvalTimeoutLedgers, 1) * 5_000,
-    ).toISOString();
-    addTimelineEvent(
-      session,
-      "PENDING_CLIENT_REVIEW",
-      "system",
-      projectEnded
-        ? "Final project settlement submitted for client review."
-        : "Client review window opened.",
-    );
+    // ─── No txHash provided — tell the frontend to call request_withdrawal ──
+    addTimelineEvent(session, "VERIFICATION_COMPLETE", "system",
+      `On-chain withdrawal requires a direct wallet signature.`);
     await putSession(session);
-    return NextResponse.json(session);
+    return NextResponse.json(
+      {
+        error: "TX_HASH_REQUIRED",
+        message: "Sign the request_withdrawal transaction in your wallet and retry with the txHash.",
+        requestedUnits: requestedUnits.toString(),
+      },
+      { status: 422 },
+    );
   } catch (error) {
     return apiError(error);
   }

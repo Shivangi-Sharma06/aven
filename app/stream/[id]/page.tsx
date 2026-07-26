@@ -255,59 +255,62 @@ export default function StreamDetailPage() {
     setSessionAction(`${sessionId}:${action}`);
     setError(null);
     try {
+      // For approve and dispute, call on-chain first (non-blocking for errors)
       const session = sessions.find((candidate) => candidate.id === sessionId);
       if (address && session) {
         if (action === "approve") {
           try {
             await approveReviewedWithdrawal(id, address, session.id);
           } catch {
-            // The on-chain WithdrawalRecord may not exist yet (verifier keypair
-            // mismatch with the deployed contract). The server-side state
-            // transition still goes through.
+            // Non-blocking — the server-side state transition still goes through.
           }
         }
         if (action === "dispute") {
           try {
             await disputeReviewedWithdrawal(id, address, session.id);
           } catch {
-            // Same as approve — non-blocking.
+            // Non-blocking.
           }
         }
       }
       await ensureBrowserSession();
-      const response = await fetch(path, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body ?? {}),
-      });
-      const data = await response.json();
 
-      // ─── Verifier fallback: server says verifier is unavailable ───────
-      // When the server cannot use verify_work (wrong/missing verifier), it
-      // returns 422 with error=VERIFIER_UNAVAILABLE. In that case, we call
-      // request_withdrawal directly from the recipient's Freighter wallet
-      // (the legacy path), then retry the server route with the txHash.
-      if (
-        response.status === 422 &&
-        data.error === "VERIFIER_UNAVAILABLE" &&
-        action === "request-withdrawal" &&
-        address
-      ) {
-        const requestedUnits = BigInt(data.requestedUnits);
-        const legacyResult = await requestWithdrawalLegacy(
-          id,
-          address,
-          sessionId,
-          requestedUnits,
-        );
-        // Retry the server route with the on-chain txHash
-        const retryResponse = await fetch(path, {
+      // For request-withdrawal, always call the contract directly from
+      // the wallet first, then submit the txHash to the server.
+      if (action === "request-withdrawal" && address) {
+        // Step 1: Ask the server to validate and prepare the session
+        const validateResponse = await fetch(path, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ txHash: legacyResult.txHash }),
+          body: JSON.stringify({}),
         });
-        const retryData = await retryResponse.json();
-        if (!retryResponse.ok) throw new Error(retryData.error ?? "Work-session action failed after on-chain fallback.");
+        const validateData = await validateResponse.json();
+
+        // If already in a reserved state, just return
+        if (validateResponse.ok) return;
+
+        // If pending client review, the withdrawal was already requested
+        if (validateResponse.status === 422 && validateData.error === "TX_HASH_REQUIRED") {
+          // Step 2: Call request_withdrawal on-chain from the wallet
+          const requestedUnits = BigInt(validateData.requestedUnits);
+          const legacyResult = await requestWithdrawalLegacy(
+            id,
+            address,
+            sessionId,
+            requestedUnits,
+          );
+
+          // Step 3: Retry the server route with the on-chain txHash
+          const retryResponse = await fetch(path, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ txHash: legacyResult.txHash }),
+          });
+          const retryData = await retryResponse.json();
+          if (!retryResponse.ok) throw new Error(retryData.error ?? "Work-session action failed after on-chain request.");
+        } else if (!validateResponse.ok) {
+          throw new Error(validateData.error ?? "Work-session action failed.");
+        }
         setApproveSession(null);
         setDisputeSession(null);
         setDisputeReason("");
@@ -315,6 +318,12 @@ export default function StreamDetailPage() {
         return;
       }
 
+      const response = await fetch(path, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body ?? {}),
+      });
+      const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Work-session action failed.");
       setApproveSession(null);
       setDisputeSession(null);
@@ -444,12 +453,10 @@ export default function StreamDetailPage() {
       try {
         withdrawalResult = await withdrawReviewed(id, address, session.id);
       } catch (caught) {
-        // On-chain withdraw_approved failed (no WithdrawalRecord exists
-        // because the verifier keypair doesn't match the deployed contract).
-        // Cancel the prepare so the session goes back to RELEASE_ELIGIBLE
-        // for retry, and show the error to the user.
+        // On-chain withdraw_approved failed. Cancel the prepare so the
+        // session goes back to RELEASE_ELIGIBLE for retry.
         await fetch(cancelPath, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
-        setError(`On-chain withdrawal failed. ${caught instanceof Error ? caught.message : String(caught)}. The client must retry from the dashboard.`);
+        setError(`On-chain withdrawal failed. ${caught instanceof Error ? caught.message : String(caught)}. Please retry.`);
         await loadSessions();
         return;
       }

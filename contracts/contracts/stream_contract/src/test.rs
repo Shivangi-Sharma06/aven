@@ -54,16 +54,14 @@ fn create_asset(env: &Env, sender: &Address, amount: i128) -> Address {
     asset_id
 }
 
-fn setup(env: &Env) -> (StreamContractClient<'_>, Address, Address) {
+fn setup_no_verifier(env: &Env) -> (StreamContractClient<'_>, Address, Address) {
     env.mock_all_auths();
     let admin = Address::generate(env);
-    let verifier = Address::generate(env);
     let attestation = env.register(MockAttestationContract, ());
     let contract_id = env.register(StreamContract, ());
     let client = StreamContractClient::new(env, &contract_id);
     client.init(&admin, &attestation);
-    client.set_verifier(&admin, &verifier);
-    (client, admin, verifier)
+    (client, admin, attestation)
 }
 
 fn create_stream(
@@ -91,21 +89,21 @@ fn create_stream(
     )
 }
 
-fn verify(
+fn request(
     env: &Env,
     client: &StreamContractClient,
     id: u64,
-    request: &str,
+    recipient: &Address,
+    request_id: &str,
     amount: i128,
-    seconds: u64,
 ) {
-    client.verify_work(
+    // Mock all auths so the test can call request_withdrawal directly
+    // (normally the recipient signs).
+    client.request_withdrawal(
         &id,
-        &String::from_str(env, request),
+        recipient,
+        &String::from_str(env, request_id),
         &amount,
-        &BytesN::from_array(env, &[7; 32]),
-        &seconds,
-        &0,
     );
 }
 
@@ -115,7 +113,7 @@ fn stream_creation_rejects_self_payment_and_keeps_legacy_fields_inert() {
     let sender = Address::generate(&env);
     let recipient = Address::generate(&env);
     let asset = create_asset(&env, &sender, 100_000);
-    let (client, _, _) = setup(&env);
+    let (client, _, _) = setup_no_verifier(&env);
 
     let same_wallet = client.try_create_stream(
         &sender,
@@ -151,7 +149,7 @@ fn ledger_time_does_not_increase_available_or_measured_value() {
     let sender = Address::generate(&env);
     let recipient = Address::generate(&env);
     let asset = create_asset(&env, &sender, 100_000);
-    let (client, _, _) = setup(&env);
+    let (client, _, _) = setup_no_verifier(&env);
     let id = create_stream(&env, &client, &sender, &recipient, &asset, 10, 20_000, 400);
 
     assert_eq!(client.compute_available(&id), 20_000);
@@ -162,51 +160,36 @@ fn ledger_time_does_not_increase_available_or_measured_value() {
 }
 
 #[test]
-fn verifier_can_only_reserve_active_seconds_times_rate() {
-    let env = Env::default();
-    let sender = Address::generate(&env);
-    let recipient = Address::generate(&env);
-    let asset = create_asset(&env, &sender, 100_000);
-    let (client, _, _) = setup(&env);
-    let id = create_stream(&env, &client, &sender, &recipient, &asset, 10, 20_000, 400);
-    let request = String::from_str(&env, "session-mismatch");
-    let evidence = BytesN::from_array(&env, &[7; 32]);
-
-    let mismatch = client.try_verify_work(&id, &request, &121, &evidence, &12, &0);
-    assert_eq!(mismatch.unwrap_err().unwrap(), Error::PaymentMismatch);
-    let zero_time = client.try_verify_work(&id, &request, &1, &evidence, &0, &0);
-    assert_eq!(
-        zero_time.unwrap_err().unwrap(),
-        Error::InvalidActiveDuration
-    );
-
-    verify(&env, &client, id, "session-valid", 120, 12);
-    assert_eq!(client.compute_earned(&id), 120);
-    assert_eq!(client.compute_available(&id), 19_880);
-}
-
-#[test]
-fn approved_session_releases_exact_reserved_amount() {
+fn request_withdrawal_reserves_escrow_and_requires_approval() {
     let env = Env::default();
     env.mock_all_auths();
     let sender = Address::generate(&env);
     let recipient = Address::generate(&env);
     let asset = create_asset(&env, &sender, 100_000);
     let token = TokenClient::new(&env, &asset);
-    let (client, _, _) = setup(&env);
+    let (client, _, _) = setup_no_verifier(&env);
     let id = create_stream(&env, &client, &sender, &recipient, &asset, 10, 20_000, 400);
-    let request = String::from_str(&env, "session-release");
+    let request_id = String::from_str(&env, "session-request");
 
-    verify(&env, &client, id, "session-release", 1_000, 100);
+    // Recipient requests a withdrawal directly (no verifier needed)
+    request(&env, &client, id, &recipient, "session-request", 1_000);
+    assert_eq!(client.compute_earned(&id), 1_000);
+    assert_eq!(client.compute_available(&id), 19_000);
+
+    // Cannot withdraw without approval
     assert_eq!(
         client
-            .try_withdraw_approved(&id, &recipient, &request)
+            .try_withdraw_approved(&id, &recipient, &request_id)
             .unwrap_err()
             .unwrap(),
         Error::WithdrawalNotApproved
     );
-    client.approve_withdrawal(&id, &sender, &request);
-    assert_eq!(client.withdraw_approved(&id, &recipient, &request), 1_000);
+
+    // Sender approves
+    client.approve_withdrawal(&id, &sender, &request_id);
+
+    // Now the recipient can withdraw
+    assert_eq!(client.withdraw_approved(&id, &recipient, &request_id), 1_000);
     assert_eq!(token.balance(&recipient), 1_000);
     assert_eq!(client.compute_earned(&id), 1_000);
     assert_eq!(client.compute_available(&id), 19_000);
@@ -220,11 +203,11 @@ fn dispute_frees_capacity_and_pending_claim_blocks_cancel() {
     let recipient = Address::generate(&env);
     let asset = create_asset(&env, &sender, 100_000);
     let token = TokenClient::new(&env, &asset);
-    let (client, _, _) = setup(&env);
+    let (client, _, _) = setup_no_verifier(&env);
     let id = create_stream(&env, &client, &sender, &recipient, &asset, 10, 20_000, 400);
-    let request = String::from_str(&env, "session-dispute");
+    let request_id = String::from_str(&env, "session-dispute");
 
-    verify(&env, &client, id, "session-dispute", 500, 50);
+    request(&env, &client, id, &recipient, "session-dispute", 500);
     assert_eq!(
         client
             .try_cancel_stream(&id, &sender)
@@ -232,7 +215,7 @@ fn dispute_frees_capacity_and_pending_claim_blocks_cancel() {
             .unwrap(),
         Error::OutstandingWithdrawals
     );
-    client.dispute_withdrawal(&id, &sender, &request);
+    client.dispute_withdrawal(&id, &sender, &request_id);
     assert_eq!(client.compute_available(&id), 20_000);
     client.cancel_stream(&id, &sender);
     assert_eq!(token.balance(&sender), 100_000);
@@ -246,13 +229,13 @@ fn full_escrow_release_completes_stream() {
     let sender = Address::generate(&env);
     let recipient = Address::generate(&env);
     let asset = create_asset(&env, &sender, 100_000);
-    let (client, _, _) = setup(&env);
+    let (client, _, _) = setup_no_verifier(&env);
     let id = create_stream(&env, &client, &sender, &recipient, &asset, 10, 20_000, 400);
-    let request = String::from_str(&env, "session-complete");
+    let request_id = String::from_str(&env, "session-complete");
 
-    verify(&env, &client, id, "session-complete", 20_000, 2_000);
-    client.approve_withdrawal(&id, &sender, &request);
-    client.withdraw_approved(&id, &recipient, &request);
+    request(&env, &client, id, &recipient, "session-complete", 20_000);
+    client.approve_withdrawal(&id, &sender, &request_id);
+    client.withdraw_approved(&id, &recipient, &request_id);
 
     assert_eq!(client.get_stream(&id).status, StreamStatus::Completed);
     assert_eq!(client.compute_available(&id), 0);
@@ -260,25 +243,22 @@ fn full_escrow_release_completes_stream() {
 }
 
 #[test]
-fn configured_verifier_blocks_legacy_requests() {
+fn legacy_request_withdrawal_works_without_verifier() {
     let env = Env::default();
+    env.mock_all_auths();
     let sender = Address::generate(&env);
     let recipient = Address::generate(&env);
     let asset = create_asset(&env, &sender, 100_000);
-    let (client, _, _) = setup(&env);
+    let (client, _, _) = setup_no_verifier(&env);
     let id = create_stream(&env, &client, &sender, &recipient, &asset, 10, 20_000, 400);
+
+    // This should succeed — no verifier is configured, so the legacy path is open.
     let result = client.try_request_withdrawal(
         &id,
         &recipient,
-        &String::from_str(&env, "legacy"),
-        &1,
+        &String::from_str(&env, "legacy-request"),
+        &500,
     );
-    assert_eq!(result.unwrap_err().unwrap(), Error::VerificationRequired);
-}
-
-#[test]
-fn get_verifier_returns_configured_account() {
-    let env = Env::default();
-    let (client, _, verifier) = setup(&env);
-    assert_eq!(client.get_verifier(), Some(verifier));
+    assert!(result.is_ok());
+    assert_eq!(client.compute_earned(&id), 500);
 }

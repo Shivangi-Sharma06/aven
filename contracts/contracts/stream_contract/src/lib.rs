@@ -20,7 +20,6 @@ enum DataKey {
     RecipientStreams(Address),
     Withdrawal(u64, String),
     ReservedWithdrawals(u64),
-    Verifier,
 }
 
 const MAX_WITHDRAWAL_REQUEST_ID_LEN: u32 = 64;
@@ -82,8 +81,6 @@ pub enum Error {
     WithdrawalDisputed = 28,
     WithdrawalApprovalRequired = 29,
     NotAdmin = 30,
-    VerifierNotConfigured = 31,
-    VerificationRequired = 32,
     SenderMatchesRecipient = 33,
     InvalidActiveDuration = 34,
     PaymentMismatch = 35,
@@ -100,19 +97,6 @@ pub struct StreamCreated {
     pub recipient: Address,
     pub asset: Address,
     pub total_deposited: i128,
-}
-
-#[contractevent(topics = ["work_verified"])]
-pub struct WorkVerified {
-    #[topic]
-    pub stream_id: u64,
-    #[topic]
-    pub recipient: Address,
-    pub request_id: String,
-    pub amount: i128,
-    pub active_duration_seconds: u64,
-    pub evidence_hash: BytesN<32>,
-    pub deadline_ledger: u32,
 }
 
 #[contractevent(topics = ["withdrawal_requested"])]
@@ -192,127 +176,6 @@ impl StreamContract {
         env.storage().instance().set(&DataKey::NextStreamId, &1u64);
         bump_instance(&env);
         log!(&env, "init: admin={}, attestation={}", admin, attestation_contract);
-        Ok(())
-    }
-
-    pub fn set_verifier(env: Env, admin: Address, verifier: Address) -> Result<(), Error> {
-        admin.require_auth();
-        let expected: Address = env
-            .storage()
-            .instance()
-            .get(&DataKey::Admin)
-            .ok_or(Error::NotInitialized)?;
-        if admin != expected {
-            return Err(Error::NotAdmin);
-        }
-        env.storage().instance().set(&DataKey::Verifier, &verifier);
-        bump_instance(&env);
-        log!(&env, "set_verifier: verifier={}", verifier);
-        Ok(())
-    }
-
-    /// Return the verifier account trusted to reserve verified work payments.
-    pub fn get_verifier(env: Env) -> Option<Address> {
-        env.storage().instance().get(&DataKey::Verifier)
-    }
-
-    /// Reserves payment for one npm-tracked work session.
-    ///
-    /// The verifier cannot choose an arbitrary amount: the contract recomputes
-    /// `rate_per_second * active_duration_seconds` and caps it at the unreserved
-    /// escrow remaining. Ledger time and checkpoints do not unlock funds.
-    pub fn verify_work(
-        env: Env,
-        stream_id: u64,
-        request_id: String,
-        amount: i128,
-        evidence_hash: BytesN<32>,
-        active_duration_seconds: u64,
-        work_start_ledger: u32,
-    ) -> Result<(), Error> {
-        let verifier: Address = env
-            .storage()
-            .instance()
-            .get(&DataKey::Verifier)
-            .ok_or(Error::VerifierNotConfigured)?;
-        verifier.require_auth();
-        bump_instance(&env);
-
-        let stream = load_stream(&env, stream_id)?;
-        require_payable_status(&stream)?;
-        validate_request_id(&request_id)?;
-        if amount <= 0 {
-            return Err(Error::InvalidAmount);
-        }
-        if active_duration_seconds == 0 {
-            return Err(Error::InvalidActiveDuration);
-        }
-
-        let key = DataKey::Withdrawal(stream_id, request_id.clone());
-        if let Some(existing) = env.storage().persistent().get::<_, WithdrawalRecord>(&key) {
-            if existing.amount == amount
-                && existing.evidence_hash == Some(evidence_hash.clone())
-                && existing.active_duration_seconds == active_duration_seconds
-                && existing.work_start_ledger == work_start_ledger
-                && (existing.status == WithdrawalStatus::Pending
-                    || existing.status == WithdrawalStatus::Approved)
-            {
-                return Ok(());
-            }
-            return Err(Error::WithdrawalAlreadyExists);
-        }
-
-        let available = remaining_unreserved(&env, &stream)?;
-        if available <= 0 {
-            return Err(Error::AmountExceedsWithdrawable);
-        }
-        let rate_per_second = stream.rate_per_ledger / LEDGERS_PER_UNIT;
-        let tracked_amount = rate_per_second
-            .checked_mul(active_duration_seconds as i128)
-            .ok_or(Error::Overflow)?;
-        let expected_amount = if tracked_amount > available {
-            available
-        } else {
-            tracked_amount
-        };
-        if amount != expected_amount {
-            return Err(Error::PaymentMismatch);
-        }
-
-        let requested_at_ledger = env.ledger().sequence();
-        let deadline_ledger = requested_at_ledger
-            .checked_add(stream.approval_timeout_ledgers)
-            .ok_or(Error::Overflow)?;
-        let record = WithdrawalRecord {
-            stream_id,
-            request_id: request_id.clone(),
-            amount,
-            requested_at_ledger,
-            deadline_ledger,
-            status: WithdrawalStatus::Pending,
-            evidence_hash: Some(evidence_hash.clone()),
-            work_start_ledger,
-            active_duration_seconds,
-        };
-        save_withdrawal(&env, &record);
-        save_reserved(
-            &env,
-            stream_id,
-            load_reserved(&env, stream_id)
-                .checked_add(amount)
-                .ok_or(Error::Overflow)?,
-        );
-
-        WorkVerified {
-            stream_id,
-            recipient: stream.recipient,
-            request_id,
-            amount,
-            active_duration_seconds,
-            evidence_hash,
-            deadline_ledger,
-        }
-        .publish(&env);
         Ok(())
     }
 
@@ -451,7 +314,9 @@ impl StreamContract {
         Ok(id)
     }
 
-    /// Legacy direct requests are disabled whenever the npm verifier is configured.
+    /// Request a withdrawal from the stream escrow.
+    /// The recipient signs this transaction. The request goes directly into
+    /// Pending status; no verifier is required.
     pub fn request_withdrawal(
         env: Env,
         stream_id: u64,
@@ -461,9 +326,6 @@ impl StreamContract {
     ) -> Result<(), Error> {
         recipient.require_auth();
         bump_instance(&env);
-        if env.storage().instance().has(&DataKey::Verifier) {
-            return Err(Error::VerificationRequired);
-        }
 
         let stream = load_stream(&env, stream_id)?;
         if recipient != stream.recipient {
@@ -631,16 +493,7 @@ impl StreamContract {
             &record.amount,
         );
 
-        let kind = if record.evidence_hash.is_some() {
-            AttestationKind::WorkSession
-        } else {
-            AttestationKind::LegacyReviewed
-        };
-        let verifier = if kind == AttestationKind::WorkSession {
-            env.storage().instance().get(&DataKey::Verifier)
-        } else {
-            None
-        };
+        let kind = AttestationKind::LegacyReviewed;
         let period_start = if record.work_start_ledger > 0 {
             record.work_start_ledger
         } else {
@@ -658,8 +511,8 @@ impl StreamContract {
             record.active_duration_seconds,
             client_confirmed,
             auto_released,
-            verifier,
-            record.evidence_hash,
+            None,
+            None,
         )?;
 
         // Reputation consumes only this one completion record, so the score is
@@ -698,7 +551,7 @@ impl StreamContract {
         load_withdrawal(&env, stream_id, &request_id)
     }
 
-    /// Unreserved escrow still available for future npm work sessions.
+    /// Unreserved escrow still available for future withdrawals.
     pub fn compute_available(env: Env, stream_id: u64) -> Result<i128, Error> {
         let stream = load_stream(&env, stream_id)?;
         if stream.status == StreamStatus::Cancelled {
@@ -707,7 +560,7 @@ impl StreamContract {
         remaining_unreserved(&env, &stream)
     }
 
-    /// Total value already measured by submitted npm sessions.
+    /// Total value already withdrawn or reserved.
     pub fn compute_earned(env: Env, stream_id: u64) -> Result<i128, Error> {
         let stream = load_stream(&env, stream_id)?;
         stream

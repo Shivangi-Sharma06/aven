@@ -31,7 +31,12 @@ if (typeof window !== "undefined") {
 }
 
 
-
+export const networks = {
+  testnet: {
+    networkPassphrase: "Test SDF Network ; September 2015",
+    contractId: "CBUPYHMAUX3JGICPIMDQ5Y6FX7OS7HMY27NSEEX6HL3QZAVP6CSX42YF",
+  }
+} as const
 
 export const Errors = {
   1: {message:"AlreadyInitialized"},

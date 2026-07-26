@@ -154,7 +154,7 @@ export default function LandingPage() {
                 </div>
               </div>
 
-              <pre className="developer-hub__code" aria-label="Aven command example"><code><span>$</span> npm install aven-work-session{'\n'}<span>$</span> npx aven start{'\n'}<span>$</span> npx aven submit --ended</code></pre>
+              <pre className="developer-hub__code" aria-label="Aven command example"><code><span>$</span> npm install aven-work-session{'\n'}<span>$</span> npx aven-stellar start{'\n'}<span>$</span> npx aven-stellar stop --ended</code></pre>
             </div>
           </section>
 

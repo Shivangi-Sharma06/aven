@@ -275,3 +275,10 @@ fn configured_verifier_blocks_legacy_requests() {
     );
     assert_eq!(result.unwrap_err().unwrap(), Error::VerificationRequired);
 }
+
+#[test]
+fn get_verifier_returns_configured_account() {
+    let env = Env::default();
+    let (client, _, verifier) = setup(&env);
+    assert_eq!(client.get_verifier(), Some(verifier));
+}

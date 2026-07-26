@@ -9,6 +9,10 @@ import {
   STREAM_CONTRACT_ID,
 } from "./contracts";
 import type { WorkSessionReport } from "./work-session";
+import {
+  assertWorkVerifierMatches,
+  isLegacyVerifierGetterMissing,
+} from "./work-stream-verifier-config";
 
 function unwrap<T>(value: unknown): T {
   return ((value as { unwrap?: () => T })?.unwrap?.() ?? value) as T;
@@ -30,7 +34,7 @@ function reportDigest(report: WorkSessionReport) {
   return createHash("sha256").update(JSON.stringify(report)).digest();
 }
 
-function verifierClient() {
+async function verifierClient() {
   const secret = process.env.AVEN_VERIFIER_SECRET?.trim();
   if (!secret) throw new Error("AVEN_VERIFIER_SECRET is not configured on the server.");
   if (!STREAM_CONTRACT_ID) {
@@ -38,38 +42,27 @@ function verifierClient() {
   }
 
   const keypair = Keypair.fromSecret(secret);
-  return {
-    keypair,
-    client: new StreamClient({
-      contractId: STREAM_CONTRACT_ID,
-      networkPassphrase: NETWORK_PASSPHRASE,
-      rpcUrl: SOROBAN_RPC_URL,
-      publicKey: keypair.publicKey(),
-      signTransaction: async (xdr: string) => {
-        const transaction = TransactionBuilder.fromXDR(xdr, NETWORK_PASSPHRASE);
-        transaction.sign(keypair);
-        return { signedTxXdr: transaction.toXDR(), signerAddress: keypair.publicKey() };
-      },
-      signAuthEntry: async (entryXdr: string) => {
-        const entryBytes = Buffer.from(entryXdr, "base64");
-        const hash = createHash("sha256").update(entryBytes).digest();
-        const signature = keypair.sign(hash);
-        // The SDK decodes the returned signedAuthEntry as a DecoratedSignature
-        // XDR object. It must contain the 4-byte hint (last 4 bytes of the raw
-        // public key) and the Ed25519 signature bytes.
-        const rawPublicKey = keypair.rawPublicKey();
-        const hint = rawPublicKey.slice(-4);
-        const decoratedSignature = new xdr.DecoratedSignature({
-          hint: hint,
-          signature: signature,
-        });
-        return {
-          signedAuthEntry: decoratedSignature.toXDR("base64"),
-          signerAddress: keypair.publicKey(),
-        };
-      },
-    }),
-  };
+  const client = new StreamClient({
+    contractId: STREAM_CONTRACT_ID,
+    networkPassphrase: NETWORK_PASSPHRASE,
+    rpcUrl: SOROBAN_RPC_URL,
+    publicKey: keypair.publicKey(),
+    signTransaction: async (xdr: string) => {
+      const transaction = TransactionBuilder.fromXDR(xdr, NETWORK_PASSPHRASE);
+      transaction.sign(keypair);
+      return { signedTxXdr: transaction.toXDR(), signerAddress: keypair.publicKey() };
+    },
+  });
+  try {
+    const configured = await client.get_verifier();
+    assertWorkVerifierMatches(keypair.publicKey(), configured.result);
+  } catch (error) {
+    if (!isLegacyVerifierGetterMissing(error)) throw error;
+    // Legacy testnet contracts still enforce the configured verifier through
+    // require_auth() in verify_work. A mismatched server key therefore fails
+    // during simulation instead of being able to reserve any escrow.
+  }
+  return client;
 }
 
 export async function recordVerifiedWork(input: {
@@ -80,7 +73,7 @@ export async function recordVerifiedWork(input: {
   onchainActiveSeconds?: bigint | number;
   workStartLedger?: number;
 }) {
-  const { client, keypair } = verifierClient();
+  const client = await verifierClient();
   const digest = reportDigest(input.report);
 
   const transaction = await client.verify_work({

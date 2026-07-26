@@ -51,7 +51,10 @@ function sumRequested(sessions: WorkSession[], statuses: WorkSession["status"][]
 
 type ManagedRepository = {
   fullName: string;
+  name: string;        // bare repo name (e.g. "aven-11-my-project")
   htmlUrl: string;
+  cloneUrl: string;    // HTTPS clone URL
+  sshUrl: string;      // SSH clone URL
   status: "CREATING" | "ACTIVE" | "TRANSFER_PENDING" | "TRANSFERRED" | "TRANSFER_FAILED";
   transferDestination?: string;
   lastError?: string;
@@ -63,6 +66,33 @@ type GithubConnection = {
   githubLogin?: string;
   avatarUrl?: string;
 };
+
+function CopyButton({ value, label }: { value: string; label: string }) {
+  const [state, setState] = useState<"idle" | "copied" | "error">("idle");
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(value);
+      setState("copied");
+      setTimeout(() => setState("idle"), 2000);
+    } catch {
+      setState("error");
+      setTimeout(() => setState("idle"), 3000);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      className={styles["copy-btn"]}
+      aria-label={label}
+      onClick={handleCopy}
+      data-copy-state={state}
+    >
+      {state === "copied" ? "Copied" : state === "error" ? "Copy failed" : "Copy"}
+    </button>
+  );
+}
 
 export default function StreamDetailPage() {
   const params = useParams();
@@ -615,6 +645,44 @@ export default function StreamDetailPage() {
                   GITHUB_OAUTH_* variables and restart the app.
                 </p>
               )}
+              {/* Employee repository details — only shown to the recipient when a repo exists */}
+              {isRecipient && repository && (
+                <div className={styles["repo-employee-details"]}>
+                  <div className={styles["repo-detail-row"]}>
+                    <span className={styles["repo-detail-label"]}>Status</span>
+                    <span
+                      className={styles["repo-status-badge"]}
+                      data-status={repository.status}
+                    >
+                      {repository.status.replaceAll("_", " ")}
+                    </span>
+                  </div>
+                  <div className={styles["repo-detail-row"]}>
+                    <a
+                      className={styles["repo-open-btn"]}
+                      href={repository.htmlUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Open repository ↗
+                    </a>
+                  </div>
+                  <div className={styles["repo-clone-row"]}>
+                    <span className={styles["repo-detail-label"]}>HTTPS clone</span>
+                    <code className={styles["repo-clone-url"]}>{repository.cloneUrl}</code>
+                    <CopyButton value={repository.cloneUrl} label="Copy HTTPS clone URL" />
+                  </div>
+                  <div className={styles["repo-clone-row"]}>
+                    <span className={styles["repo-detail-label"]}>SSH clone</span>
+                    <code className={styles["repo-clone-url"]}>{repository.sshUrl}</code>
+                    <CopyButton value={repository.sshUrl} label="Copy SSH clone URL" />
+                  </div>
+                  <p className={styles["repo-invite-note"]}>
+                    Accept the GitHub collaborator invitation from your GitHub notifications or
+                    email before you clone.
+                  </p>
+                </div>
+              )}
             </div>
             <div className={styles["repository-actions"]}>
               {!githubConnection?.connected && (
@@ -674,7 +742,123 @@ export default function StreamDetailPage() {
                   {repositoryBusy ? "Refreshing…" : "Refresh transfer status"}
                 </button>
               )}
+              {/* Client: copy onboarding link so they can share it with the employee */}
+              {isSender && (
+                <CopyButton
+                  value={typeof window !== "undefined" ? `${window.location.origin}/stream/${id}` : `/stream/${id}`}
+                  label="Copy employee onboarding link"
+                />
+              )}
             </div>
+          </section>
+        )}
+
+        {/* Employee onboarding checklist — only shown to the recipient */}
+        {isRecipient && (
+          <section className={styles["onboarding-panel"]}>
+            <div className={styles["onboarding-heading"]}>
+              <span className={styles["onboarding-eyebrow"]}>EMPLOYEE SETUP</span>
+              <h3 className={styles["onboarding-title"]}>Start working</h3>
+            </div>
+
+            {!repository ? (
+              <ol className={styles["onboarding-list"]}>
+                <li>
+                  {!githubConnection?.connected ? (
+                    <button type="button" className={styles["onboarding-link-btn"]} onClick={connectGithub}>
+                      Connect GitHub
+                    </button>
+                  ) : (
+                    <span>Connect GitHub <span className={styles["onboarding-done"]}>✓ connected as @{githubConnection.githubLogin}</span></span>
+                  )}
+                </li>
+                <li>Wait for the client to create the repository</li>
+                <li>Accept the GitHub collaborator invitation</li>
+                <li>Clone the repository</li>
+                <li>Enter the repository directory</li>
+                <li>Start an Aven work session</li>
+                <li>Commit and push changes</li>
+                <li>Stop and submit the session</li>
+              </ol>
+            ) : (
+              <ol className={styles["onboarding-list"]}>
+                <li>
+                  {!githubConnection?.connected ? (
+                    <button type="button" className={styles["onboarding-link-btn"]} onClick={connectGithub}>
+                      Connect GitHub
+                    </button>
+                  ) : (
+                    <span>Connect GitHub <span className={styles["onboarding-done"]}>✓ @{githubConnection.githubLogin}</span></span>
+                  )}
+                </li>
+                <li><span className={styles["onboarding-done"]}>✓ Repository created</span></li>
+                <li>
+                  Accept the GitHub collaborator invitation from your GitHub notifications or email
+                  before cloning.
+                </li>
+                <li>
+                  <span className={styles["onboarding-step-label"]}>Clone the repository</span>
+                  <div className={styles["onboarding-cmd-row"]}>
+                    <code className={styles["onboarding-cmd"]}>git clone {repository.cloneUrl}</code>
+                    <CopyButton value={`git clone ${repository.cloneUrl}`} label="Copy git clone command" />
+                  </div>
+                </li>
+                <li>
+                  <span className={styles["onboarding-step-label"]}>Enter the repository directory</span>
+                  <div className={styles["onboarding-cmd-row"]}>
+                    <code className={styles["onboarding-cmd"]}>cd {repository.name}</code>
+                    <CopyButton value={`cd ${repository.name}`} label="Copy cd command" />
+                  </div>
+                </li>
+                <li>
+                  <span className={styles["onboarding-step-label"]}>Start an Aven work session</span>
+                  <div className={styles["onboarding-cmd-row"]}>
+                    <code className={styles["onboarding-cmd"]}>
+                      {`npx aven-stellar start --stream ${id} --dashboard ${typeof window !== "undefined" ? window.location.origin : ""}`}
+                    </code>
+                    <CopyButton
+                      value={`npx aven-stellar start --stream ${id} --dashboard ${typeof window !== "undefined" ? window.location.origin : ""}`}
+                      label="Copy aven-stellar start command"
+                    />
+                  </div>
+                </li>
+                <li>
+                  <span className={styles["onboarding-step-label"]}>For each work session — commit and push</span>
+                  <div className={styles["onboarding-cmd-row"]}>
+                    <code className={styles["onboarding-cmd"]}>git add .</code>
+                    <CopyButton value="git add ." label="Copy git add command" />
+                  </div>
+                  <div className={styles["onboarding-cmd-row"]}>
+                    <code className={styles["onboarding-cmd"]}>git commit -m &quot;Describe completed work&quot;</code>
+                    <CopyButton value='git commit -m "Describe completed work"' label="Copy git commit command" />
+                  </div>
+                  <div className={styles["onboarding-cmd-row"]}>
+                    <code className={styles["onboarding-cmd"]}>git push</code>
+                    <CopyButton value="git push" label="Copy git push command" />
+                  </div>
+                  <div className={styles["onboarding-cmd-row"]}>
+                    <code className={styles["onboarding-cmd"]}>npx aven-stellar stop</code>
+                    <CopyButton value="npx aven-stellar stop" label="Copy aven-stellar stop command" />
+                  </div>
+                </li>
+                <li>
+                  <span className={styles["onboarding-step-label"]}>Final delivery — push all branches first</span>
+                  <p className={styles["onboarding-final-note"]}>
+                    Push all delivery branches before running{" "}
+                    <code>stop --ended</code>. If any selected final-delivery branch has not been
+                    pushed, the repository transfer will be blocked.
+                  </p>
+                  <div className={styles["onboarding-cmd-row"]}>
+                    <code className={styles["onboarding-cmd"]}>git push</code>
+                    <CopyButton value="git push" label="Copy final git push command" />
+                  </div>
+                  <div className={styles["onboarding-cmd-row"]}>
+                    <code className={styles["onboarding-cmd"]}>npx aven-stellar stop --ended</code>
+                    <CopyButton value="npx aven-stellar stop --ended" label="Copy aven-stellar stop --ended command" />
+                  </div>
+                </li>
+              </ol>
+            )}
           </section>
         )}
 

@@ -186,6 +186,12 @@ export interface Client {
   verify_work: ({stream_id, request_id, amount, evidence_hash, active_duration_seconds, work_start_ledger}: {stream_id: u64, request_id: string, amount: i128, evidence_hash: Buffer, active_duration_seconds: u64, work_start_ledger: u32}, options?: MethodOptions) => Promise<AssembledTransaction<Result<void>>>
 
   /**
+   * Construct and simulate a get_verifier transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+   * Return the verifier account trusted to reserve verified work payments.
+   */
+  get_verifier: (options?: MethodOptions) => Promise<AssembledTransaction<Option<string>>>
+
+  /**
    * Construct and simulate a pause_stream transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
    */
   pause_stream: ({stream_id, caller}: {stream_id: u64, caller: string}, options?: MethodOptions) => Promise<AssembledTransaction<Result<void>>>
@@ -291,6 +297,7 @@ export class Client extends ContractClient {
         "AAAAAAAAAAAAAAAEaW5pdAAAAAIAAAAAAAAABWFkbWluAAAAAAAAEwAAAAAAAAAUYXR0ZXN0YXRpb25fY29udHJhY3QAAAATAAAAAQAAA+kAAAACAAAAAw==",
         "AAAAAAAAAAAAAAAKZ2V0X3N0cmVhbQAAAAAAAQAAAAAAAAAJc3RyZWFtX2lkAAAAAAAABgAAAAEAAAPpAAAH0AAAAAxTdHJlYW1SZWNvcmQAAAAD",
         "AAAAAAAAAQhSZXNlcnZlcyBwYXltZW50IGZvciBvbmUgbnBtLXRyYWNrZWQgd29yayBzZXNzaW9uLgoKVGhlIHZlcmlmaWVyIGNhbm5vdCBjaG9vc2UgYW4gYXJiaXRyYXJ5IGFtb3VudDogdGhlIGNvbnRyYWN0IHJlY29tcHV0ZXMKYHJhdGVfcGVyX3NlY29uZCAqIGFjdGl2ZV9kdXJhdGlvbl9zZWNvbmRzYCBhbmQgY2FwcyBpdCBhdCB0aGUgdW5yZXNlcnZlZAplc2Nyb3cgcmVtYWluaW5nLiBMZWRnZXIgdGltZSBhbmQgY2hlY2twb2ludHMgZG8gbm90IHVubG9jayBmdW5kcy4AAAALdmVyaWZ5X3dvcmsAAAAABgAAAAAAAAAJc3RyZWFtX2lkAAAAAAAABgAAAAAAAAAKcmVxdWVzdF9pZAAAAAAAEAAAAAAAAAAGYW1vdW50AAAAAAALAAAAAAAAAA1ldmlkZW5jZV9oYXNoAAAAAAAD7gAAACAAAAAAAAAAF2FjdGl2ZV9kdXJhdGlvbl9zZWNvbmRzAAAAAAYAAAAAAAAAEXdvcmtfc3RhcnRfbGVkZ2VyAAAAAAAABAAAAAEAAAPpAAAAAgAAAAM=",
+        "AAAAAAAAAEZSZXR1cm4gdGhlIHZlcmlmaWVyIGFjY291bnQgdHJ1c3RlZCB0byByZXNlcnZlIHZlcmlmaWVkIHdvcmsgcGF5bWVudHMuAAAAAAAMZ2V0X3ZlcmlmaWVyAAAAAAAAAAEAAAPoAAAAEw==",
         "AAAAAAAAAAAAAAAMcGF1c2Vfc3RyZWFtAAAAAgAAAAAAAAAJc3RyZWFtX2lkAAAAAAAABgAAAAAAAAAGY2FsbGVyAAAAAAATAAAAAQAAA+kAAAACAAAAAw==",
         "AAAAAAAAAAAAAAAMc2V0X3ZlcmlmaWVyAAAAAgAAAAAAAAAFYWRtaW4AAAAAAAATAAAAAAAAAAh2ZXJpZmllcgAAABMAAAABAAAD6QAAAAIAAAAD",
         "AAAAAAAAAAAAAAANY2FuY2VsX3N0cmVhbQAAAAAAAAIAAAAAAAAACXN0cmVhbV9pZAAAAAAAAAYAAAAAAAAABmNhbGxlcgAAAAAAEwAAAAEAAAPpAAAAAgAAAAM=",
@@ -318,6 +325,7 @@ export class Client extends ContractClient {
     init: this.txFromJSON<Result<void>>,
         get_stream: this.txFromJSON<Result<StreamRecord>>,
         verify_work: this.txFromJSON<Result<void>>,
+        get_verifier: this.txFromJSON<Option<string>>,
         pause_stream: this.txFromJSON<Result<void>>,
         set_verifier: this.txFromJSON<Result<void>>,
         cancel_stream: this.txFromJSON<Result<void>>,

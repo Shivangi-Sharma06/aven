@@ -9,6 +9,7 @@ import {
   STREAM_CONTRACT_ID,
 } from "./contracts";
 import type { WorkSessionReport } from "./work-session";
+import { assertWorkVerifierMatches } from "./work-stream-verifier-config";
 
 function unwrap<T>(value: unknown): T {
   return ((value as { unwrap?: () => T })?.unwrap?.() ?? value) as T;
@@ -30,7 +31,7 @@ function reportDigest(report: WorkSessionReport) {
   return createHash("sha256").update(JSON.stringify(report)).digest();
 }
 
-function verifierClient() {
+async function verifierClient() {
   const secret = process.env.AVEN_VERIFIER_SECRET?.trim();
   if (!secret) throw new Error("AVEN_VERIFIER_SECRET is not configured on the server.");
   if (!STREAM_CONTRACT_ID) {
@@ -38,7 +39,7 @@ function verifierClient() {
   }
 
   const keypair = Keypair.fromSecret(secret);
-  return new StreamClient({
+  const client = new StreamClient({
     contractId: STREAM_CONTRACT_ID,
     networkPassphrase: NETWORK_PASSPHRASE,
     rpcUrl: SOROBAN_RPC_URL,
@@ -49,6 +50,9 @@ function verifierClient() {
       return { signedTxXdr: transaction.toXDR(), signerAddress: keypair.publicKey() };
     },
   });
+  const configured = await client.get_verifier();
+  assertWorkVerifierMatches(keypair.publicKey(), configured.result);
+  return client;
 }
 
 export async function recordVerifiedWork(input: {
@@ -59,7 +63,7 @@ export async function recordVerifiedWork(input: {
   onchainActiveSeconds?: bigint | number;
   workStartLedger?: number;
 }) {
-  const client = verifierClient();
+  const client = await verifierClient();
   const digest = reportDigest(input.report);
 
   const transaction = await client.verify_work({

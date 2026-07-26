@@ -209,6 +209,11 @@ impl StreamContract {
         Ok(())
     }
 
+    /// Return the verifier account trusted to reserve verified work payments.
+    pub fn get_verifier(env: Env) -> Option<Address> {
+        env.storage().instance().get(&DataKey::Verifier)
+    }
+
     /// Reserves payment for one npm-tracked work session.
     ///
     /// The verifier cannot choose an arbitrary amount: the contract recomputes

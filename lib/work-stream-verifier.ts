@@ -34,7 +34,7 @@ function reportDigest(report: WorkSessionReport) {
   return createHash("sha256").update(JSON.stringify(report)).digest();
 }
 
-async function verifierClient() {
+async function verifierClient(): Promise<{ client: StreamClient; keypair: Keypair }> {
   const secret = process.env.AVEN_VERIFIER_SECRET?.trim();
   if (!secret) throw new Error("AVEN_VERIFIER_SECRET is not configured on the server.");
   if (!STREAM_CONTRACT_ID) {
@@ -62,7 +62,7 @@ async function verifierClient() {
     // require_auth() in verify_work. A mismatched server key therefore fails
     // during simulation instead of being able to reserve any escrow.
   }
-  return client;
+  return { client, keypair };
 }
 
 export async function recordVerifiedWork(input: {
@@ -73,7 +73,7 @@ export async function recordVerifiedWork(input: {
   onchainActiveSeconds?: bigint | number;
   workStartLedger?: number;
 }) {
-  const client = await verifierClient();
+  const { client, keypair } = await verifierClient();
   const digest = reportDigest(input.report);
 
   const transaction = await client.verify_work({

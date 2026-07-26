@@ -13,7 +13,7 @@ import {
   getUsdcTrustlineStatus,
   isValidStellarAccountAddress,
 } from "@/lib/stellar";
-import { STELLAR_EXPLORER } from "@/lib/contracts";
+import { NETWORK_LABEL, STELLAR_EXPLORER } from "@/lib/contracts";
 
 type Asset = "USDC" | "XLM";
 type TrustlineState = "idle" | "checking" | "ready" | "missing" | "blocked" | "error";

@@ -38,17 +38,30 @@ function verifierClient() {
   }
 
   const keypair = Keypair.fromSecret(secret);
-  return new StreamClient({
-    contractId: STREAM_CONTRACT_ID,
-    networkPassphrase: NETWORK_PASSPHRASE,
-    rpcUrl: SOROBAN_RPC_URL,
-    publicKey: keypair.publicKey(),
-    signTransaction: async (xdr: string) => {
-      const transaction = TransactionBuilder.fromXDR(xdr, NETWORK_PASSPHRASE);
-      transaction.sign(keypair);
-      return { signedTxXdr: transaction.toXDR(), signerAddress: keypair.publicKey() };
-    },
-  });
+  return {
+    keypair,
+    client: new StreamClient({
+      contractId: STREAM_CONTRACT_ID,
+      networkPassphrase: NETWORK_PASSPHRASE,
+      rpcUrl: SOROBAN_RPC_URL,
+      publicKey: keypair.publicKey(),
+      signTransaction: async (xdr: string) => {
+        const transaction = TransactionBuilder.fromXDR(xdr, NETWORK_PASSPHRASE);
+        transaction.sign(keypair);
+        return { signedTxXdr: transaction.toXDR(), signerAddress: keypair.publicKey() };
+      },
+      signAuthEntry: async (entryXdr: string) => {
+        const preimageHash = createHash("sha256")
+          .update(Buffer.from(entryXdr, "base64"))
+          .digest();
+        const signature = keypair.sign(preimageHash);
+        return {
+          signedAuthEntry: signature.toString("base64"),
+          signerAddress: keypair.publicKey(),
+        };
+      },
+    }),
+  };
 }
 
 export async function recordVerifiedWork(input: {
@@ -59,7 +72,7 @@ export async function recordVerifiedWork(input: {
   onchainActiveSeconds?: bigint | number;
   workStartLedger?: number;
 }) {
-  const client = verifierClient();
+  const { client, keypair } = verifierClient();
   const digest = reportDigest(input.report);
 
   const transaction = await client.verify_work({
@@ -72,6 +85,17 @@ export async function recordVerifiedWork(input: {
     ),
     work_start_ledger: input.workStartLedger ?? 0,
   });
+
+  // The contract's verifier.require_auth() generates a SorobanAddressCredentials
+  // auth entry. The SDK's signAndSend() will refuse to submit unless all such
+  // auth entries are signed first via signAuthEntries().
+  const nonInvokerSigners = transaction.needsNonInvokerSigningBy();
+  if (nonInvokerSigners.length > 0) {
+    await transaction.signAuthEntries({
+      address: keypair.publicKey(),
+    });
+  }
+
   const sent = await transaction.signAndSend();
   const claimTx = await client.get_withdrawal({
     stream_id: BigInt(input.streamId),

@@ -94,9 +94,22 @@ export async function recordVerifiedWork(input: {
     work_start_ledger: input.workStartLedger ?? 0,
   });
 
-  // The verifier keypair is set as the client's publicKey (source account /
-  // invoker). The contract's verifier.require_auth() is satisfied by the
-  // transaction envelope signature — no separate auth entries needed.
+  // Determine which addresses require auth entry signing. If the simulation
+  // returns an address that is NOT the verifier keypair, it means set_verifier
+  // hasn't been called yet (the verifier storage key is absent) or was set to
+  // a different key. In either case, the verifier keypair cannot satisfy it.
+  const nonInvokerSigners = transaction.needsNonInvokerSigningBy();
+  for (const signer of nonInvokerSigners) {
+    if (signer !== keypair.publicKey()) {
+      throw new Error(
+        `The stream contract expects ${signer} as the verifier, but the server ` +
+        `has ${keypair.publicKey()}. Go to /set-verifier to register the correct verifier. ` +
+        `See needsNonInvokerSigningBy for details.`,
+      );
+    }
+    await transaction.signAuthEntries({ address: signer });
+  }
+
   const sent = await transaction.signAndSend();
   const claimTx = await client.get_withdrawal({
     stream_id: BigInt(input.streamId),

@@ -3,7 +3,7 @@ import { apiError } from "@/lib/api-response";
 import { getSession, putSession } from "@/lib/session-store";
 import { verifyReport } from "@/lib/work-verifier";
 import { recordVerifiedWork } from "@/lib/work-stream-verifier";
-import type { WorkSessionReport } from "@/lib/work-session";
+import type { WorkSession, WorkSessionReport } from "@/lib/work-session";
 import { STREAM_CONTRACT_ID } from "@/lib/contracts";
 import {
   addTimelineEvent,
@@ -39,7 +39,13 @@ export async function POST(request: Request) {
       if (!addressesEqual(existing.workerAddress, token.walletAddress)) {
         return apiError("This session belongs to another worker.", 403);
       }
-      return NextResponse.json({ sessionId: existing.id, status: existing.status, session: existing });
+      // Allow retry if the session is stuck in VERIFYING (on-chain step failed
+      // mid-way) or SUBMITTED (on-chain verify_work failed but session was
+      // reverted). Otherwise return the existing session.
+      if (existing.status !== "VERIFYING" && existing.status !== "SUBMITTED") {
+        return NextResponse.json({ sessionId: existing.id, status: existing.status, session: existing });
+      }
+      // Fall through to re-run verification.
     }
 
     const stream = await getOnchainStream(report.session.streamId);
@@ -102,41 +108,73 @@ export async function POST(request: Request) {
     );
 
     const now = new Date().toISOString();
-    const session = addTimelineEvent(
-      {
-        id: report.session.sessionId,
-        contractId: STREAM_CONTRACT_ID,
-        streamId: stream.id,
-        workerAddress: stream.recipient,
-        clientAddress: stream.sender,
-        status: "SUBMITTED",
-        report,
-        submittedAt: now,
-        createdAt: now,
-        updatedAt: now,
-        timeline: [],
-      },
-      "SUBMITTED",
-      "worker",
-      "Work-session report submitted.",
-    );
-    await putSession(session);
 
-    addTimelineEvent(session, "VERIFYING", "system", "Static report verification started.");
-    await putSession(session);
+    // Determine if we are retrying a previously stuck session.
+    const isRetry = existing != null;
+    let session: WorkSession;
+
+    if (!isRetry) {
+      // First-time submission — create the session record.
+      session = addTimelineEvent(
+        {
+          id: report.session.sessionId,
+          contractId: STREAM_CONTRACT_ID,
+          streamId: stream.id,
+          workerAddress: stream.recipient,
+          clientAddress: stream.sender,
+          status: "SUBMITTED",
+          report,
+          submittedAt: now,
+          createdAt: now,
+          updatedAt: now,
+          timeline: [],
+        },
+        "SUBMITTED",
+        "worker",
+        "Work-session report submitted.",
+      );
+      await putSession(session);
+
+      addTimelineEvent(session, "VERIFYING", "system", "Static report verification started.");
+      await putSession(session);
+    } else {
+      // Retry — re-use the existing session but update the report.
+      existing.report = report;
+      existing.updatedAt = now;
+      addTimelineEvent(existing, "VERIFYING", "system", "Retrying on-chain verification after previous failure.");
+      await putSession(existing);
+      session = existing;
+    }
+
     const verification = verifyReport(report);
     session.verificationFlags = verification.flags;
     session.verificationSummary = verification.summary;
 
-    // Create the on-chain WithdrawalRecord via the verifier.
-    // The verifier keypair (AVEN_VERIFIER_SECRET) signs verify_work, which
-    // reserves the payment and stores the evidence hash on-chain.
-    const onchain = await recordVerifiedWork({
-      streamId: stream.id,
-      sessionId: session.id,
-      amountUnits: calculatedUnits,
-      report,
-    });
+    // On-chain verify_work via the verifier keypair.
+    // If this fails, the session stays in VERIFYING so the CLI can retry.
+    let onchain;
+    try {
+      onchain = await recordVerifiedWork({
+        streamId: stream.id,
+        sessionId: session.id,
+        amountUnits: calculatedUnits,
+        report,
+      });
+    } catch (onchainError: any) {
+      // On-chain verification failed. Revert to SUBMITTED so the CLI can retry,
+      // and attach the error message to the session for diagnostics.
+      const errorMessage = onchainError?.message ?? String(onchainError);
+      addTimelineEvent(
+        session,
+        "SUBMITTED",
+        "system",
+        `On-chain verification failed: ${errorMessage}. Resubmit to retry.`,
+      );
+      session.verificationError = errorMessage;
+      await putSession(session);
+      return apiError(`On-chain verification failed: ${errorMessage}`, 502);
+    }
+
     session.verifierTxHash = onchain.transactionHash;
     session.reportDigest = onchain.reportDigest;
     session.reviewDeadlineLedger = onchain.reviewDeadlineLedger;

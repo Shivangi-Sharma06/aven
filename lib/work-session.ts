@@ -146,6 +146,7 @@ export type WorkSession = {
   reportDigest?: string;
   disputeReason?: string;
   workerResponse?: string;
+  verificationError?: string;
   releasedTxHash?: string;
   submittedAt?: string;
   timeline?: WorkSessionEvent[];

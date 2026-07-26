@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createHash } from "node:crypto";
-import { Keypair, TransactionBuilder } from "@stellar/stellar-sdk";
+import { Keypair, TransactionBuilder, xdr } from "@stellar/stellar-sdk";
 import { Client as StreamClient } from "../contracts/bindings/stream/src/index";
 import {
   NETWORK_PASSPHRASE,
@@ -51,12 +51,20 @@ function verifierClient() {
         return { signedTxXdr: transaction.toXDR(), signerAddress: keypair.publicKey() };
       },
       signAuthEntry: async (entryXdr: string) => {
-        const preimageHash = createHash("sha256")
-          .update(Buffer.from(entryXdr, "base64"))
-          .digest();
-        const signature = keypair.sign(preimageHash);
+        const entryBytes = Buffer.from(entryXdr, "base64");
+        const hash = createHash("sha256").update(entryBytes).digest();
+        const signature = keypair.sign(hash);
+        // The SDK decodes the returned signedAuthEntry as a DecoratedSignature
+        // XDR object. It must contain the 4-byte hint (last 4 bytes of the raw
+        // public key) and the Ed25519 signature bytes.
+        const rawPublicKey = keypair.rawPublicKey();
+        const hint = rawPublicKey.slice(-4);
+        const decoratedSignature = new xdr.DecoratedSignature({
+          hint: hint,
+          signature: signature,
+        });
         return {
-          signedAuthEntry: signature.toString("base64"),
+          signedAuthEntry: decoratedSignature.toXDR("base64"),
           signerAddress: keypair.publicKey(),
         };
       },
@@ -86,16 +94,9 @@ export async function recordVerifiedWork(input: {
     work_start_ledger: input.workStartLedger ?? 0,
   });
 
-  // The contract's verifier.require_auth() generates a SorobanAddressCredentials
-  // auth entry. The SDK's signAndSend() will refuse to submit unless all such
-  // auth entries are signed first via signAuthEntries().
-  const nonInvokerSigners = transaction.needsNonInvokerSigningBy();
-  if (nonInvokerSigners.length > 0) {
-    await transaction.signAuthEntries({
-      address: keypair.publicKey(),
-    });
-  }
-
+  // The verifier keypair is set as the client's publicKey (source account /
+  // invoker). The contract's verifier.require_auth() is satisfied by the
+  // transaction envelope signature — no separate auth entries needed.
   const sent = await transaction.signAndSend();
   const claimTx = await client.get_withdrawal({
     stream_id: BigInt(input.streamId),

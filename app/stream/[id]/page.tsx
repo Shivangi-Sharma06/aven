@@ -228,20 +228,17 @@ export default function StreamDetailPage() {
     try {
       const session = sessions.find((candidate) => candidate.id === sessionId);
       if (address && session) {
-        // The old deployed contract supports approve_withdrawal and
-        // dispute_withdrawal directly from the sender's wallet (no verifier
-        // required). Call them on-chain so the withdrawal record transitions
-        // to Approved/Disputed, enabling the recipient to call withdraw_approved.
+        // The deployed contract supports approve_withdrawal and
+        // dispute_withdrawal directly from the sender's wallet. The on-chain
+        // WithdrawalRecord was already created during session submission via
+        // the verifier's verify_work call (server-side), so no on-chain call
+        // is needed here for request-withdrawal.
         if (action === "approve") await approveReviewedWithdrawal(id, address, session.id);
         if (action === "dispute") await disputeReviewedWithdrawal(id, address, session.id);
         if (action === "request-withdrawal") {
-          // Call the legacy on-chain request_withdrawal to create the withdrawal
-          // record on the old contract. The verifier-based verify_work is not
-          // available on this deployment.
-          const amountStr = session.requestedAmount ?? session.report?.paymentRequest.requestedAmount ?? "0";
-          const amountBigInt = BigInt(Math.round(parseFloat(amountStr) * 10_000_000));
-          const result = await requestWithdrawalLegacy(id, address, session.id, amountBigInt);
-          txHash = result.txHash;
+          // No on-chain call needed — the WithdrawalRecord was already created
+          // by the verifier during session submit. The server route only needs
+          // to update the session status server-side.
         }
       }
       await ensureBrowserSession();

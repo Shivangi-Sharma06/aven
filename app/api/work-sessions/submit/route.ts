@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { apiError } from "@/lib/api-response";
 import { getSession, putSession } from "@/lib/session-store";
 import { verifyReport } from "@/lib/work-verifier";
+import { recordVerifiedWork } from "@/lib/work-stream-verifier";
 import type { WorkSession, WorkSessionReport } from "@/lib/work-session";
 import { STREAM_CONTRACT_ID } from "@/lib/contracts";
 import {
@@ -38,14 +39,13 @@ export async function POST(request: Request) {
       if (!addressesEqual(existing.workerAddress, token.walletAddress)) {
         return apiError("This session belongs to another worker.", 403);
       }
-      // Allow retry for any status that is not already past the verification
-      // phase. The on-chain verify_work path is currently disabled because the
-      // deployed contract is an older version that does not support it, so
-      // sessions get stuck in VERIFYING. We skip past it.
-      if (existing.status !== "SUBMITTED" && existing.status !== "VERIFYING" && existing.status !== "VERIFICATION_COMPLETE") {
+      // Allow retry for sessions that never completed the full flow.
+      // This includes VERIFYING (on-chain timed out), SUBMITTED (reverted),
+      // and VERIFICATION_COMPLETE (already done — return it).
+      if (existing.status === "VERIFICATION_COMPLETE") {
         return NextResponse.json({ sessionId: existing.id, status: existing.status, session: existing });
       }
-      // Fall through to re-run verification if stuck.
+      // Fall through to re-run verification for VERIFYING or SUBMITTED.
     }
 
     const stream = await getOnchainStream(report.session.streamId);
@@ -146,30 +146,37 @@ export async function POST(request: Request) {
     session.verificationFlags = verification.flags;
     session.verificationSummary = verification.summary;
 
-    // On-chain verify_work is currently SKIPPED because the deployed contract
-    // is an older version that does not support it. The session is immediately
-    // marked VERIFICATION_COMPLETE so the "Request withdrawal" button appears.
-    // ── On-chain call removed ────────────────────────────────────────────────
-    // When the contract is redeployed, uncomment the block below and remove this
-    // comment. The AVEN_VERIFIER_SECRET keypair must have the verifier role on
-    // the stream contract.
+    // On-chain verify_work via the verifier keypair. This creates the
+    // WithdrawalRecord with "Pending" status, which is required because the
+    // deployed contract blocks the legacy request_withdrawal when a verifier
+    // is configured (Error #32 = VerificationRequired).
+    addTimelineEvent(session, "VERIFYING", "system", "Calling verify_work on-chain via verifier.");
+    await putSession(session);
 
-    //   const onchain = await recordVerifiedWork({
-    //     streamId: stream.id,
-    //     sessionId: session.id,
-    //     amountUnits: calculatedUnits,
-    //     report,
-    //   });
-    //   session.verifierTxHash = onchain.transactionHash;
-    //   session.reportDigest = onchain.reportDigest;
-    //   session.reviewDeadlineLedger = onchain.reviewDeadlineLedger;
+    let onchain;
+    try {
+      onchain = await recordVerifiedWork({
+        streamId: stream.id,
+        sessionId: session.id,
+        amountUnits: calculatedUnits,
+        report,
+      });
+    } catch (onchainError: any) {
+      const errorMessage = onchainError?.message ?? String(onchainError);
+      addTimelineEvent(
+        session,
+        "SUBMITTED",
+        "system",
+        `On-chain verification failed: ${errorMessage}. Resubmit to retry.`,
+      );
+      session.verificationError = errorMessage;
+      await putSession(session);
+      return apiError(`On-chain verification failed: ${errorMessage}`, 502);
+    }
 
-    // The withdrawal is reserved on-chain by the verifier. Without that step the
-    // server-side request-withdrawal route must handle the on-chain reservation
-    // on the first invocation, or use the legacy requestWithdrawalLegacy flow.
-    // For now the session goes to VERIFICATION_COMPLETE so the flow works end to
-    // end with the dashboard.
-    // ── End of on-chain skip ──────────────────────────────────────────────────
+    session.verifierTxHash = onchain.transactionHash;
+    session.reportDigest = onchain.reportDigest;
+    session.reviewDeadlineLedger = onchain.reviewDeadlineLedger;
 
     addTimelineEvent(session, "VERIFICATION_COMPLETE", "system", verification.summary);
     await putSession(session);

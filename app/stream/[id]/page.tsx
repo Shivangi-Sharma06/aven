@@ -224,7 +224,6 @@ export default function StreamDetailPage() {
     const path = `/api/work-sessions/${encodeURIComponent(sessionId)}/${action}`;
     setSessionAction(`${sessionId}:${action}`);
     setError(null);
-    let txHash: string | undefined;
     try {
       const session = sessions.find((candidate) => candidate.id === sessionId);
       if (address && session) {
@@ -244,17 +243,48 @@ export default function StreamDetailPage() {
             // Same as approve — non-blocking.
           }
         }
-        if (action === "request-withdrawal") {
-          // No on-chain call needed — server route handles it.
-        }
       }
       await ensureBrowserSession();
       const response = await fetch(path, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(txHash ? { ...(body ?? {}), txHash } : (body ?? {})),
+        body: JSON.stringify(body ?? {}),
       });
       const data = await response.json();
+
+      // ─── Verifier fallback: server says verifier is unavailable ───────
+      // When the server cannot use verify_work (wrong/missing verifier), it
+      // returns 422 with error=VERIFIER_UNAVAILABLE. In that case, we call
+      // request_withdrawal directly from the recipient's Freighter wallet
+      // (the legacy path), then retry the server route with the txHash.
+      if (
+        response.status === 422 &&
+        data.error === "VERIFIER_UNAVAILABLE" &&
+        action === "request-withdrawal" &&
+        address
+      ) {
+        const requestedUnits = BigInt(data.requestedUnits);
+        const legacyResult = await requestWithdrawalLegacy(
+          id,
+          address,
+          sessionId,
+          requestedUnits,
+        );
+        // Retry the server route with the on-chain txHash
+        const retryResponse = await fetch(path, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ txHash: legacyResult.txHash }),
+        });
+        const retryData = await retryResponse.json();
+        if (!retryResponse.ok) throw new Error(retryData.error ?? "Work-session action failed after on-chain fallback.");
+        setApproveSession(null);
+        setDisputeSession(null);
+        setDisputeReason("");
+        await loadSessions();
+        return;
+      }
+
       if (!response.ok) throw new Error(data.error ?? "Work-session action failed.");
       setApproveSession(null);
       setDisputeSession(null);

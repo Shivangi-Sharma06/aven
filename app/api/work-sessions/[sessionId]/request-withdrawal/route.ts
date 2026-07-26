@@ -10,7 +10,6 @@ import {
   calculateSettlementSeconds,
   formatAmountUnits,
   getAvailableUnits,
-  getOnchainStream,
   getSessionOnchainStream,
   parseAmountUnits,
 } from "@/lib/work-session-server";
@@ -50,6 +49,10 @@ export async function POST(
     return apiError("The stream recipient could not be verified.", 403);
   }
   try {
+    const body = await request.json().catch(() => ({})) as {
+      txHash?: string;
+      requestedUnits?: string;
+    };
     const projectEnded = session.report?.session.projectEnded === true;
     const requestedAmount = session.report?.paymentRequest.requestedAmount;
     if (!requestedAmount) return apiError("The report has no payment request.");
@@ -83,12 +86,41 @@ export async function POST(
     }
     session.requestedAmount = formatAmountUnits(requestedUnits);
 
-    // Create the on-chain WithdrawalRecord via the verifier keypair.
-    // After the admin calls set_verifier (through the /set-verifier page),
-    // the AVEN_VERIFIER_SECRET keypair will be authorized to call verify_work.
     addTimelineEvent(session, "WITHDRAWAL_REQUESTED", "worker", "Creating on-chain withdrawal record.");
     await putSession(session);
 
+    // ─── Path 1: Frontend already submitted request_withdrawal on-chain ────
+    // The frontend sends txHash when it called request_withdrawal via Freighter
+    // (the legacy/direct path that works when no verifier is configured).
+    const frontendTxHash = body.txHash?.trim();
+    if (frontendTxHash && /^[a-f\d]{64}$/i.test(frontendTxHash)) {
+      session.verifierTxHash = frontendTxHash.toLowerCase();
+      // Use a reasonable review deadline based on stream's approval timeout
+      session.reviewDeadlineLedger = 0; // will rely on reviewDeadlineAt
+      addTimelineEvent(
+        session,
+        "WITHDRAWAL_REQUESTED",
+        "worker",
+        projectEnded
+          ? `Reserved the final ${session.requestedAmount} ${stream.asset} settlement via direct on-chain request.`
+          : `Reserved ${session.requestedAmount} ${stream.asset} via direct on-chain request.`,
+      );
+      session.reviewDeadlineAt = new Date(
+        Date.now() + Math.max(stream.approvalTimeoutLedgers, 1) * 5_000,
+      ).toISOString();
+      addTimelineEvent(
+        session,
+        "PENDING_CLIENT_REVIEW",
+        "system",
+        projectEnded
+          ? "Final project settlement submitted for client review."
+          : "Client review window opened.",
+      );
+      await putSession(session);
+      return NextResponse.json(session);
+    }
+
+    // ─── Path 2: Server-side verify_work via the verifier keypair ──────────
     let reviewDeadlineLedger: number;
     try {
       const onchain = await recordVerifiedWork({
@@ -101,10 +133,31 @@ export async function POST(
       reviewDeadlineLedger = onchain.reviewDeadlineLedger;
     } catch (onchainError: any) {
       const errorMessage = onchainError?.message ?? String(onchainError);
-      // If set_verifier hasn't been called yet, the verifier will be rejected.
-      // Revert to VERIFICATION_COMPLETE so the user can retry later.
+      const isVerifierMismatch =
+        errorMessage.includes("verifier") ||
+        errorMessage.includes("set_verifier") ||
+        errorMessage.includes("AVEN_VERIFIER_SECRET") ||
+        errorMessage.includes("VerifierNotConfigured") ||
+        errorMessage.includes("needsNonInvokerSigningBy");
+
+      if (isVerifierMismatch) {
+        // Revert to VERIFICATION_COMPLETE so the frontend can retry via
+        // the legacy request_withdrawal path (Freighter-signed).
+        addTimelineEvent(session, "VERIFICATION_COMPLETE", "system",
+          `Server verifier path unavailable. Falling back to direct on-chain request.`);
+        await putSession(session);
+        return NextResponse.json(
+          {
+            error: "VERIFIER_UNAVAILABLE",
+            message: "The server verifier is not registered on this contract. The withdrawal will be submitted directly from your wallet.",
+            requestedUnits: requestedUnits.toString(),
+          },
+          { status: 422 },
+        );
+      }
+      // Non-verifier error — revert and report
       addTimelineEvent(session, "VERIFICATION_COMPLETE", "system",
-        `On-chain withdrawal failed: ${errorMessage}. Try again after set_verifier.`);
+        `On-chain withdrawal failed: ${errorMessage}.`);
       session.verificationError = errorMessage;
       await putSession(session);
       return apiError(`On-chain withdrawal failed: ${errorMessage}`, 502);

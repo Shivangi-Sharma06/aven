@@ -114,7 +114,6 @@ export interface AttestationRecord {
   sender: string;
   stream_id: u64;
   title: string;
-  verifier: Option<string>;
 }
 
 export interface Client {

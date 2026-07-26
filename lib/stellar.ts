@@ -465,12 +465,8 @@ export async function disputeReviewedWithdrawal(
 }
 
 /**
- * Call the legacy request_withdrawal on the stream contract from the recipient's wallet.
- * This bypasses the verifier path (which requires a configured verifier on the contract).
+ * Call request_withdrawal on the stream contract from the recipient's wallet.
  * The recipient must sign the transaction via Freighter.
- *
- * @throws if the contract has a verifier configured (VerificationRequired) or if the
- *         withdrawal already exists or the amount exceeds the unreserved escrow.
  */
 export async function requestWithdrawalLegacy(
   streamId: string,

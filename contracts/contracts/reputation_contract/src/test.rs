@@ -61,7 +61,6 @@ impl MockAttestation {
                 minted_at_ledger: 2,
                 client_confirmed,
                 auto_released: !client_confirmed,
-                verifier: None,
                 report_hash: None::<BytesN<32>>,
             },
         );
@@ -100,7 +99,7 @@ fn score_is_zero_until_stream_completion() {
         &recipient,
         &100_000_000,
         &Category::Freelance,
-        &AttestationKind::WorkSession,
+        &AttestationKind::LegacyReviewed,
         &true,
     );
     assert_eq!(client.compute_score(&recipient), 0);
@@ -115,7 +114,7 @@ fn score_is_calculated_once_from_completion_record() {
         &recipient,
         &100_000_000,
         &Category::Freelance,
-        &AttestationKind::WorkSession,
+        &AttestationKind::LegacyReviewed,
         &true,
     );
     mock.add(

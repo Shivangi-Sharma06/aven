@@ -116,7 +116,7 @@
                     "val": {
                       "vec": [
                         {
-                          "symbol": "WorkSession"
+                          "symbol": "LegacyReviewed"
                         }
                       ]
                     }
@@ -190,12 +190,6 @@
                     "val": {
                       "string": "Work"
                     }
-                  },
-                  {
-                    "key": {
-                      "symbol": "verifier"
-                    },
-                    "val": "void"
                   }
                 ]
               }

@@ -34,7 +34,6 @@ impl MockAttestationContract {
         _active_duration_seconds: u64,
         _client_confirmed: bool,
         _auto_released: bool,
-        _verifier: Option<Address>,
         _report_hash: Option<BytesN<32>>,
     ) -> u64 {
         caller.require_auth();

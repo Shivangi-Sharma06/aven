@@ -50,7 +50,6 @@ fn mint_sample(
         &0,  // active_duration_seconds
         &true, // client_confirmed
         &false, // auto_released
-        &None, // verifier
         &None::<BytesN<32>>, // report_hash
     )
 }
@@ -74,7 +73,6 @@ fn test_mint_success() {
     assert_eq!(record.active_duration_seconds, 0);
     assert!(record.client_confirmed);
     assert!(!record.auto_released);
-    assert_eq!(record.verifier, None);
     assert_eq!(record.report_hash, None);
 }
 
@@ -100,7 +98,6 @@ fn test_mint_only_by_stream_contract() {
         &0,
         &true,
         &false,
-        &Some(Address::generate(&env)),
         &Some(BytesN::from_array(&env, &[8; 32])),
     );
     assert_eq!(res.unwrap_err().unwrap(), Error::Unauthorized);
@@ -146,7 +143,6 @@ fn test_invalid_payment_rejected() {
         &0,
         &true,
         &false,
-        &None,
         &None::<BytesN<32>>,
     );
     assert_eq!(res.unwrap_err().unwrap(), Error::InvalidPayment);
@@ -173,7 +169,6 @@ fn test_invalid_ledger_range_rejected() {
         &0,
         &true,
         &false,
-        &None,
         &None::<BytesN<32>>,
     );
     assert_eq!(res.unwrap_err().unwrap(), Error::InvalidLedgerRange);
@@ -204,7 +199,6 @@ fn test_title_too_long_rejected() {
         &0,
         &true,
         &false,
-        &None,
         &None::<BytesN<32>>,
     );
     assert_eq!(res.unwrap_err().unwrap(), Error::TitleTooLong);
@@ -233,8 +227,7 @@ fn test_get_recipient_attestations() {
         &0,
         &true,
         &false,
-        &Some(Address::generate(&env)),
-        &Some(BytesN::from_array(&env, &[8; 32])),
+        &None::<BytesN<32>>,
     );
     
     let attestations = client.get_recipient_attestations(&recipient);
@@ -267,7 +260,7 @@ fn test_get_sender_attestations() {
 
     let id2 = client.mint_attestation(
         &stream_contract,
-        &AttestationKind::WorkSession,
+        &AttestationKind::LegacyReviewed,
         &8,
         &String::from_str(&env, "ws-2"),
         &0,
@@ -282,7 +275,6 @@ fn test_get_sender_attestations() {
         &3600,
         &true,
         &false,
-        &Some(Address::generate(&env)),
         &Some(BytesN::from_array(&env, &[8; 32])),
     );
 
@@ -293,14 +285,14 @@ fn test_get_sender_attestations() {
 }
 
 #[test]
-fn test_duplicate_work_session_attestation_rejected() {
+fn test_duplicate_legacy_reviewed_attestation_rejected() {
     let (env, client, stream_contract, sender, recipient) = setup();
     let evidence = BytesN::from_array(&env, &[42u8; 32]);
 
     // First mint should succeed
     let id = client.mint_attestation(
         &stream_contract,
-        &AttestationKind::WorkSession,
+        &AttestationKind::LegacyReviewed,
         &7,
         &String::from_str(&env, "session-1"),
         &0,
@@ -315,7 +307,6 @@ fn test_duplicate_work_session_attestation_rejected() {
         &3600,
         &true,
         &false,
-        &Some(Address::generate(&env)),
         &Some(evidence.clone()),
     );
     assert!(id > 0);
@@ -323,7 +314,7 @@ fn test_duplicate_work_session_attestation_rejected() {
     // Second mint with same stream_id + request_id should fail
     let res = client.try_mint_attestation(
         &stream_contract,
-        &AttestationKind::WorkSession,
+        &AttestationKind::LegacyReviewed,
         &7,
         &String::from_str(&env, "session-1"),
         &0,
@@ -338,7 +329,6 @@ fn test_duplicate_work_session_attestation_rejected() {
         &3600,
         &true,
         &false,
-        &Some(Address::generate(&env)),
         &Some(evidence),
     );
     assert_eq!(res.unwrap_err().unwrap(), Error::DuplicateAttestation);

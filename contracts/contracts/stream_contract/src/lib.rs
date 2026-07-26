@@ -512,7 +512,6 @@ impl StreamContract {
             client_confirmed,
             auto_released,
             None,
-            None,
         )?;
 
         // Reputation consumes only this one completion record, so the score is
@@ -529,7 +528,6 @@ impl StreamContract {
                 0,
                 client_confirmed,
                 auto_released,
-                None,
                 None,
             )?;
         }
@@ -723,7 +721,6 @@ fn mint_attestation(
     active_duration_seconds: u64,
     client_confirmed: bool,
     auto_released: bool,
-    verifier: Option<Address>,
     report_hash: Option<BytesN<32>>,
 ) -> Result<u64, Error> {
     let attestation_contract: Address = env
@@ -749,7 +746,6 @@ fn mint_attestation(
         active_duration_seconds.into_val(env),
         client_confirmed.into_val(env),
         auto_released.into_val(env),
-        verifier.into_val(env),
         report_hash.into_val(env),
     ];
     Ok(env.invoke_contract(

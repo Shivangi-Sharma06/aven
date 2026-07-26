@@ -1,6 +1,6 @@
 {
   "generators": {
-    "address": 6,
+    "address": 7,
     "nonce": 0,
     "mux_id": 0
   },
@@ -43,7 +43,7 @@
                 {
                   "vec": [
                     {
-                      "symbol": "Checkpoint"
+                      "symbol": "LegacyReviewed"
                     }
                   ]
                 },
@@ -51,7 +51,7 @@
                   "u64": "7"
                 },
                 {
-                  "string": ""
+                  "string": "session-1"
                 },
                 {
                   "u32": 0
@@ -76,7 +76,7 @@
                   ]
                 },
                 {
-                  "string": "Design sprint"
+                  "string": "Work session 1"
                 },
                 {
                   "u32": 10
@@ -85,7 +85,7 @@
                   "u32": 20
                 },
                 {
-                  "u64": "0"
+                  "u64": "3600"
                 },
                 {
                   "bool": true
@@ -93,7 +93,9 @@
                 {
                   "bool": false
                 },
-                "void"
+                {
+                  "bytes": "2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a"
+                }
               ]
             }
           },
@@ -178,7 +180,7 @@
                       "symbol": "active_duration_seconds"
                     },
                     "val": {
-                      "u64": "0"
+                      "u64": "3600"
                     }
                   },
                   {
@@ -248,7 +250,7 @@
                     "val": {
                       "vec": [
                         {
-                          "symbol": "Checkpoint"
+                          "symbol": "LegacyReviewed"
                         }
                       ]
                     }
@@ -289,14 +291,16 @@
                     "key": {
                       "symbol": "report_hash"
                     },
-                    "val": "void"
+                    "val": {
+                      "bytes": "2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a"
+                    }
                   },
                   {
                     "key": {
                       "symbol": "request_id"
                     },
                     "val": {
-                      "string": ""
+                      "string": "session-1"
                     }
                   },
                   {
@@ -320,7 +324,7 @@
                       "symbol": "title"
                     },
                     "val": {
-                      "string": "Design sprint"
+                      "string": "Work session 1"
                     }
                   }
                 ]
@@ -386,6 +390,36 @@
                     "u64": "1"
                   }
                 ]
+              }
+            }
+          },
+          "ext": "v0"
+        },
+        "live_until": 535680
+      },
+      {
+        "entry": {
+          "last_modified_ledger_seq": 0,
+          "data": {
+            "contract_data": {
+              "ext": "v0",
+              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
+              "key": {
+                "vec": [
+                  {
+                    "symbol": "WorkSessionAttestation"
+                  },
+                  {
+                    "u64": "7"
+                  },
+                  {
+                    "string": "session-1"
+                  }
+                ]
+              },
+              "durability": "persistent",
+              "val": {
+                "u64": "1"
               }
             }
           },

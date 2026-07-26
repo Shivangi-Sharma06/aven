@@ -97,7 +97,6 @@ impl AttestationContract {
         active_duration_seconds: u64,
         client_confirmed: bool,
         auto_released: bool,
-        verifier: Option<Address>,
         report_hash: Option<BytesN<32>>,
     ) -> Result<u64, Error> {
         caller.require_auth();
@@ -120,18 +119,8 @@ impl AttestationContract {
             return Err(Error::TitleTooLong);
         }
 
-        // Session records must prove they came through the configured verifier flow.
-        if kind == AttestationKind::WorkSession
-            && (request_id.is_empty()
-                || active_duration_seconds == 0
-                || verifier.is_none()
-                || report_hash.is_none())
-        {
-            return Err(Error::InvalidWorkSession);
-        }
-
-        // Duplicate prevention for WorkSession and LegacyReviewed kinds.
-        if kind == AttestationKind::WorkSession || kind == AttestationKind::LegacyReviewed {
+        // Duplicate prevention for LegacyReviewed kind.
+        if kind == AttestationKind::LegacyReviewed {
             if request_id.is_empty() || request_id.len() > MAX_REQUEST_ID_LEN {
                 return Err(Error::InvalidRequestId);
             }
@@ -182,7 +171,6 @@ impl AttestationContract {
             minted_at_ledger: env.ledger().sequence(),
             client_confirmed,
             auto_released,
-            verifier,
             report_hash,
         };
 
@@ -192,8 +180,8 @@ impl AttestationContract {
             .persistent()
             .extend_ttl(&key, LEDGER_BUMP, LEDGER_BUMP);
 
-        // Store duplicate-prevention key for WorkSession / LegacyReviewed
-        if kind == AttestationKind::WorkSession || kind == AttestationKind::LegacyReviewed {
+        // Store duplicate-prevention key for LegacyReviewed
+        if kind == AttestationKind::LegacyReviewed {
             let dup_key =
                 DataKey::WorkSessionAttestation(stream_id, request_id);
             env.storage().persistent().set(&dup_key, &id);

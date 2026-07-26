@@ -47,7 +47,6 @@ pub enum Category {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AttestationKind {
     Checkpoint,       // legacy finalized checkpoint payment
-    WorkSession,      // verified npm work-session payment (verifier-backed)
     LegacyReviewed,   // legacy request_withdrawal path (no verifier)
     StreamCompletion, // one final record used for reputation scoring
 }
@@ -108,6 +107,5 @@ pub struct AttestationRecord {
     pub minted_at_ledger: u32,
     pub client_confirmed: bool,
     pub auto_released: bool,          // true when deadline expired without client action
-    pub verifier: Option<Address>,    // None for checkpoint / legacy paths
     pub report_hash: Option<BytesN<32>>, // SHA-256 of verification report; None otherwise
 }

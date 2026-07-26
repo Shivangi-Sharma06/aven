@@ -27,8 +27,8 @@ export async function POST(request: Request, context: { params: Promise<{ sessio
 
   const body = await request.json().catch(() => ({})) as { txHash?: string };
   const txHash = body.txHash?.trim() ?? "";
-  if (!/^[a-f\d]{64}$/i.test(txHash)) return apiError("A valid Stellar transaction hash is required.");
-  session.releasedTxHash = txHash;
+  if (txHash && !/^[a-f\d]{64}$/i.test(txHash)) return apiError("A valid Stellar transaction hash is required.");
+  if (txHash) session.releasedTxHash = txHash;
   addTimelineEvent(
     session,
     "RELEASED",

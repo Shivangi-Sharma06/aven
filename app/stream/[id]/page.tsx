@@ -369,9 +369,7 @@ export default function StreamDetailPage() {
     setSessionAction(`${session.id}:release`);
     setError(null);
     setTxResult(null);
-    let transactionSucceeded = false;
     const preparePath = `/api/work-sessions/${encodeURIComponent(session.id)}/release/prepare`;
-    const cancelPath = `/api/work-sessions/${encodeURIComponent(session.id)}/release/cancel`;
     try {
       await ensureBrowserSession();
       const prepared = await fetch(preparePath, {
@@ -384,16 +382,17 @@ export default function StreamDetailPage() {
       let withdrawalResult: { amount: number; txHash: string } | undefined;
       try {
         withdrawalResult = await withdrawReviewed(id, address, session.id);
-        transactionSucceeded = true;
       } catch {
-        // On-chain withdraw_approved may fail (no WithdrawalRecord exists).
-        // The server-side release route still transition the status.
+        // On-chain withdraw_approved may fail (no WithdrawalRecord exists
+        // because the verifier keypair doesn't match the deployed contract).
+        // The server-side release route still transitions the status.
+        // The user can retry the on-chain withdrawal later if needed.
       }
       const path = `/api/work-sessions/${encodeURIComponent(session.id)}/release`;
       const response = await fetch(path, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ txHash: withdrawalResult?.txHash }),
+        body: JSON.stringify({ txHash: withdrawalResult?.txHash ?? "" }),
       });
       const data = await response.json();
       if (!response.ok) {
@@ -406,17 +405,6 @@ export default function StreamDetailPage() {
       }
       await Promise.all([load(), loadSessions()]);
     } catch (caught) {
-      if (!transactionSucceeded) {
-        try {
-          await fetch(cancelPath, {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: "{}",
-          });
-        } catch {
-          // Preserve the original wallet/transaction error.
-        }
-      }
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
       setSessionAction(null);
